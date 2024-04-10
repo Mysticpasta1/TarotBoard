@@ -4,6 +4,7 @@ plugins {
     id 'org.javamodularity.moduleplugin' version '1.8.12'
     id 'org.openjfx.javafxplugin' version '0.0.13'
     id 'org.beryx.jlink' version '2.25.0'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
 }
 
 group 'com.mystic'
@@ -34,8 +35,17 @@ javafx {
     modules = ['javafx.controls', 'javafx.fxml']
 }
 
-dependencies {
+repositories {
+    mavenCentral()
+}
 
+dependencies {
+    implementation 'org.openjfx:javafx-controls:16'
+    implementation 'org.openjfx:javafx-fxml:16'
+    implementation 'org.openjfx:javafx-graphics:16'
+    implementation 'org.openjfx:javafx-base:16'
+    implementation 'org.openjfx:javafx-media:16'
+    implementation 'org.openjfx:javafx-web:16'
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
 }
@@ -54,4 +64,10 @@ jlink {
 
 jlinkZip {
     group = 'distribution'
+}
+
+shadowJar {
+    manifest {
+        attributes 'Main-Class': "com.mystic.playingcardgame.SolitaireApplication"
+    }
 }
