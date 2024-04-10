@@ -1,4 +1,4 @@
-module com.mystic.pcg {
+module com.mystic.playingcardgame {
     requires javafx.controls;
     requires javafx.fxml;
 
