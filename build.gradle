@@ -2,7 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'org.javamodularity.moduleplugin' version '1.8.12'
-    id 'org.openjfx.javafxplugin' version '0.0.13'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
     id 'org.beryx.jlink' version '2.25.0'
     id 'com.github.johnrengelman.shadow' version '7.0.0'
 }
@@ -30,18 +30,17 @@ application {
     mainClass = 'com.mystic.playingcardgame.SolitaireApplication'
 }
 
-javafx {
-    version = '22-ea+11'
-    modules = ['javafx.controls', 'javafx.fxml']
-}
-
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation 'org.openjfx:javafx-controls:16'
-    implementation 'org.openjfx:javafx-fxml:16'
+    implementation('org.openjfx:javafx-controls:16') {
+        exclude group: 'org.openjfx', module: 'javafx-graphics'
+    }
+    implementation('org.openjfx:javafx-fxml:16') {
+        exclude group: 'org.openjfx', module: 'javafx-graphics'
+    }
     implementation 'org.openjfx:javafx-graphics:16'
     implementation 'org.openjfx:javafx-base:16'
     implementation 'org.openjfx:javafx-media:16'
@@ -66,8 +65,27 @@ jlinkZip {
     group = 'distribution'
 }
 
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'com.mystic.playingcardgame.SolitaireApplication'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it).matching {
+            exclude 'module-info.class'
+            exclude 'META-INF/substrate/'
+
+        } }
+    }
+}
+
 shadowJar {
     manifest {
         attributes 'Main-Class': "com.mystic.playingcardgame.SolitaireApplication"
     }
+}
+
+application {
+    mainClassName = 'com.mystic.playingcardgame.SolitaireApplication'
 }
