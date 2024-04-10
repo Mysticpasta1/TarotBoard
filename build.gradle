@@ -26,8 +26,8 @@ tasks.withType(JavaCompile) {
 }
 
 application {
-    mainModule = 'com.mystic.pcg'
-    mainClass = 'com.mystic.pcg.SolitaireApplication'
+    mainModule = 'com.mystic.playingcardgame'
+    mainClass = 'com.mystic.playingcardgame.SolitaireApplication'
 }
 
 javafx {
