@@ -1,4 +1,4 @@
-package com.mystic.pcg;
+package com.mystic.playingcardgame;
 
 import javafx.application.Application;
 import javafx.collections.FXCollections;
@@ -9,8 +9,6 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;

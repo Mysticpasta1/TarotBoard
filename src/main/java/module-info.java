@@ -3,6 +3,6 @@ module com.mystic.pcg {
     requires javafx.fxml;
 
 
-    opens com.mystic.pcg to javafx.fxml;
-    exports com.mystic.pcg;
+    opens com.mystic.playingcardgame to javafx.fxml;
+    exports com.mystic.playingcardgame;
 }
