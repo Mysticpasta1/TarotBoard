@@ -107,7 +107,6 @@ public class SolitaireApplication extends Application {
         primaryStage.setY(screenBounds.getMinY());
         primaryStage.setWidth(screenBounds.getWidth());
         primaryStage.setHeight(screenBounds.getHeight());
-
         primaryStage.show();
     }
 
@@ -121,12 +120,13 @@ public class SolitaireApplication extends Application {
                     ImageView cardFrontImageView = (ImageView) cardPane.getChildren().get(1);
                     Text cardNameText = (Text) cardPane.getChildren().get(2);
 
+                    cardBackImageView.setRotate(0);
+                    cardFrontImageView.setRotate(0);
+                    cardNameText.setRotate(0);
                     cardBackImageView.setVisible(true);
                     cardFrontImageView.setVisible(false);
                     cardNameText.setVisible(false);
-                    cardBackImageView.setRotate(0);
-                    cardBackImageView.setRotate(0);
-                    cardNameText.setRotate(0);
+                    rotationAngle = 0;
 
                     // Reset the position of the card pane
                     cardPane.setTranslateX(0);
@@ -149,10 +149,10 @@ public class SolitaireApplication extends Application {
     private void makeFlippableAndRotatable(Pane pane) {
         pane.setOnMouseClicked(event -> {
             if(event.getButton() == MouseButton.PRIMARY) {
+                Node front = null;
+                Node back = null;
+                Node text = null;
                 if (event.isShiftDown()) {
-                    Node front = null;
-                    Node back = null;
-                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
                             if (imageView.isVisible()) {
@@ -173,9 +173,6 @@ public class SolitaireApplication extends Application {
                         pane.toFront();
                     }
                 } else {
-                    Node front = null;
-                    Node back = null;
-                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
                             if (imageView.isVisible()) {
