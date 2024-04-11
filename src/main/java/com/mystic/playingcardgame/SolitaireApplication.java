@@ -6,6 +6,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
@@ -43,6 +44,8 @@ public class SolitaireApplication extends Application {
         BackgroundSize backgroundSize = new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, true, false);
         BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.DEFAULT, backgroundSize);
         root.setBackground(new Background(background));
+
+        StackPane[] cardPanes = new StackPane[NUM_CARDS]; // Array to store card panes
 
         // Create and position cards in the stack
         for (int i = 0; i < NUM_CARDS; i++) {
@@ -82,17 +85,60 @@ public class SolitaireApplication extends Application {
             makeDraggable(cardPane);
             makeFlippable(cardPane);
 
+            // Add the card pane to the array
+            cardPanes[i] = cardPane;
+
             // Add the card to the root pane
             root.getChildren().add(cardPane);
-            primaryStage.setScene(scene);
-            primaryStage.setX(screenBounds.getMinX());
-            primaryStage.setY(screenBounds.getMinY());
-            primaryStage.setWidth(screenBounds.getWidth());
-            primaryStage.setHeight(screenBounds.getHeight());
-
-            primaryStage.show();
         }
+
+        Button reshuffleButton = getReshuffleButton(root, cardPanes, screenBounds);
+        reshuffleButton.layoutXProperty().bind(scene.widthProperty().subtract(reshuffleButton.widthProperty()).subtract(110)); // 10 pixels from the right edge
+        reshuffleButton.layoutYProperty().bind(scene.heightProperty().subtract(reshuffleButton.heightProperty()).subtract(110)); // 10 pixels from the bottom edge
+
+        root.getChildren().add(reshuffleButton);
+
+        primaryStage.setScene(scene);
+        primaryStage.setX(screenBounds.getMinX());
+        primaryStage.setY(screenBounds.getMinY());
+        primaryStage.setWidth(screenBounds.getWidth());
+        primaryStage.setHeight(screenBounds.getHeight());
+
+        primaryStage.show();
     }
+
+    private Button getReshuffleButton(Pane root, StackPane[] cardPanes, Rectangle2D screenBounds) {
+        Button reshuffleButton = new Button("Reshuffle");
+        reshuffleButton.setOnAction(event -> {
+            for (Node node : root.getChildren()) {
+                if (node instanceof StackPane) {
+                    StackPane cardPane = (StackPane) node;
+                    ImageView cardBackImageView = (ImageView) cardPane.getChildren().get(0);
+                    ImageView cardFrontImageView = (ImageView) cardPane.getChildren().get(1);
+                    Text cardNameText = (Text) cardPane.getChildren().get(2);
+
+                    cardBackImageView.setVisible(true);
+                    cardFrontImageView.setVisible(false);
+                    cardNameText.setVisible(false);
+
+                    // Reset the position of the card pane
+                    cardPane.setTranslateX(0);
+                    cardPane.setTranslateY(0);
+                }
+            }
+
+            String[] cardNames2 = generateShuffledCardNames();
+
+            // Update the card names
+            for (int a = 0; a < NUM_CARDS; a++) {
+                Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
+                cardNameText.setText(cardNames2[a]);
+            }
+        });
+
+        return reshuffleButton;
+    }
+
 
     private void makeFlippable(Pane pane) {
         pane.setOnMouseClicked(event -> {
