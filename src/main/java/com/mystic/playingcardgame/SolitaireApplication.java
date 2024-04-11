@@ -124,6 +124,9 @@ public class SolitaireApplication extends Application {
                     cardBackImageView.setVisible(true);
                     cardFrontImageView.setVisible(false);
                     cardNameText.setVisible(false);
+                    cardBackImageView.setRotate(0);
+                    cardBackImageView.setRotate(0);
+                    cardNameText.setRotate(0);
 
                     // Reset the position of the card pane
                     cardPane.setTranslateX(0);
@@ -147,14 +150,27 @@ public class SolitaireApplication extends Application {
         pane.setOnMouseClicked(event -> {
             if(event.getButton() == MouseButton.PRIMARY) {
                 if (event.isShiftDown()) {
+                    Node front = null;
+                    Node back = null;
+                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
-                            imageView.setRotate(rotationAngle++);
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
                         }
 
-                        if (node instanceof Text text) {
-                            text.setRotate(rotationAngle++);
+                        if (node instanceof Text text1) {
+                            text = text1;
                         }
+                    }
+                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                        front.setRotate(rotationAngle++);
+                        back.setRotate(rotationAngle++);
+                        text.setRotate(rotationAngle++);
+                        pane.toFront();
                     }
                 } else {
                     Node front = null;
@@ -178,41 +194,79 @@ public class SolitaireApplication extends Application {
                         text.setVisible(!front.isVisible() && !text.isVisible());
                         back.setVisible(!back.isVisible());
                         pane.toFront();
-
                     }
                 }
             } else if (event.getButton() == MouseButton.SECONDARY) {
                 if (event.isShiftDown()) {
+                    Node front = null;
+                    Node back = null;
+                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
-                            imageView.setRotate(rotationAngle--);
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
                         }
 
-                        if (node instanceof Text text) {
-                            text.setRotate(rotationAngle--);
+                        if (node instanceof Text text1) {
+                            text = text1;
                         }
+                    }
+                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                        front.setRotate(rotationAngle--);
+                        back.setRotate(rotationAngle--);
+                        text.setRotate(rotationAngle--);
+                        pane.toFront();
                     }
                 } else if (event.isControlDown()) {
+                    Node front = null;
+                    Node back = null;
+                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
-                            imageView.setRotate(rotationAngle);
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
                         }
 
-                        if (node instanceof Text text) {
-                            text.setRotate(rotationAngle);
+                        if (node instanceof Text text1) {
+                            text = text1;
                         }
                     }
-                    rotationAngle = rotationAngle + 45;
+                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                        front.setRotate(rotationAngle);
+                        back.setRotate(rotationAngle);
+                        text.setRotate(rotationAngle);
+                        pane.toFront();
+                    }
+                    rotationAngle = rotationAngle + 90;
                 } else {
                     rotationAngle = 0;
+                    Node front = null;
+                    Node back = null;
+                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
-                            imageView.setRotate(rotationAngle);
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
                         }
 
-                        if (node instanceof Text text) {
-                            text.setRotate(rotationAngle);
+                        if (node instanceof Text text1) {
+                            text = text1;
                         }
+                    }
+                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                        front.setRotate(rotationAngle);
+                        back.setRotate(rotationAngle);
+                        text.setRotate(rotationAngle);
+                        pane.toFront();
                     }
                 }
             }
