@@ -1,20 +1,26 @@
 package com.mystic.playingcardgame;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -24,9 +30,7 @@ public class SolitaireApplication extends Application {
     private static final int NUM_CARDS = 1024;
     private static final double CARD_WIDTH = 200;
     private static final double CARD_HEIGHT = 300;
-    private static final int NUM_WIN_PILES = 32;
-    private static final int NUM_ROWS = 8;
-    private static boolean moving = false;
+    private int rotationAngle = 0;
 
     @Override
     public void start(Stage primaryStage) {
@@ -83,7 +87,7 @@ public class SolitaireApplication extends Application {
 
             // Make the card movable
             makeDraggable(cardPane);
-            makeFlippable(cardPane);
+            makeFlippableAndRotatable(cardPane);
 
             // Add the card pane to the array
             cardPanes[i] = cardPane;
@@ -92,7 +96,7 @@ public class SolitaireApplication extends Application {
             root.getChildren().add(cardPane);
         }
 
-        Button reshuffleButton = getReshuffleButton(root, cardPanes, screenBounds);
+        Button reshuffleButton = getReshuffleButton(root, cardPanes);
         reshuffleButton.layoutXProperty().bind(scene.widthProperty().subtract(reshuffleButton.widthProperty()).subtract(110)); // 10 pixels from the right edge
         reshuffleButton.layoutYProperty().bind(scene.heightProperty().subtract(reshuffleButton.heightProperty()).subtract(110)); // 10 pixels from the bottom edge
 
@@ -107,7 +111,7 @@ public class SolitaireApplication extends Application {
         primaryStage.show();
     }
 
-    private Button getReshuffleButton(Pane root, StackPane[] cardPanes, Rectangle2D screenBounds) {
+    private Button getReshuffleButton(Pane root, StackPane[] cardPanes) {
         Button reshuffleButton = new Button("Reshuffle");
         reshuffleButton.setOnAction(event -> {
             for (Node node : root.getChildren()) {
@@ -139,31 +143,78 @@ public class SolitaireApplication extends Application {
         return reshuffleButton;
     }
 
-
-    private void makeFlippable(Pane pane) {
+    private void makeFlippableAndRotatable(Pane pane) {
         pane.setOnMouseClicked(event -> {
-            Node front = null;
-            Node back = null;
-            Node text = null;
-            for (Node node : pane.getChildren()) {
-                if (node instanceof ImageView) {
-                    ImageView imageView = (ImageView) node;
-                    if (imageView.isVisible()) {
-                        front = imageView;
-                    } else {
-                        back = imageView;
+            if(event.getButton() == MouseButton.PRIMARY) {
+                if (event.isShiftDown()) {
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            imageView.setRotate(rotationAngle++);
+                        }
+
+                        if (node instanceof Text text) {
+                            text.setRotate(rotationAngle++);
+                        }
+                    }
+                } else {
+                    Node front = null;
+                    Node back = null;
+                    Node text = null;
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
+                        }
+
+                        if (node instanceof Text text1) {
+                            text = text1;
+                        }
+                    }
+                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                        front.setVisible(!front.isVisible());
+                        text.setVisible(!front.isVisible() && !text.isVisible());
+                        back.setVisible(!back.isVisible());
+                        pane.toFront();
+
                     }
                 }
+            } else if (event.getButton() == MouseButton.SECONDARY) {
+                if (event.isShiftDown()) {
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            imageView.setRotate(rotationAngle--);
+                        }
 
-                if (node instanceof Text text1) {
-                    text = text1;
+                        if (node instanceof Text text) {
+                            text.setRotate(rotationAngle--);
+                        }
+                    }
+                } else if (event.isControlDown()) {
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            imageView.setRotate(rotationAngle);
+                        }
+
+                        if (node instanceof Text text) {
+                            text.setRotate(rotationAngle);
+                        }
+                    }
+                    rotationAngle = rotationAngle + 45;
+                } else {
+                    rotationAngle = 0;
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            imageView.setRotate(rotationAngle);
+                        }
+
+                        if (node instanceof Text text) {
+                            text.setRotate(rotationAngle);
+                        }
+                    }
                 }
-            }
-            if (front != null && back != null && text != null && event.isStillSincePress()) {
-                front.setVisible(!front.isVisible());
-                text.setVisible(!front.isVisible() && !text.isVisible());
-                back.setVisible(!back.isVisible());
-                pane.toFront();
             }
         });
     }
