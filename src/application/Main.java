@@ -1,7 +1,5 @@
-package com.mystic.playingcardgame;
+package application;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -25,9 +23,9 @@ import javafx.util.Duration;
 import java.util.Collections;
 import java.util.Objects;
 
-public class SolitaireApplication extends Application {
+public class Main extends Application {
 
-    private static final int NUM_CARDS = 1024;
+    private static final int NUM_CARDS = 1058;
     private static final double CARD_WIDTH = 200;
     private static final double CARD_HEIGHT = 300;
     private int rotationAngle = 0;
@@ -103,6 +101,7 @@ public class SolitaireApplication extends Application {
         root.getChildren().add(reshuffleButton);
 
         primaryStage.setScene(scene);
+        primaryStage.setTitle("1024 Playing Card Deck");
         primaryStage.setX(screenBounds.getMinX());
         primaryStage.setY(screenBounds.getMinY());
         primaryStage.setWidth(screenBounds.getWidth());
@@ -305,6 +304,41 @@ public class SolitaireApplication extends Application {
                 cardNames.add(value + " of " + suit);
             }
         }
+
+        cardNames.add("Blessings of Heart (Will)");
+        cardNames.add("Follow of Soul (Will)");
+        cardNames.add("Call of Light (Will))");
+        cardNames.add("Whisper of Dark (Will))");
+        cardNames.add("Judgement (Will)");
+        cardNames.add("Chorus (Will)");
+        cardNames.add("Dawn of Death (Will)");
+        cardNames.add("Night of Wrath (Will)");
+        cardNames.add("Voice (Will)");
+        cardNames.add("Voices (Will)");
+        cardNames.add("Mother (Will)");
+        cardNames.add("Father (Will)");
+        cardNames.add("Brother (Will)");
+        cardNames.add("Sister (Will)");
+        cardNames.add("Duality (Will)");
+        cardNames.add("Husband (Will)");
+        cardNames.add("Wife (Will)");
+        cardNames.add("Progeny (Will)");
+        cardNames.add("Corridor (Will)");
+        cardNames.add("Field (Will)");
+        cardNames.add("Intellect (Will)");
+        cardNames.add("Brawn (Will)");
+        cardNames.add("Hope (Will)");
+        cardNames.add("Despair (Will)");
+        cardNames.add("Past (Will)");
+        cardNames.add("Present (Will)");
+        cardNames.add("Future (Will)");
+        cardNames.add("Gate (Will)");
+        cardNames.add("Sign (Will)");
+        cardNames.add("Ruin (Will)");
+        cardNames.add("Snow (Will)");
+        cardNames.add("Rain (Will)");
+        cardNames.add("Tempest (Will)");
+        cardNames.add("Lovers (Will)");
 
         // Shuffle the cards
         Collections.shuffle(cardNames);
