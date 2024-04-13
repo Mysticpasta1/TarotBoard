@@ -1,4 +1,4 @@
-package com.mystic.playingcardgame;
+package com.mystic.tarotboard;
 
 import com.traneptora.jxlatte.JXLDecoder;
 import com.traneptora.jxlatte.JXLOptions;
@@ -35,7 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class SolitaireApplication extends Application {
+public class TarotBoard extends Application {
 
     private static final int NUM_CARDS = 1024;
     private static final double CARD_WIDTH = 150;
@@ -54,7 +54,7 @@ public class SolitaireApplication extends Application {
 
         Image backgroundImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/background_image.png")));
         BackgroundSize backgroundSize = new BackgroundSize(scene.getWidth(), scene.getHeight(), false, false, true, false);
-        BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.DEFAULT, backgroundSize);
+        BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize);
         root.setBackground(new Background(background));
 
         StackPane[] cardPanes = new StackPane[NUM_CARDS]; // Array to store card panes
@@ -215,8 +215,8 @@ public class SolitaireApplication extends Application {
             }
         });
 
-        reshuffleButton.layoutXProperty().bind(scene.widthProperty().subtract(reshuffleButton.widthProperty()).subtract(110)); // 10 pixels from the right edge
-        reshuffleButton.layoutYProperty().bind(scene.heightProperty().subtract(reshuffleButton.heightProperty()).subtract(110)); // 10 pixels from the bottom edge
+        reshuffleButton.layoutXProperty().bind(scene.widthProperty().subtract(reshuffleButton.widthProperty()).subtract(50));
+        reshuffleButton.layoutYProperty().bind(scene.heightProperty().subtract(reshuffleButton.heightProperty()).subtract(50));
 
         root.getChildren().add(reshuffleButton);
 
@@ -260,7 +260,7 @@ public class SolitaireApplication extends Application {
 
     private void makeFlippableAndRotatable(Pane pane) {
         pane.setOnMouseClicked(event -> {
-            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+            if (event.getButton() == MouseButton.PRIMARY) {
                 Node front = null;
                 Node back = null;
                 Node text = null;
@@ -288,25 +288,27 @@ public class SolitaireApplication extends Application {
                         text.setRotate(rotationAngle++);
                     }
                 } else {
-                    for (Node node : pane.getChildren()) {
-                        if (node instanceof ImageView imageView) {
-                            if (imageView.isVisible()) {
-                                front = imageView;
-                            } else {
-                                back = imageView;
+                    if (event.getClickCount() == 2) {
+                        for (Node node : pane.getChildren()) {
+                            if (node instanceof ImageView imageView) {
+                                if (imageView.isVisible()) {
+                                    front = imageView;
+                                } else {
+                                    back = imageView;
+                                }
+                            }
+
+                            if (node instanceof Text text1) {
+                                text = text1;
                             }
                         }
-
-                        if (node instanceof Text text1) {
-                            text = text1;
-                        }
-                    }
-                    if (front != null && back != null && event.isStillSincePress()) {
-                        front.setVisible(!front.isVisible());
-                        back.setVisible(!back.isVisible());
-                        pane.toFront();
-                        if (text != null) {
-                            text.setVisible(!front.isVisible() && !text.isVisible());
+                        if (front != null && back != null && event.isStillSincePress()) {
+                            front.setVisible(!front.isVisible());
+                            back.setVisible(!back.isVisible());
+                            pane.toFront();
+                            if (text != null) {
+                                text.setVisible(!front.isVisible() && !text.isVisible());
+                            }
                         }
                     }
                 }

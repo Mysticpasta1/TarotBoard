@@ -20,7 +20,7 @@ tasks.withType(JavaCompile) {
 }
 
 application {
-    mainClass = 'com.mystic.playingcardgame.SolitaireApplication'
+    mainClass = 'com.mystic.tarotboard.TarotBoard'
 }
 
 javafx {

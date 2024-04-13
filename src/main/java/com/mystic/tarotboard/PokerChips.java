@@ -1,4 +1,4 @@
-package com.mystic.playingcardgame;
+package com.mystic.tarotboard;
 
 public class PokerChips {
     private String color;

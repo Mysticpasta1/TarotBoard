@@ -1,8 +1,8 @@
-package com.mystic.playingcardgame;
+package com.mystic.tarotboard;
 
 public class Launcher {
     public static void main(String[] args)
     {
-        SolitaireApplication.main(args);
+        TarotBoard.main(args);
     }
 }
