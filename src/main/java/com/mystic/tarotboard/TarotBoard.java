@@ -37,7 +37,7 @@ import java.util.Objects;
 
 public class TarotBoard extends Application {
 
-    private static final int NUM_CARDS = 1024;
+    private static final int NUM_CARDS = 1058;
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
     private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
