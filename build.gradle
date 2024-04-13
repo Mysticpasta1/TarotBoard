@@ -1,17 +1,12 @@
 plugins {
     id 'java'
     id 'application'
-    id 'org.javamodularity.moduleplugin' version '1.8.12'
     id 'org.openjfx.javafxplugin' version '0.0.13'
     id 'org.beryx.jlink' version '2.25.0'
 }
 
 group 'com.mystic'
 version '1.0.0'
-
-repositories {
-    mavenCentral()
-}
 
 ext {
     junitVersion = '5.10.0'
@@ -25,20 +20,23 @@ tasks.withType(JavaCompile) {
 }
 
 application {
-    mainModule = 'com.mystic.playingcardgame'
     mainClass = 'com.mystic.playingcardgame.SolitaireApplication'
 }
 
 javafx {
     version = '22-ea+11'
-    modules = ['javafx.controls', 'javafx.fxml']
+    modules = ['javafx.controls', 'javafx.fxml', "javafx.graphics", "javafx.swing"]
 }
 
 repositories {
     mavenCentral()
+    maven {
+        url = "https://maven.generations.gg/releases"
+    }
 }
 
 dependencies {
+    implementation("com.traneptora:jxlatte:2.0.0")
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
 }

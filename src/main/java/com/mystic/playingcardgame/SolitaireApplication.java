@@ -1,35 +1,47 @@
 package com.mystic.playingcardgame;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import com.traneptora.jxlatte.JXLDecoder;
+import com.traneptora.jxlatte.JXLOptions;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.event.ActionEvent;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.effect.Blend;
+import javafx.scene.effect.BlendMode;
+import javafx.scene.effect.ColorAdjust;
+import javafx.scene.effect.ColorInput;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
-import javafx.util.Duration;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 public class SolitaireApplication extends Application {
 
     private static final int NUM_CARDS = 1024;
-    private static final double CARD_WIDTH = 200;
-    private static final double CARD_HEIGHT = 300;
+    private static final double CARD_WIDTH = 150;
+    private static final double CARD_HEIGHT = 200;
+    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
+    private static final int NUM_CHIPS = 200;
     private int rotationAngle = 0;
 
     @Override
@@ -40,13 +52,9 @@ public class SolitaireApplication extends Application {
         Scene scene = new Scene(root, screenBounds.getWidth(), screenBounds.getHeight());
         String[] cardNames = generateShuffledCardNames();
 
-        // Create a single pane for the card stack
-        Pane cardStack = new Pane();
-        root.getChildren().add(cardStack);
-
         Image backgroundImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/background_image.png")));
-        BackgroundSize backgroundSize = new BackgroundSize(BackgroundSize.AUTO, BackgroundSize.AUTO, false, false, true, false);
-        BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.DEFAULT, backgroundSize);
+        BackgroundSize backgroundSize = new BackgroundSize(scene.getWidth(), scene.getHeight(), false, false, true, false);
+        BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.DEFAULT, backgroundSize);
         root.setBackground(new Background(background));
 
         StackPane[] cardPanes = new StackPane[NUM_CARDS]; // Array to store card panes
@@ -56,16 +64,12 @@ public class SolitaireApplication extends Application {
             // Load the custom images for the card fronts and backs
             Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/card_front.png")));
             Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/card_back.png")));
-
             // Create a stack pane to overlay the front and back images
             StackPane cardPane = new StackPane();
-
-            // Create a text node for the card name
+            
             Text cardNameText = new Text(cardNames[i]);
-            cardNameText.setStyle("-fx-font-size: 30pt; -fx-fill: lightblue;");
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
             cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
-
-            // Set the text node size to match the card size
             cardNameText.setWrappingWidth(CARD_WIDTH); // Use the card width for centering
             cardNameText.setTextAlignment(TextAlignment.CENTER);
             cardNameText.setTranslateY(0);
@@ -84,6 +88,8 @@ public class SolitaireApplication extends Application {
             cardFrontImageView.setVisible(false);
 
             cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+            cardPane.setTranslateX(50);
+            cardPane.setTranslateY(50);
 
             // Make the card movable
             makeDraggable(cardPane);
@@ -96,7 +102,119 @@ public class SolitaireApplication extends Application {
             root.getChildren().add(cardPane);
         }
 
-        Button reshuffleButton = getReshuffleButton(root, cardPanes);
+        List<PokerChips> pokerChips = new ArrayList<>();
+
+        for (String color : colors) {
+            for (int i = 0; i < NUM_CHIPS; i++) {
+                pokerChips.add(new PokerChips(color, i));
+            }
+        }
+
+        double chipRadius = 50;
+        double spacing = 5;
+        StackPane[] chipPanes = new StackPane[pokerChips.size()];
+
+        for (int i = 0; i < colors.length; i++) {
+            String color = colors[i];
+            List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.getColor().equals(color)).toList();
+
+            BufferedImage bwFrontImage = loadImage("front_poker_chips.jxl");
+            BufferedImage bwBackImage = loadImage("back_poker_chips.jxl");
+
+            ColorAdjust colorAdjust = new ColorAdjust(0, 0, 0.5, 0);
+
+            for (int j = 0; j < chipsOfColor.size(); j++) {
+                PokerChips chip = chipsOfColor.get(j);
+                Color color1 = Color.valueOf(chip.getColor());
+
+                Circle circle = new Circle(chipRadius / 2);
+                circle.setCenterX(25.0);
+                circle.setCenterY(25.0);
+
+                // Apply color adjustment
+                Blend blend = new Blend(BlendMode.MULTIPLY);
+                blend.setBottomInput(new ColorInput(0, 0, chipRadius, chipRadius, color1));
+                blend.setTopInput(colorAdjust);
+
+                StackPane chipPane = new StackPane();
+
+                // Create a new ImageView for each chip to apply different colors
+                BufferedImage resizedBackImage = resizeImage(bwBackImage);
+                ImageView chipBackImageView = new ImageView(SwingFXUtils.toFXImage(resizedBackImage, null));
+                chipBackImageView.setFitWidth(chipRadius);
+                chipBackImageView.setFitHeight(chipRadius);
+                chipBackImageView.setVisible(false);
+                chipBackImageView.setEffect(blend);
+
+                // Create an image view for the front of the chip
+                BufferedImage resizedFrontImage = resizeImage(bwFrontImage);
+                ImageView chipFrontImageView = new ImageView(SwingFXUtils.toFXImage(resizedFrontImage, null));
+                chipFrontImageView.setFitWidth(chipRadius);
+                chipFrontImageView.setFitHeight(chipRadius);
+                chipFrontImageView.setVisible(true);
+                chipFrontImageView.setEffect(blend);
+
+
+                chipPane.getChildren().addAll(chipFrontImageView, chipBackImageView);
+
+                chipPane.setClip(circle);
+                chipPane.translateXProperty().bind(scene.widthProperty().subtract(200).subtract(j));
+                chipPane.setTranslateY(((scene.getHeight() / 8) + (chipRadius + spacing) * i) - 75);
+
+                makeDraggable(chipPane);
+                makeFlippableAndRotatable(chipPane);
+
+                // Add the card pane to the array
+                chipPanes[i * chipsOfColor.size() + j] = chipPane;
+
+                // Add the card to the root pane
+                root.getChildren().add(chipPane);
+            }
+        }
+
+        Button reshuffleButton = new Button("Reshuffle");
+        reshuffleButton.setOnAction(event -> {
+            for (StackPane pane : cardPanes) {
+                ImageView cardBackImageView = (ImageView) pane.getChildren().get(0);
+                ImageView cardFrontImageView = (ImageView) pane.getChildren().get(1);
+                Text cardNameText = (Text) pane.getChildren().get(2);
+                cardNameText.setRotate(0);
+                cardBackImageView.setRotate(0);
+                cardFrontImageView.setRotate(0);
+                cardNameText.setVisible(false);
+                cardBackImageView.setVisible(true);
+                cardFrontImageView.setVisible(false);
+                rotationAngle = 0;
+                pane.setTranslateY(50);
+                pane.setTranslateX(50);
+            }
+
+            for (int i = 0; i < colors.length; i++) {
+                String color = colors[i];
+                List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.getColor().equals(color)).toList();
+                for (int j = 0; j < chipsOfColor.size(); j++) {
+                    StackPane pane1 = chipPanes[i * chipsOfColor.size() + j];
+                    ImageView chipBackImageView = (ImageView) pane1.getChildren().get(0);
+                    ImageView chipFrontImageView = (ImageView) pane1.getChildren().get(1);
+                    chipBackImageView.setRotate(0);
+                    chipFrontImageView.setRotate(0);
+                    chipBackImageView.setVisible(true);
+                    chipFrontImageView.setVisible(false);
+                    pane1.translateXProperty().bind(scene.widthProperty().subtract(200).subtract(j));
+                    pane1.setTranslateY(((scene.getHeight() / 8) + (chipRadius + spacing) * i) - 75);
+                    pane1.toFront();
+                }
+            }
+
+            String[] cardNames2 = generateShuffledCardNames();
+
+            // Update the card names
+            for (int a = 0; a < NUM_CARDS; a++) {
+                Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
+                cardNameText.setText(cardNames2[a]);
+            }
+        });
+
         reshuffleButton.layoutXProperty().bind(scene.widthProperty().subtract(reshuffleButton.widthProperty()).subtract(110)); // 10 pixels from the right edge
         reshuffleButton.layoutYProperty().bind(scene.heightProperty().subtract(reshuffleButton.heightProperty()).subtract(110)); // 10 pixels from the bottom edge
 
@@ -110,45 +228,39 @@ public class SolitaireApplication extends Application {
         primaryStage.show();
     }
 
-    private Button getReshuffleButton(Pane root, StackPane[] cardPanes) {
-        Button reshuffleButton = new Button("Reshuffle");
-        reshuffleButton.setOnAction(event -> {
-            for (Node node : root.getChildren()) {
-                if (node instanceof StackPane) {
-                    StackPane cardPane = (StackPane) node;
-                    ImageView cardBackImageView = (ImageView) cardPane.getChildren().get(0);
-                    ImageView cardFrontImageView = (ImageView) cardPane.getChildren().get(1);
-                    Text cardNameText = (Text) cardPane.getChildren().get(2);
+    private BufferedImage resizeImage(BufferedImage originalImage) {
+        BufferedImage resizedImage = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics2D = resizedImage.createGraphics();
+        graphics2D.drawImage(originalImage, 0, 0, 50, 50, null);
+        graphics2D.dispose();
+        return resizedImage;
+    }
 
-                    cardBackImageView.setRotate(0);
-                    cardFrontImageView.setRotate(0);
-                    cardNameText.setRotate(0);
-                    cardBackImageView.setVisible(true);
-                    cardFrontImageView.setVisible(false);
-                    cardNameText.setVisible(false);
-                    rotationAngle = 0;
-
-                    // Reset the position of the card pane
-                    cardPane.setTranslateX(0);
-                    cardPane.setTranslateY(0);
-                }
+    private BufferedImage loadImage(String name) {
+        BufferedImage temp;
+        if(name.endsWith(".jxl")) {
+            var is = Objects.requireNonNull(getClass().getResourceAsStream("/" + name));
+            var options = new JXLOptions();
+            options.hdr = JXLOptions.HDR_OFF;
+            options.threads = 2;
+            try {
+                temp = new JXLDecoder((is), options).decode().asBufferedImage();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-
-            String[] cardNames2 = generateShuffledCardNames();
-
-            // Update the card names
-            for (int a = 0; a < NUM_CARDS; a++) {
-                Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
-                cardNameText.setText(cardNames2[a]);
+        } else {
+            try {
+                temp = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/" + name)));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-        });
-
-        return reshuffleButton;
+        }
+        return temp;
     }
 
     private void makeFlippableAndRotatable(Pane pane) {
         pane.setOnMouseClicked(event -> {
-            if(event.getButton() == MouseButton.PRIMARY) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
                 Node front = null;
                 Node back = null;
                 Node text = null;
@@ -166,11 +278,14 @@ public class SolitaireApplication extends Application {
                             text = text1;
                         }
                     }
-                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                    if (front != null && back != null && event.isStillSincePress()) {
                         front.setRotate(rotationAngle++);
                         back.setRotate(rotationAngle++);
-                        text.setRotate(rotationAngle++);
                         pane.toFront();
+                    }
+
+                    if (text != null && event.isStillSincePress()) {
+                        text.setRotate(rotationAngle++);
                     }
                 } else {
                     for (Node node : pane.getChildren()) {
@@ -186,11 +301,13 @@ public class SolitaireApplication extends Application {
                             text = text1;
                         }
                     }
-                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                    if (front != null && back != null && event.isStillSincePress()) {
                         front.setVisible(!front.isVisible());
-                        text.setVisible(!front.isVisible() && !text.isVisible());
                         back.setVisible(!back.isVisible());
                         pane.toFront();
+                        if (text != null) {
+                            text.setVisible(!front.isVisible() && !text.isVisible());
+                        }
                     }
                 }
             } else if (event.getButton() == MouseButton.SECONDARY) {
@@ -211,11 +328,14 @@ public class SolitaireApplication extends Application {
                             text = text1;
                         }
                     }
-                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                    if (front != null && back != null && event.isStillSincePress()) {
                         front.setRotate(rotationAngle--);
                         back.setRotate(rotationAngle--);
-                        text.setRotate(rotationAngle--);
                         pane.toFront();
+                    }
+
+                    if (text != null && event.isStillSincePress()) {
+                        text.setRotate(rotationAngle--);
                     }
                 } else if (event.isControlDown()) {
                     Node front = null;
@@ -234,11 +354,14 @@ public class SolitaireApplication extends Application {
                             text = text1;
                         }
                     }
-                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                    if (front != null && back != null && event.isStillSincePress()) {
                         front.setRotate(rotationAngle);
                         back.setRotate(rotationAngle);
-                        text.setRotate(rotationAngle);
                         pane.toFront();
+                    }
+
+                    if (text != null && event.isStillSincePress()) {
+                        text.setRotate(rotationAngle);
                     }
                     rotationAngle = rotationAngle + 90;
                 } else {
@@ -259,24 +382,28 @@ public class SolitaireApplication extends Application {
                             text = text1;
                         }
                     }
-                    if (front != null && back != null && text != null && event.isStillSincePress()) {
+                    if (front != null && back != null && event.isStillSincePress()) {
                         front.setRotate(rotationAngle);
                         back.setRotate(rotationAngle);
-                        text.setRotate(rotationAngle);
                         pane.toFront();
+                    }
+
+                    if (text != null && event.isStillSincePress()) {
+                        text.setRotate(rotationAngle);
                     }
                 }
             }
         });
     }
 
-    private void makeDraggable(Pane pane) {
+    private void makeDraggable(StackPane pane) {
         final double[] dragDeltaX = new double[1];
         final double[] dragDeltaY = new double[1];
 
         pane.setOnMousePressed(event -> {
             dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
             dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
+            pane.translateXProperty().unbind(); // Unbind translateX while dragging
         });
 
         pane.setOnMouseDragged(event -> {
@@ -305,6 +432,41 @@ public class SolitaireApplication extends Application {
                 cardNames.add(value + " of " + suit);
             }
         }
+
+        cardNames.add("Blessings of Heart (Will)");
+        cardNames.add("Follow of Soul (Will)");
+        cardNames.add("Call of Light (Will))");
+        cardNames.add("Whisper of Dark (Will))");
+        cardNames.add("Judgement (Will)");
+        cardNames.add("Chorus (Will)");
+        cardNames.add("Dawn of Death (Will)");
+        cardNames.add("Night of Wrath (Will)");
+        cardNames.add("Voice (Will)");
+        cardNames.add("Voices (Will)");
+        cardNames.add("Mother (Will)");
+        cardNames.add("Father (Will)");
+        cardNames.add("Brother (Will)");
+        cardNames.add("Sister (Will)");
+        cardNames.add("Duality (Will)");
+        cardNames.add("Husband (Will)");
+        cardNames.add("Wife (Will)");
+        cardNames.add("Progeny (Will)");
+        cardNames.add("Corridor (Will)");
+        cardNames.add("Field (Will)");
+        cardNames.add("Intellect (Will)");
+        cardNames.add("Brawn (Will)");
+        cardNames.add("Hope (Will)");
+        cardNames.add("Despair (Will)");
+        cardNames.add("Past (Will)");
+        cardNames.add("Present (Will)");
+        cardNames.add("Future (Will)");
+        cardNames.add("Gate (Will)");
+        cardNames.add("Sign (Will)");
+        cardNames.add("Ruin (Will)");
+        cardNames.add("Snow (Will)");
+        cardNames.add("Rain (Will)");
+        cardNames.add("Tempest (Will)");
+        cardNames.add("Lovers (Will)");
 
         // Shuffle the cards
         Collections.shuffle(cardNames);
