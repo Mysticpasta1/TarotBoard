@@ -260,10 +260,10 @@ public class TarotBoard extends Application {
 
     private void makeFlippableAndRotatable(Pane pane) {
         pane.setOnMouseClicked(event -> {
+            Node front = null;
+            Node back = null;
+            Node text = null;
             if (event.getButton() == MouseButton.PRIMARY) {
-                Node front = null;
-                Node back = null;
-                Node text = null;
                 if (event.isShiftDown()) {
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
@@ -279,14 +279,38 @@ public class TarotBoard extends Application {
                         }
                     }
                     if (front != null && back != null && event.isStillSincePress()) {
-                        front.setRotate(rotationAngle++);
-                        back.setRotate(rotationAngle++);
+                        front.setRotate(rotationAngle--);
+                        back.setRotate(rotationAngle--);
                         pane.toFront();
                     }
 
                     if (text != null && event.isStillSincePress()) {
-                        text.setRotate(rotationAngle++);
+                        text.setRotate(rotationAngle--);
                     }
+                } else if (event.isControlDown()) {
+                    for (Node node : pane.getChildren()) {
+                        if (node instanceof ImageView imageView) {
+                            if (imageView.isVisible()) {
+                                front = imageView;
+                            } else {
+                                back = imageView;
+                            }
+                        }
+
+                        if (node instanceof Text text1) {
+                            text = text1;
+                        }
+                    }
+                    if (front != null && back != null && event.isStillSincePress()) {
+                        front.setRotate(rotationAngle);
+                        back.setRotate(rotationAngle);
+                        pane.toFront();
+                    }
+
+                    if (text != null && event.isStillSincePress()) {
+                        text.setRotate(rotationAngle);
+                    }
+                    rotationAngle = rotationAngle - 90;
                 } else {
                     if (event.getClickCount() == 2) {
                         for (Node node : pane.getChildren()) {
@@ -314,9 +338,6 @@ public class TarotBoard extends Application {
                 }
             } else if (event.getButton() == MouseButton.SECONDARY) {
                 if (event.isShiftDown()) {
-                    Node front = null;
-                    Node back = null;
-                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
                             if (imageView.isVisible()) {
@@ -331,18 +352,15 @@ public class TarotBoard extends Application {
                         }
                     }
                     if (front != null && back != null && event.isStillSincePress()) {
-                        front.setRotate(rotationAngle--);
-                        back.setRotate(rotationAngle--);
+                        front.setRotate(rotationAngle++);
+                        back.setRotate(rotationAngle++);
                         pane.toFront();
                     }
 
                     if (text != null && event.isStillSincePress()) {
-                        text.setRotate(rotationAngle--);
+                        text.setRotate(rotationAngle++);
                     }
                 } else if (event.isControlDown()) {
-                    Node front = null;
-                    Node back = null;
-                    Node text = null;
                     for (Node node : pane.getChildren()) {
                         if (node instanceof ImageView imageView) {
                             if (imageView.isVisible()) {
@@ -367,31 +385,30 @@ public class TarotBoard extends Application {
                     }
                     rotationAngle = rotationAngle + 90;
                 } else {
-                    rotationAngle = 0;
-                    Node front = null;
-                    Node back = null;
-                    Node text = null;
-                    for (Node node : pane.getChildren()) {
-                        if (node instanceof ImageView imageView) {
-                            if (imageView.isVisible()) {
-                                front = imageView;
-                            } else {
-                                back = imageView;
+                    if (event.getClickCount() == 2) {
+                        rotationAngle = 0;
+                        for (Node node : pane.getChildren()) {
+                            if (node instanceof ImageView imageView) {
+                                if (imageView.isVisible()) {
+                                    front = imageView;
+                                } else {
+                                    back = imageView;
+                                }
+                            }
+
+                            if (node instanceof Text text1) {
+                                text = text1;
                             }
                         }
-
-                        if (node instanceof Text text1) {
-                            text = text1;
+                        if (front != null && back != null && event.isStillSincePress()) {
+                            front.setRotate(rotationAngle);
+                            back.setRotate(rotationAngle);
+                            pane.toFront();
                         }
-                    }
-                    if (front != null && back != null && event.isStillSincePress()) {
-                        front.setRotate(rotationAngle);
-                        back.setRotate(rotationAngle);
-                        pane.toFront();
-                    }
 
-                    if (text != null && event.isStillSincePress()) {
-                        text.setRotate(rotationAngle);
+                        if (text != null && event.isStillSincePress()) {
+                            text.setRotate(rotationAngle);
+                        }
                     }
                 }
             }
