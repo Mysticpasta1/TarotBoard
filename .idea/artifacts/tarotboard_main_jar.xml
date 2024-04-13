@@ -12,6 +12,7 @@
       <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjfx/javafx-graphics/22-ea+11/a5307d45af06b042085eb46d9eb2fa4b26d5e26d/javafx-graphics-22-ea+11.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.traneptora/jxlatte/2.0.0/16301c07f1b6c6a9e1742c0e51d06084d230c0e1/jxlatte-2.0.0.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjfx/javafx-controls/22-ea+11/f04cf41438d4eb5d297b50f6e2061db6fa8db350/javafx-controls-22-ea+11.jar" path-in-jar="/" />
+      <element id="dir-copy" path="$PROJECT_DIR$/src/main/resources" />
     </root>
   </artifact>
 </component>
