@@ -52,7 +52,7 @@ public class TarotBoard extends Application {
         Scene scene = new Scene(root, screenBounds.getWidth(), screenBounds.getHeight());
         String[] cardNames = generateShuffledCardNames();
 
-        Image backgroundImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/assets/background_image.png")));
+        Image backgroundImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/background_image.png")));
         BackgroundSize backgroundSize = new BackgroundSize(scene.getWidth(), scene.getHeight(), false, false, true, false);
         BackgroundImage background = new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize);
         root.setBackground(new Background(background));
@@ -62,8 +62,8 @@ public class TarotBoard extends Application {
         // Create and position cards in the stack
         for (int i = 0; i < NUM_CARDS; i++) {
             // Load the custom images for the card fronts and backs
-            Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/assets/card_front.png")));
-            Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/assets/card_back.png")));
+            Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
+            Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
             // Create a stack pane to overlay the front and back images
             StackPane cardPane = new StackPane();
             
@@ -118,8 +118,8 @@ public class TarotBoard extends Application {
             String color = colors[i];
             List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.getColor().equals(color)).toList();
 
-            BufferedImage bwFrontImage = loadImage("com/mystic/assets/front_poker_chips.jxl");
-            BufferedImage bwBackImage = loadImage("com/mystic/assets/back_poker_chips.jxl");
+            BufferedImage bwFrontImage = loadImage("com/mystic/tarotboard/assets/front_poker_chips.jxl");
+            BufferedImage bwBackImage = loadImage("com/mystic/tarotboard/assets/back_poker_chips.jxl");
 
             ColorAdjust colorAdjust = new ColorAdjust(0, 0, 0.5, 0);
 
