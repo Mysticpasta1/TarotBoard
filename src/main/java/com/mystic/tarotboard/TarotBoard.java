@@ -12,7 +12,6 @@ import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.Blend;
 import javafx.scene.effect.BlendMode;
@@ -20,7 +19,10 @@ import javafx.scene.effect.ColorAdjust;
 import javafx.scene.effect.ColorInput;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.*;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -35,13 +37,9 @@ import javafx.stage.Stage;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.*;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.IOException;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TarotBoard extends Application {
 
@@ -55,14 +53,11 @@ public class TarotBoard extends Application {
     private static Stage primaryStage;
     private Scene startScene;
     private static Scene gameScene;
-    private boolean isQuitting = false;
-    private static boolean gameStarted = false;
 
     @Override
     public void start(Stage primaryStage) {
         TarotBoard.primaryStage = primaryStage;
         Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
-        Game game = new Game();
         Pane gameRoot = new Pane();
         gameScene = new Scene(gameRoot, screenBounds.getWidth(), screenBounds.getHeight());
 
@@ -72,72 +67,10 @@ public class TarotBoard extends Application {
         Background background = new Background(backgroundImage);
         gameRoot.setBackground(background);
 
-        StackPane multiplayerLayout = new StackPane();
-        multiplayerLayout.setBackground(background);
-
-        // Create text fields
-        TextField ipTextField = new TextField("Server IP");
-        TextField portTextField = new TextField("Server Port");
-        TextField port2TextField = new TextField("Server Port");
-
-        ipTextField.setMaxWidth(200);
-        portTextField.setMaxWidth(200);
-        port2TextField.setMaxWidth(200);
-
-        Button connectButton = getConnectButton(ipTextField, portTextField);
-
-        Button backButton = new Button("Back to Start");
-        backButton.setOnAction(e -> switchToStart());
-
-        Button backButton1 = new Button("Back to Start");
-        backButton1.setOnAction(e -> switchToStart());
-
-        Button backButton2 = new Button("Back to Start");
-        backButton2.setOnAction(e -> switchToStart());
-
-        // Create a Host button
-        Button hostButton = new Button("Host");
-        hostButton.setOnAction(e -> {
-            int serverPort = Integer.parseInt(port2TextField.getText());
-            hostGame(serverPort, game);
-        });
-
-        VBox multiplayerBox = new VBox(10);
-        multiplayerBox.setPadding(new Insets(10));
-
-        StackPane hostPane = new StackPane();
-        hostPane.setBackground(background);
-        hostPane.setAlignment(Pos.CENTER);
-        port2TextField.setTranslateY(-50);
-        backButton1.setTranslateY(100);
-        hostPane.getChildren().addAll(port2TextField, hostButton, backButton1);
-        Scene hostScene = new Scene(hostPane, primaryStage.getWidth(), primaryStage.getHeight());
-        StackPane connectionPane = new StackPane();
-        connectionPane.setBackground(background);
-        connectionPane.setAlignment(Pos.CENTER);
-        ipTextField.setTranslateY(-100);
-        portTextField.setTranslateY(-50);
-        backButton2.setTranslateY(50);
-        connectionPane.getChildren().addAll(ipTextField, portTextField, connectButton, backButton2);
-        Scene connectionScene = new Scene(connectionPane, primaryStage.getWidth(), primaryStage.getHeight());
-
-        Button goToHost = new Button("Host Game");
-        goToHost.setOnAction(event -> primaryStage.setScene(hostScene));
-
-        Button joinButton = new Button("Join Game");
-        joinButton.setOnAction(event -> primaryStage.setScene(connectionScene));
-
-        multiplayerBox.setAlignment(Pos.CENTER);
-        multiplayerBox.getChildren().addAll(goToHost, joinButton, backButton);
-        multiplayerLayout.getChildren().add(multiplayerBox);
-        Scene multiplayerScene = new Scene(multiplayerLayout, primaryStage.getWidth(), primaryStage.getHeight());
-
         // Create the start scene
         VBox startLayout = new VBox(10);
-        Button multiplayerButton = new Button("Multiplayer");
-        multiplayerButton.setOnAction(e -> primaryStage.setScene(multiplayerScene));
-        Button readingMode = new Button("Reading Mode");
-        readingMode.setOnAction(event -> switchToGame());
+        Button singlePlayer = new Button("Single Player");
+        singlePlayer.setOnAction(event -> switchToGame());
 
         startLayout.setAlignment(Pos.CENTER);
         Button quitButton = new Button("Quit");
@@ -147,7 +80,7 @@ public class TarotBoard extends Application {
         Button howToPlayButton = new Button("How To Play: Tarot Poker");
         howToPlayButton.setOnAction(event -> displayHowToPlayDialog());
 
-        startLayout.getChildren().addAll(readingMode, multiplayerButton, howToPlayButton, quitButton);
+        startLayout.getChildren().addAll(singlePlayer, howToPlayButton, quitButton);
         // Create the game scene
         Button backButton3 = new Button("Back to Start");
         backButton3.setOnAction(event -> switchToStart());
@@ -305,37 +238,37 @@ public class TarotBoard extends Application {
         HBox handChipPane = new HBox(10); // Horizontal box for the hand
         handChipPane.setPadding(new Insets(10));
 
-        for (int a = 0; a < game.players.size(); a++) {
-            for (int i = 0; i < NUM_CARDS; i++) {
-                Pane cardPane = cardPanes[i]; // Create a pane for each card
-                cardPane.setOnDragDetected(event -> {
-                    Dragboard dragboard = cardPane.startDragAndDrop(TransferMode.MOVE);
-                    ClipboardContent content = new ClipboardContent();
-                    content.putString("Cards"); // You can put any string here to identify the card
-                    dragboard.setContent(content);
-                    event.consume();
-                });
-                handCardPane.getChildren().add(cardPane); // Add the card pane to the hand
-            }
 
-            for (int i = 0; i < (NUM_CHIPS * colors.length); i++) {
-                Pane chipPane = chipPanes[i];
-                chipPane.setOnDragDetected(event -> {
-                    Dragboard dragboard = chipPane.startDragAndDrop(TransferMode.MOVE);
-                    ClipboardContent content = new ClipboardContent();
-                    content.putString("Chips"); // You can put any string here to identify the card
-                    dragboard.setContent(content);
-                    event.consume();
-                });
-                handChipPane.getChildren().add(chipPane);
-            }
-
-            Pane pane = new Pane();
-            pane.getChildren().addAll(handCardPane, handChipPane);
-            pane.layoutXProperty().bind(gameScene.widthProperty().subtract(pane.widthProperty()).subtract(500));
-            pane.layoutYProperty().bind(gameScene.heightProperty().subtract(pane.heightProperty()).subtract(50));
-            gameRoot.getChildren().addAll(pane);
+        for (int i = 0; i < NUM_CARDS; i++) {
+            Pane cardPane = cardPanes[i]; // Create a pane for each card
+            cardPane.setOnDragDetected(event -> {
+                Dragboard dragboard = cardPane.startDragAndDrop(TransferMode.MOVE);
+                ClipboardContent content = new ClipboardContent();
+                content.putString("Cards"); // You can put any string here to identify the card
+                dragboard.setContent(content);
+                event.consume();
+            });
+            handCardPane.getChildren().add(cardPane); // Add the card pane to the hand
         }
+
+        for (int i = 0; i < (NUM_CHIPS * colors.length); i++) {
+            Pane chipPane = chipPanes[i];
+            chipPane.setOnDragDetected(event -> {
+                Dragboard dragboard = chipPane.startDragAndDrop(TransferMode.MOVE);
+                ClipboardContent content = new ClipboardContent();
+                content.putString("Chips"); // You can put any string here to identify the card
+                dragboard.setContent(content);
+                event.consume();
+            });
+            handChipPane.getChildren().add(chipPane);
+        }
+
+        Pane pane = new Pane();
+        pane.getChildren().addAll(handCardPane, handChipPane);
+        pane.layoutXProperty().bind(gameScene.widthProperty().subtract(pane.widthProperty()).subtract(500));
+        pane.layoutYProperty().bind(gameScene.heightProperty().subtract(pane.heightProperty()).subtract(50));
+        gameRoot.getChildren().addAll(pane);
+
 
         resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
         resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
@@ -345,63 +278,12 @@ public class TarotBoard extends Application {
 
         gameRoot.getChildren().addAll(resetChips, reshuffleCards, backButton3);
 
-        if (gameStarted) {
-            while (!isQuitting) {
-                Player currentPlayer = game.getCurrentPlayer();
-                currentPlayer.toggleHidden();
-                if (!currentPlayer.isHidden) {
-                    System.out.println(currentPlayer.name + "'s turn");
-                }
-
-                Button doneButton = new Button("Done");
-                AtomicBoolean doneButtonClicked = new AtomicBoolean(false);
-                doneButton.setOnKeyPressed(event2 -> {
-                    if (event2.getCode() == KeyCode.D) {
-                        doneButtonClicked.set(true);
-                        currentPlayer.toggleHidden();
-                        primaryStage.close();
-                    }
-                });
-                if (doneButtonClicked.get()) {
-                    game.nextTurn();
-                    doneButtonClicked.set(false);
-                }
-
-                backButton.setOnMouseClicked(event2 -> isQuitting = true);
-            }
-            isQuitting = false;
-        }
-
         primaryStage.setScene(startScene);
         primaryStage.setX(screenBounds.getMinX());
         primaryStage.setY(screenBounds.getMinY());
         primaryStage.setWidth(screenBounds.getWidth());
         primaryStage.setHeight(screenBounds.getHeight());
         primaryStage.show();
-    }
-
-    private Button getConnectButton(TextField ipTextField, TextField portTextField) {
-        Button connectButton = new Button("Connect");
-        connectButton.setOnAction(event -> {
-            String ip = ipTextField.getText();
-            int port = Integer.parseInt(portTextField.getText());
-            Socket socket = null;
-            try {
-                socket = new Socket(ip, port);
-            } catch (IOException e) {
-                System.out.println("Connection Refused: connect");
-            }
-            System.out.println("Connecting to server at " + ip + ":" + port);
-
-            try {
-                if(socket != null) {
-                    socket.close();
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        return connectButton;
     }
 
     private Button getReshuffleCards(StackPane[] cardPanes) {
@@ -439,10 +321,6 @@ public class TarotBoard extends Application {
         graphics2D.drawImage(originalImage, 0, 0, 50, 50, null);
         graphics2D.dispose();
         return resizedImage;
-    }
-
-    private void hostGame(int serverPort, Game game) {
-        new GameServer().start(game, serverPort);
     }
 
     private BufferedImage loadImage(String name) {
@@ -805,184 +683,6 @@ public class TarotBoard extends Application {
         launch(args);
     }
 
-    public static class Player {
-        private final String name;
-        private boolean isHidden;
-
-        public Player(String name) {
-            this.name = name;
-            this.isHidden = false;
-        }
-
-        public void toggleHidden() {
-            isHidden = !isHidden;
-        }
-    }
-
-    public static class Game {
-        private final List<Player> players;
-        private int currentPlayerIndex;
-
-        public Game() {
-            this.players = new ArrayList<>();
-            this.currentPlayerIndex = 0;
-        }
-
-        public void addPlayer(Player player) {
-            players.add(player);
-        }
-
-        public void nextTurn() {
-            currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
-        }
-
-        public Player getCurrentPlayer() {
-            return players.get(currentPlayerIndex);
-        }
-
-        public Collection<Player> getPlayers() {
-            return this.players;
-        }
-    }
-
     public record PokerChips(String color, int value) {
-    }
-
-
-    public static class GameServer {
-        private static final List<ClientHandler> clients = new ArrayList<>();
-        private static Game game = new Game();
-        private static int port = 12345;
-
-        public static void main(String[] args) {
-            start(game, port);
-        }
-
-        public static void start(Game game, int port) {
-            try (ServerSocket serverSocket = new ServerSocket(port)) {
-                System.out.println("Server started. Waiting for clients to connect...");
-
-                // Add the host as a client
-                InetAddress localhost = InetAddress.getLocalHost();
-                String hostAddress = localhost.getHostAddress();
-                Socket hostSocket = new Socket(hostAddress, port);
-                ClientHandler hostClientHandler = new ClientHandler(hostSocket);
-                clients.add(hostClientHandler);
-
-                hostClientHandler.run();
-
-                while (clients.size() <= 2) {
-                    Socket clientSocket = serverSocket.accept();
-                    System.out.println("Client connected: " + clientSocket.getInetAddress().getHostAddress());
-
-                    ClientHandler clientHandler = new ClientHandler(clientSocket);
-                    clients.add(clientHandler);
-
-                    clientHandler.run();
-
-                    if (clients.size() == 2 && !serverSocket.isClosed()) {
-                        startGameIfReady(game);
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private static void startGameIfReady(Game game) {
-            if(clients.size() == 2) {
-                System.out.println("Starting game with " + clients.size() + " players.");
-                for (int i = 0; i <= clients.size(); i++) {
-                    clients.get(i).sendMessage("START_GAME");
-                    game.addPlayer(new Player("Player " + i));
-                }
-                gameStarted = true;
-                switchToGame();
-            }
-        }
-
-        private static class ClientHandler implements Runnable {
-            private final Socket clientSocket;
-            private final BufferedReader inputReader;
-            private final PrintWriter outputWriter;
-            private boolean connected = true;
-
-            public ClientHandler(Socket clientSocket) throws IOException {
-                this.clientSocket = clientSocket;
-                this.inputReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                this.outputWriter = new PrintWriter(clientSocket.getOutputStream(), true);
-            }
-
-            @Override
-            public void run() {
-                try {
-                    while (connected) {
-                        String message = inputReader.readLine();
-                        if (message == null) {
-                            System.out.println("Client Disconnected");
-                            disconnect();
-                            break; // Exit the loop if client disconnects
-                        }
-                        System.out.println("Received message from client: " + message);
-                        // Handle messages from client
-                        if (message.equals("JOIN_GAME")) {
-                            switchToGame();
-                        } else if (message.equals("START_GAME")) {
-                            switchToGame();
-                        }
-
-                        // Handle other messages as needed
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    disconnect();
-                }
-            }
-
-            private void disconnect() {
-                connected = false;
-                try {
-                    inputReader.close();
-                    outputWriter.close();
-                    clientSocket.close();
-                    clients.remove(this); // Remove this client handler from the list
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            public void sendMessage(String message) {
-                outputWriter.println(message);
-            }
-        }
-    }
-
-
-    // Client
-    public static class GameClient {
-        private static final String SERVER_ADDRESS = "localhost";
-        private static final int SERVER_PORT = 12345;
-
-        public static void main(String[] args) {
-            try {
-                try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                    ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
-                    ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
-
-                    System.out.println("Connected to server.");
-
-                    // Send a message to the server
-                    outputStream.writeObject("JOIN_GAME");
-
-                    // Receive a message from the server
-                    String serverMessage = (String) inputStream.readObject();
-                    System.out.println("Server says: " + serverMessage);
-                }
-            } catch (IOException | ClassNotFoundException e) {
-                // Handle exceptions appropriately
-                e.printStackTrace();
-            }
-        }
     }
 }
