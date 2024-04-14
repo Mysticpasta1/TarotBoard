@@ -99,7 +99,7 @@ public class TarotBoard extends Application {
         Button hostButton = new Button("Host");
         hostButton.setOnAction(e -> {
             int serverPort = Integer.parseInt(port2TextField.getText());
-            hostGame(serverPort);
+            hostGame(serverPort, game);
         });
 
         VBox multiplayerBox = new VBox(10);
@@ -345,7 +345,7 @@ public class TarotBoard extends Application {
 
         gameRoot.getChildren().addAll(resetChips, reshuffleCards, backButton3);
 
-        if(gameStarted) {
+        if (gameStarted) {
             while (!isQuitting) {
                 Player currentPlayer = game.getCurrentPlayer();
                 currentPlayer.toggleHidden();
@@ -394,7 +394,9 @@ public class TarotBoard extends Application {
             System.out.println("Connecting to server at " + ip + ":" + port);
 
             try {
-                socket.close();
+                if(socket != null) {
+                    socket.close();
+                }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -439,32 +441,10 @@ public class TarotBoard extends Application {
         return resizedImage;
     }
 
-    private void hostGame(int serverPort) {
-        List<GameServer.ClientHandler> clients = new ArrayList<>();
-        try (ServerSocket serverSocket = new ServerSocket(serverPort)) {
-            System.out.println("Server started. Waiting for clients to connect...");
-            InetAddress localhost = InetAddress.getLocalHost();
-            String hostip = localhost.getHostAddress();
-            System.out.println("Server started on " + hostip + ":" + serverPort);
-
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Client connected: " + clientSocket.getInetAddress().getHostAddress());
-
-                try {
-                    GameServer.ClientHandler clientHandler = new GameServer.ClientHandler(clientSocket);
-                    clients.add(clientHandler);
-                    new Thread(clientHandler).start();
-                } catch (IOException e) {
-                    System.out.println("Error creating client handler: " + e.getMessage());
-                    // Handle or log the exception as needed
-                }
-            }
-        } catch (IOException e) {
-            System.out.println("Error starting server: " + e.getMessage());
-            // Handle or log the exception as needed
-        }
+    private void hostGame(int serverPort, Game game) {
+        new GameServer().start(game, serverPort);
     }
+
     private BufferedImage loadImage(String name) {
         BufferedImage temp;
         if (name.endsWith(".jxl")) {
@@ -733,18 +713,18 @@ public class TarotBoard extends Application {
         cardTooltips.put("Night of Wrath (Will)", "Remove 2 Cards From Each Hand And The Draw Pile, Discard All");
         cardTooltips.put("Voice (Will)", "Add A Card To Your Hand");
         cardTooltips.put("Voices (Will)", "Add A Card To Everyone But Your Hand");
-        cardTooltips.put("Mother (Will)", "");
-        cardTooltips.put("Father (Will)", "");
-        cardTooltips.put("Brother (Will)", "");
-        cardTooltips.put("Sister (Will)", "");
+        cardTooltips.put("Mother (Will)", "Add 5 Red Chips To Everyone's Hand");
+        cardTooltips.put("Father (Will)", "Add 5 Red Chips To Everyone's Hand");
+        cardTooltips.put("Brother (Will)", "Add 5 Red Chips To Everyone's Hand");
+        cardTooltips.put("Sister (Will)", "Add 5 Red Chips To Everyone's Hand");
         cardTooltips.put("Duality (Will)", "Pull Two Card, Give Yourself One And One To A Friend Or Foe");
-        cardTooltips.put("Husband (Will)", "");
-        cardTooltips.put("Wife (Will)", "");
-        cardTooltips.put("Progeny (Will)", "");
-        cardTooltips.put("Corridor (Will)", "");
-        cardTooltips.put("Field (Will)", "");
-        cardTooltips.put("Intellect (Will)", "");
-        cardTooltips.put("Brawn (Will)", "");
+        cardTooltips.put("Husband (Will)", "Remove 5 Red Chips From Everyone's Hand");
+        cardTooltips.put("Wife (Will)", "Remove 5 Red Chips To Another Player's Hand");
+        cardTooltips.put("Progeny (Will)", "Remove 15 Red Chips From Your Hand");
+        cardTooltips.put("Corridor (Will)", "Draw 10, Discard 5");
+        cardTooltips.put("Field (Will)", "Draw 20, Discard 10");
+        cardTooltips.put("Intellect (Will)", "Discard 10");
+        cardTooltips.put("Brawn (Will)", "Discard 20");
         cardTooltips.put("Hope (Will)", "Add One Extra Card To Your Hand and One Face Up In The Middle");
         cardTooltips.put("Despair (Will)", "Remove 3 Cards From A Person Of Your Choosing");
         cardTooltips.put("Past (Will)", "Add 3 Cards From The Draw To Your Hand");
@@ -753,10 +733,10 @@ public class TarotBoard extends Application {
         cardTooltips.put("Gate (Will)", "Remove 3 Red Chips (If You Have Some Chips) From Your Hand");
         cardTooltips.put("Sign (Will)", "Draw 2 Cards And Discard 2 Other Cards");
         cardTooltips.put("Ruin (Will)", "Reshuffle All Cards, All Player Draw 5");
-        cardTooltips.put("Snow (Will)", "");
-        cardTooltips.put("Rain (Will)", "");
-        cardTooltips.put("Tempest (Will)", "");
-        cardTooltips.put("Lovers (Will)", "");
+        cardTooltips.put("Snow (Will)", "Add 3 White Chips To Everyone's Hand");
+        cardTooltips.put("Rain (Will)", "Add 3 Cyan Chips To Everyone's Hand");
+        cardTooltips.put("Tempest (Will)", "Remove 2 Cards And 10 Red Chips From Your Hand");
+        cardTooltips.put("Lovers (Will)", "Add 2 Cards And 10 Red Chips To Your Hand");
     }
 
     private String[] generateShuffledCardNames() {
@@ -870,29 +850,37 @@ public class TarotBoard extends Application {
 
 
     public static class GameServer {
-        private static final int MAX_PLAYERS = 10;
-        private static final int MIN_PLAYERS = 2;
         private static final List<ClientHandler> clients = new ArrayList<>();
         private static Game game = new Game();
+        private static int port = 12345;
+
         public static void main(String[] args) {
-            new GameServer().start(game);
+            start(game, port);
         }
 
-        private void start(Game game) {
-            try (ServerSocket serverSocket = new ServerSocket(12345)) {
+        public static void start(Game game, int port) {
+            try (ServerSocket serverSocket = new ServerSocket(port)) {
                 System.out.println("Server started. Waiting for clients to connect...");
 
-                while (clients.size() < MAX_PLAYERS) {
+                // Add the host as a client
+                InetAddress localhost = InetAddress.getLocalHost();
+                String hostAddress = localhost.getHostAddress();
+                Socket hostSocket = new Socket(hostAddress, port);
+                ClientHandler hostClientHandler = new ClientHandler(hostSocket);
+                clients.add(hostClientHandler);
+
+                hostClientHandler.run();
+
+                while (clients.size() <= 2) {
                     Socket clientSocket = serverSocket.accept();
                     System.out.println("Client connected: " + clientSocket.getInetAddress().getHostAddress());
 
                     ClientHandler clientHandler = new ClientHandler(clientSocket);
                     clients.add(clientHandler);
 
-                    // Handle client logic in a separate thread
-                    new Thread(clientHandler).start();
+                    clientHandler.run();
 
-                    if (clients.size() >= MIN_PLAYERS && !serverSocket.isClosed()) {
+                    if (clients.size() == 2 && !serverSocket.isClosed()) {
                         startGameIfReady(game);
                     }
                 }
@@ -902,14 +890,14 @@ public class TarotBoard extends Application {
         }
 
         private static void startGameIfReady(Game game) {
-            boolean allClientsConnected = clients.stream().allMatch(ClientHandler::isConnected);
-            if (allClientsConnected) {
+            if(clients.size() == 2) {
                 System.out.println("Starting game with " + clients.size() + " players.");
-                for (int i = 0; i < clients.size(); i++) {
+                for (int i = 0; i <= clients.size(); i++) {
+                    clients.get(i).sendMessage("START_GAME");
                     game.addPlayer(new Player("Player " + i));
                 }
-                switchToGame();
                 gameStarted = true;
+                switchToGame();
             }
         }
 
@@ -928,16 +916,18 @@ public class TarotBoard extends Application {
             @Override
             public void run() {
                 try {
-                    while (connected && !clientSocket.isClosed()) {
+                    while (connected) {
                         String message = inputReader.readLine();
                         if (message == null) {
                             System.out.println("Client Disconnected");
-                            break;
+                            disconnect();
+                            break; // Exit the loop if client disconnects
                         }
                         System.out.println("Received message from client: " + message);
-
                         // Handle messages from client
                         if (message.equals("JOIN_GAME")) {
+                            switchToGame();
+                        } else if (message.equals("START_GAME")) {
                             switchToGame();
                         }
 
@@ -950,23 +940,20 @@ public class TarotBoard extends Application {
                 }
             }
 
-            public void sendMessage(String message) {
-                outputWriter.println(message);
-            }
-
-            public void disconnect() {
+            private void disconnect() {
                 connected = false;
                 try {
                     inputReader.close();
                     outputWriter.close();
                     clientSocket.close();
+                    clients.remove(this); // Remove this client handler from the list
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
 
-            public boolean isConnected() {
-                return connected;
+            public void sendMessage(String message) {
+                outputWriter.println(message);
             }
         }
     }
@@ -976,27 +963,25 @@ public class TarotBoard extends Application {
     public static class GameClient {
         private static final String SERVER_ADDRESS = "localhost";
         private static final int SERVER_PORT = 12345;
+
         public static void main(String[] args) {
             try {
-                Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                System.out.println("Connected to server.");
+                try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                    ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
+                    ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
 
-                // Communicate with server
-                ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
-                ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
+                    System.out.println("Connected to server.");
 
-                // Example: Send a message to the server
-                outputStream.writeObject("JOIN_GAME");
+                    // Send a message to the server
+                    outputStream.writeObject("JOIN_GAME");
 
-                // Example: Receive a message from the server
-                String serverMessage = (String) inputStream.readObject();
-                System.out.println("Server says: " + serverMessage);
-
-                // Close resources
-                outputStream.close();
-                inputStream.close();
-                socket.close();
-            } catch (IOException | ClassNotFoundException ignore) {
+                    // Receive a message from the server
+                    String serverMessage = (String) inputStream.readObject();
+                    System.out.println("Server says: " + serverMessage);
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                // Handle exceptions appropriately
+                e.printStackTrace();
             }
         }
     }
