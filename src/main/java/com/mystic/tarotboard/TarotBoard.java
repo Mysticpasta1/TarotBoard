@@ -19,10 +19,7 @@ import javafx.scene.effect.ColorAdjust;
 import javafx.scene.effect.ColorInput;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseButton;
-import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -71,13 +68,12 @@ public class TarotBoard extends Application {
         VBox startLayout = new VBox(10);
         Button singlePlayer = new Button("Single Player");
         singlePlayer.setOnAction(event -> switchToGame());
-
         startLayout.setAlignment(Pos.CENTER);
         Button quitButton = new Button("Quit");
         quitButton.setOnAction(event -> primaryStage.close());
         startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
 
-        Button howToPlayButton = new Button("How To Play: Tarot Poker");
+        Button howToPlayButton = new Button("How To Play: Tarot Poker IRL");
         howToPlayButton.setOnAction(event -> displayHowToPlayDialog());
 
         startLayout.getChildren().addAll(singlePlayer, howToPlayButton, quitButton);
@@ -232,44 +228,6 @@ public class TarotBoard extends Application {
             }
         });
 
-        HBox handCardPane = new HBox(10); // Horizontal box for the hand
-        handCardPane.setPadding(new Insets(10));
-
-        HBox handChipPane = new HBox(10); // Horizontal box for the hand
-        handChipPane.setPadding(new Insets(10));
-
-
-        for (int i = 0; i < NUM_CARDS; i++) {
-            Pane cardPane = cardPanes[i]; // Create a pane for each card
-            cardPane.setOnDragDetected(event -> {
-                Dragboard dragboard = cardPane.startDragAndDrop(TransferMode.MOVE);
-                ClipboardContent content = new ClipboardContent();
-                content.putString("Cards"); // You can put any string here to identify the card
-                dragboard.setContent(content);
-                event.consume();
-            });
-            handCardPane.getChildren().add(cardPane); // Add the card pane to the hand
-        }
-
-        for (int i = 0; i < (NUM_CHIPS * colors.length); i++) {
-            Pane chipPane = chipPanes[i];
-            chipPane.setOnDragDetected(event -> {
-                Dragboard dragboard = chipPane.startDragAndDrop(TransferMode.MOVE);
-                ClipboardContent content = new ClipboardContent();
-                content.putString("Chips"); // You can put any string here to identify the card
-                dragboard.setContent(content);
-                event.consume();
-            });
-            handChipPane.getChildren().add(chipPane);
-        }
-
-        Pane pane = new Pane();
-        pane.getChildren().addAll(handCardPane, handChipPane);
-        pane.layoutXProperty().bind(gameScene.widthProperty().subtract(pane.widthProperty()).subtract(500));
-        pane.layoutYProperty().bind(gameScene.heightProperty().subtract(pane.heightProperty()).subtract(50));
-        gameRoot.getChildren().addAll(pane);
-
-
         resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
         resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
 
@@ -375,7 +333,7 @@ public class TarotBoard extends Application {
         instructionsText.setPrefWidth(300);
 
         // Add the instructions text to the TextFlow
-        Text introText = new Text("How To Play: Tarot Poker:\n\n");
+        Text introText = new Text("How To Play: Tarot Poker IRL\n\n");
         introText.setStyle("-fx-font-weight: bold;");
         Text bodyText = new Text("""
                 Everyone Starts With 5 Cards and 5 Red Chips
