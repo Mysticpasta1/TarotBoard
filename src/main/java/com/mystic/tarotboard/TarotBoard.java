@@ -40,16 +40,31 @@ import java.util.*;
 
 public class TarotBoard extends Application {
 
-    private static final int NUM_CARDS = 1058;
+    private static final int NUM_CARDS = 1091;
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
     private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
-    private static final int NUM_CHIPS = 200;
+    private static final int NUM_CHIPS = 250;
+    private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
     private int rotationAngle = 0;
     private final Map<String, String> cardTooltips = new HashMap<>();
+    private final Map<String, String> chipTooltips = new HashMap<>();
     private static Stage primaryStage;
     private Scene startScene;
     private static Scene gameScene;
+    private final List<PokerChips> pokerChips = new ArrayList<>();
+    private final StackPane[] chipPanes = new StackPane[TOTAL_CHIPS];
+    private final String[] suits = {
+            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns", "Diamonds", "Embers", "Eyes",
+            "Gears", "Glyphs", "Flames", "Flowers", "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls",
+            "Shells", "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
+    };
+    private final String[] values = {
+            "Hold", "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Nomad",
+            "Prince", "Rune", "Fable", "Sorceress", "Utopia", "Wizard", "Titan",
+            "Baron", "Illusionist", "Oracle", "Magician", "Luminary", "Eclipse",
+            "Celestial", "Duke", "Genesis", "Zephyr", "Vesper"
+    };
 
     @Override
     public void start(Stage primaryStage) {
@@ -89,7 +104,7 @@ public class TarotBoard extends Application {
 
         startLayout.setBackground(background);
 
-        generateTooltips();
+        generateCardTooltips();
 
         // Create and position cards in the stack
         for (int i = 0; i < NUM_CARDS; i++) {
@@ -119,7 +134,7 @@ public class TarotBoard extends Application {
             cardFrontImageView.setFitHeight(CARD_HEIGHT);
             cardFrontImageView.setVisible(false);
 
-            makeTooltip(cardPane, cardNames[i]);
+            makeCardTooltip(cardPane, cardNames[i]);
 
             cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
             cardPane.setTranslateX(50);
@@ -136,17 +151,16 @@ public class TarotBoard extends Application {
             gameRoot.getChildren().add(cardPane);
         }
 
-        List<PokerChips> pokerChips = new ArrayList<>();
-
         for (String color : colors) {
             for (int i = 0; i < NUM_CHIPS; i++) {
                 pokerChips.add(new PokerChips(color, i));
             }
         }
 
+        generateChipTooltips();
+
         double chipRadius = 50;
         double spacing = 5;
-        StackPane[] chipPanes = new StackPane[pokerChips.size()];
 
         for (int i = 0; i < colors.length; i++) {
             String color = colors[i];
@@ -188,7 +202,6 @@ public class TarotBoard extends Application {
                 chipFrontImageView.setVisible(true);
                 chipFrontImageView.setEffect(blend);
 
-
                 chipPane.getChildren().addAll(chipFrontImageView, chipBackImageView);
 
                 chipPane.setClip(circle);
@@ -197,6 +210,7 @@ public class TarotBoard extends Application {
 
                 makeDraggable(chipPane);
                 makeFlippableAndRotatable(chipPane);
+                makeChipTooltip(chipPane, i, j, chipsOfColor);
 
                 // Add the card pane to the array
                 chipPanes[i * chipsOfColor.size() + j] = chipPane;
@@ -206,8 +220,25 @@ public class TarotBoard extends Application {
             }
         }
 
-        Button reshuffleCards = getReshuffleCards(cardPanes);
+        Button resetChips = getResetButton(chipRadius, spacing);
+        resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
+        resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
 
+        Button reshuffleCards = getReshuffleCards(cardPanes);
+        reshuffleCards.layoutXProperty().bind(gameScene.widthProperty().subtract(reshuffleCards.widthProperty()).subtract(50));
+        reshuffleCards.layoutYProperty().bind(gameScene.heightProperty().subtract(reshuffleCards.heightProperty()).subtract(100));
+
+        gameRoot.getChildren().addAll(resetChips, reshuffleCards, backButton3);
+
+        primaryStage.setScene(startScene);
+        primaryStage.setX(screenBounds.getMinX());
+        primaryStage.setY(screenBounds.getMinY());
+        primaryStage.setWidth(screenBounds.getWidth());
+        primaryStage.setHeight(screenBounds.getHeight());
+        primaryStage.show();
+    }
+
+    private Button getResetButton(double chipRadius, double spacing) {
         Button resetChips = new Button("Reset Chips");
         resetChips.setOnAction(event -> {
             for (int i = 0; i < colors.length; i++) {
@@ -227,21 +258,7 @@ public class TarotBoard extends Application {
                 }
             }
         });
-
-        resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
-        resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
-
-        reshuffleCards.layoutXProperty().bind(gameScene.widthProperty().subtract(reshuffleCards.widthProperty()).subtract(50));
-        reshuffleCards.layoutYProperty().bind(gameScene.heightProperty().subtract(reshuffleCards.heightProperty()).subtract(100));
-
-        gameRoot.getChildren().addAll(resetChips, reshuffleCards, backButton3);
-
-        primaryStage.setScene(startScene);
-        primaryStage.setX(screenBounds.getMinX());
-        primaryStage.setY(screenBounds.getMinY());
-        primaryStage.setWidth(screenBounds.getWidth());
-        primaryStage.setHeight(screenBounds.getHeight());
-        primaryStage.show();
+        return resetChips;
     }
 
     private Button getReshuffleCards(StackPane[] cardPanes) {
@@ -303,12 +320,62 @@ public class TarotBoard extends Application {
         return temp;
     }
 
-    private void makeTooltip(Pane pane, String cardName) {
+    private void makeCardTooltip(Pane pane, String cardName) {
         String hoverText = cardTooltips.get(cardName);
         if (hoverText != null) {
             Tooltip tooltip = new Tooltip(hoverText);
-            pane.setOnMouseEntered(event -> Tooltip.install(pane, tooltip));
-            pane.setOnMouseExited(event -> Tooltip.uninstall(pane, tooltip));
+            tooltip.setStyle("-fx-font-size: 18pt;");
+            Tooltip.install(pane, tooltip);
+
+            // Show tooltip on mouse enter
+            pane.setOnMouseEntered(event -> {
+                if (pane.getChildren().get(1).isVisible()) {
+                    tooltip.setText(hoverText);
+                    tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
+                } else {
+                    tooltip.setText("Unknown");
+                }
+            });
+
+            // Hide tooltip on mouse exit
+            pane.setOnMouseExited(event -> tooltip.hide());
+        }
+    }
+
+    private void makeChipTooltip(Pane pane, int i, int j, List<PokerChips> colorOfChips) {
+        String hoverText = chipTooltips.get(Integer.toString(i * colorOfChips.size() + j));
+        Tooltip tooltip = new Tooltip(hoverText);
+        tooltip.setStyle("-fx-font-size: 18pt;");
+        Tooltip.install(pane, tooltip);
+
+        // Show tooltip on mouse enter
+        pane.setOnMouseEntered(event -> {
+            if (pane.getChildren().get(0).isVisible()) {
+                tooltip.setText(hoverText);
+                tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
+            } else {
+                tooltip.setText("-" + hoverText);
+            }
+        });
+
+        // Hide tooltip on mouse exit
+        pane.setOnMouseExited(event -> tooltip.hide());
+    }
+
+    private void generateChipTooltips() {
+        String points;
+        for (int i = 0; i < colors.length; i++) {
+            String color = colors[i];
+            List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.color().equals(color)).toList();
+            int num = i * 5;
+            if (i * 5 == 0) {
+                points = Integer.toString((1));
+            } else {
+                points = Integer.toString(num);
+            }
+            for (int j = 0; j < chipsOfColor.size(); j++) {
+                chipTooltips.put(Integer.toString(i * chipsOfColor.size() + j), points);
+            }
         }
     }
 
@@ -537,57 +604,52 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void generateTooltips() {
-        cardTooltips.put("Joker (Will)", "Wild Card, Can Be Matched With Anything Or, Added On Top Of Anything");
-        cardTooltips.put("Blessings of Heart (Will)", "Add 5 Red Chips To Your Hand");
-        cardTooltips.put("Follow of Soul (Will)", "Add 5 Blue Chips To Your Hand");
-        cardTooltips.put("Call of Light (Will))", "Add 2 Yellow Chips To Your Hand");
-        cardTooltips.put("Whisper of Dark (Will))", "Add 3 Dark Gray Chips To Your Hand");
-        cardTooltips.put("Judgement (Will)", "Pull Three Cards, Choose 1 For You, The Others Discards");
-        cardTooltips.put("Chorus (Will)", "Add 4 Purple Chips To Your Hand");
-        cardTooltips.put("Dawn of Death (Will)", "Remove All Chips From 1 Person");
-        cardTooltips.put("Night of Wrath (Will)", "Remove 2 Cards From Each Hand And The Draw Pile, Discard All");
-        cardTooltips.put("Voice (Will)", "Add A Card To Your Hand");
-        cardTooltips.put("Voices (Will)", "Add A Card To Everyone But Your Hand");
-        cardTooltips.put("Mother (Will)", "Add 5 Red Chips To Everyone's Hand");
-        cardTooltips.put("Father (Will)", "Add 5 Red Chips To Everyone's Hand");
-        cardTooltips.put("Brother (Will)", "Add 5 Red Chips To Everyone's Hand");
-        cardTooltips.put("Sister (Will)", "Add 5 Red Chips To Everyone's Hand");
-        cardTooltips.put("Duality (Will)", "Pull Two Card, Give Yourself One And One To A Friend Or Foe");
-        cardTooltips.put("Husband (Will)", "Remove 5 Red Chips From Everyone's Hand");
-        cardTooltips.put("Wife (Will)", "Remove 5 Red Chips To Another Player's Hand");
-        cardTooltips.put("Progeny (Will)", "Remove 15 Red Chips From Your Hand");
-        cardTooltips.put("Corridor (Will)", "Draw 10, Discard 5");
-        cardTooltips.put("Field (Will)", "Draw 20, Discard 10");
-        cardTooltips.put("Intellect (Will)", "Discard 10");
-        cardTooltips.put("Brawn (Will)", "Discard 20");
-        cardTooltips.put("Hope (Will)", "Add One Extra Card To Your Hand and One Face Up In The Middle");
-        cardTooltips.put("Despair (Will)", "Remove 3 Cards From A Person Of Your Choosing");
-        cardTooltips.put("Past (Will)", "Add 3 Cards From The Draw To Your Hand");
-        cardTooltips.put("Present (Will)", "Add 2 Cards From The Draw To Your Hand");
-        cardTooltips.put("Future (Will)", "Remove 3 Cards From Your Hand And Discard");
-        cardTooltips.put("Gate (Will)", "Remove 3 Red Chips (If You Have Some Chips) From Your Hand");
-        cardTooltips.put("Sign (Will)", "Draw 2 Cards And Discard 2 Other Cards");
-        cardTooltips.put("Ruin (Will)", "Reshuffle All Cards, All Player Draw 5");
-        cardTooltips.put("Snow (Will)", "Add 3 White Chips To Everyone's Hand");
-        cardTooltips.put("Rain (Will)", "Add 3 Cyan Chips To Everyone's Hand");
-        cardTooltips.put("Tempest (Will)", "Remove 2 Cards And 10 Red Chips From Your Hand");
-        cardTooltips.put("Lovers (Will)", "Add 2 Cards And 10 Red Chips To Your Hand");
+    private void generateCardTooltips() {
+        for (String suit : suits) {
+            for (int i = 0; i < values.length; i++) {
+                cardTooltips.put(values[i] + " of " + suit, i + "\n" + suit);
+            }
+        }
+
+        cardTooltips.put("Joker", "Wild Card, Can Be Matched With Anything Or, Added On Top Of Anything\n Will Card");
+        cardTooltips.put("Blessings of Heart", "Add 5 Red Chips To Your Hand\n Will Card");
+        cardTooltips.put("Follow of Soul", "Add 5 Blue Chips To Your Hand\n Will Card");
+        cardTooltips.put("Call of Light", "Add 2 Yellow Chips To Your Hand\n Will Card");
+        cardTooltips.put("Whisper of Dark", "Add 3 Dark Gray Chips To Your Hand\n Will Card");
+        cardTooltips.put("Judgement", "Pull Three Cards, Choose 1 For You, The Others Discards\n Will Card");
+        cardTooltips.put("Chorus", "Add 4 Purple Chips To Your Hand\n Will Card");
+        cardTooltips.put("Dawn of Death", "Remove All Chips From 1 Person\n Will Card");
+        cardTooltips.put("Night of Wrath", "Remove 2 Cards From Each Hand And The Draw Pile, Discard All\n Will Card");
+        cardTooltips.put("Voice", "Add A Card To Your Hand\n Will Card");
+        cardTooltips.put("Voices", "Add A Card To Everyone But Your Hand\n Will Card");
+        cardTooltips.put("Mother", "Add 5 Red Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Father", "Add 5 Red Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Brother", "Add 5 Red Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Sister", "Add 5 Red Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Duality", "Pull Two Card, Give Yourself One And One To A Friend Or Foe\n Will Card");
+        cardTooltips.put("Husband", "Remove 5 Red Chips From Everyone's Hand\n Will Card");
+        cardTooltips.put("Wife", "Remove 5 Red Chips To Another Player's Hand\n Will Card");
+        cardTooltips.put("Progeny", "Remove 15 Red Chips From Your Hand\n Will Card");
+        cardTooltips.put("Corridor", "Draw 10, Discard 5\n Will Card");
+        cardTooltips.put("Field", "Draw 20, Discard 10\n Will Card");
+        cardTooltips.put("Intellect", "Discard 10\n Will Card");
+        cardTooltips.put("Brawn", "Discard 20\n Will Card");
+        cardTooltips.put("Hope", "Add One Extra Card To Your Hand and One Face Up In The Middle\n Will Card");
+        cardTooltips.put("Despair", "Remove 3 Cards From A Person Of Your Choosing\n Will Card");
+        cardTooltips.put("Past", "Add 3 Cards From The Draw To Your Hand\n Will Card");
+        cardTooltips.put("Present", "Add 2 Cards From The Draw To Your Hand\n Will Card");
+        cardTooltips.put("Future", "Remove 3 Cards From Your Hand And Discard\n Will Card");
+        cardTooltips.put("Gate", "Remove 3 Red Chips (If You Have Some Chips) From Your Hand\n Will Card");
+        cardTooltips.put("Sign", "Draw 2 Cards And Discard 2 Other Cards\n Will Card");
+        cardTooltips.put("Ruin", "Reshuffle All Cards, All Player Draw 5\n Will Card");
+        cardTooltips.put("Snow", "Add 3 White Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Rain", "Add 3 Cyan Chips To Everyone's Hand\n Will Card");
+        cardTooltips.put("Tempest", "Remove 2 Cards And 10 Red Chips From Your Hand\n Will Card");
+        cardTooltips.put("Lovers", "Add 2 Cards And 10 Red Chips To Your Hand\n Will Card");
     }
 
     private String[] generateShuffledCardNames() {
         ObservableList<String> cardNames = FXCollections.observableArrayList();
-        String[] suits = {
-                "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns", "Diamonds", "Embers", "Eyes",
-                "Gears", "Glyphs", "Flames", "Flowers", "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls",
-                "Shells", "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
-        };
-        String[] values = {
-                "(0) Hold, (1) Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "(11) Jack", "(12) Queen", "(13) King", "(14) Nomad",
-                "(15) Prince", "(16) Rune", "(17) Fable", "(18) Sorceress", "(19) Utopia", "(20) Wizard", "(21) Titan",
-                "(22) Baron", "(23) Illusionist", "(24) Oracle", "(25) Magician", "(26) Luminary", "(27) Eclipse",
-                "(28) Celestial", "(29) Duke", "(30) Genesis", "(31) Zephyr", "(32) Vesper"
-        };
 
         for (String suit : suits) {
             for (String value : values) {
