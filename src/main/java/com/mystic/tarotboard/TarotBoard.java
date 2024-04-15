@@ -55,15 +55,18 @@ public class TarotBoard extends Application {
     private final List<PokerChips> pokerChips = new ArrayList<>();
     private final StackPane[] chipPanes = new StackPane[TOTAL_CHIPS];
     private final String[] suits = {
-            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns", "Diamonds", "Embers", "Eyes",
-            "Gears", "Glyphs", "Flames", "Flowers", "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls",
-            "Shells", "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
+            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
+            "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
+            "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells",
+            "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
     };
     private final String[] values = {
-            "Hold", "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Nomad",
-            "Prince", "Rune", "Fable", "Sorceress", "Utopia", "Wizard", "Titan",
-            "Baron", "Illusionist", "Oracle", "Magician", "Luminary", "Eclipse",
-            "Celestial", "Duke", "Genesis", "Zephyr", "Vesper"
+            "(0) Hold", "(1) Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+            "(11) Jack", "(12) Queen", "(13) King", "(14) Nomad", "(15) Prince",
+            "(16) Rune", "(17) Fable", "(18) Sorceress", "(19) Utopia", "(20) Wizard",
+            "(21) Titan", "(22) Baron", "(23) Illusionist", "(24) Oracle", "(25) Magician",
+            "(26) Luminary", "(27) Eclipse", "(28) Celestial", "(29) Duke", "(30) Genesis",
+            "(31) Zephyr", "(32) Vesper"
     };
 
     @Override
@@ -82,13 +85,16 @@ public class TarotBoard extends Application {
         // Create the start scene
         VBox startLayout = new VBox(10);
         Button singlePlayer = new Button("Single Player");
+        singlePlayer.setStyle("-fx-font-size: 20pt;");
         singlePlayer.setOnAction(event -> switchToGame());
         startLayout.setAlignment(Pos.CENTER);
         Button quitButton = new Button("Quit");
+        quitButton.setStyle("-fx-font-size: 20pt;");
         quitButton.setOnAction(event -> primaryStage.close());
         startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
 
         Button howToPlayButton = new Button("How To Play: Tarot Poker IRL");
+        howToPlayButton.setStyle("-fx-font-size: 20pt;");
         howToPlayButton.setOnAction(event -> displayHowToPlayDialog());
 
         startLayout.getChildren().addAll(singlePlayer, howToPlayButton, quitButton);
