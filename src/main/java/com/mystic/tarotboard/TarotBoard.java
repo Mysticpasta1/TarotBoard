@@ -54,6 +54,7 @@ public class TarotBoard extends Application {
     private static Scene gameScene;
     private final List<PokerChips> pokerChips = new ArrayList<>();
     private final StackPane[] chipPanes = new StackPane[TOTAL_CHIPS];
+    private boolean reshuffled = false;
     private final String[] suits = {
             "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
             "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
@@ -148,12 +149,13 @@ public class TarotBoard extends Application {
 
             // Add the card pane to the array
             cardPanes[i] = cardPane;
-
+            reshuffled = false;
+            generateCardTooltips(cardNameText.getText());
+            makeCardTooltip(cardPane, cardNameText.getText(), reshuffled);
             // Add the card to the root pane
             gameRoot.getChildren().add(cardPane);
         }
-        generateCardTooltips(cardPanes);
-        makeCardTooltip(cardPanes);
+
 
         for (String color : colors) {
             for (int i = 0; i < NUM_CHIPS; i++) {
@@ -284,13 +286,16 @@ public class TarotBoard extends Application {
             }
 
             String[] cardNames2 = generateShuffledCardNames();
+            reshuffled = true;
 
             // Update the card names
             for (int a = 0; a < NUM_CARDS; a++) {
                 Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
                 cardNameText.setText(cardNames2[a]);
+                makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
             }
         });
+        reshuffled = false;
         return reshuffleCards;
     }
 
@@ -324,28 +329,30 @@ public class TarotBoard extends Application {
         return temp;
     }
 
-    private void makeCardTooltip(StackPane[] cardPanes) {
-        for (int i = 0; i < NUM_CARDS; i++) {
-            Pane pane = cardPanes[i];
-            String hoverText = cardTooltips.get(getReshuffleCards(cardPanes).getText());
-            if (hoverText != null) {
-                Tooltip tooltip = new Tooltip(hoverText);
-                tooltip.setStyle("-fx-font-size: 18pt;");
-                Tooltip.install(pane, tooltip);
+    private void makeCardTooltip(StackPane pane, String text, boolean reshuffled) {
+        String hoverText = cardTooltips.get(text);
+        if (hoverText != null) {
+            Tooltip tooltip = new Tooltip(hoverText);
+            tooltip.setStyle("-fx-font-size: 18pt;");
 
-                // Show tooltip on mouse enter
-                pane.setOnMouseEntered(event -> {
-                    if (pane.getChildren().get(1).isVisible()) {
-                        tooltip.setText(hoverText);
-                        tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
-                    } else {
-                        tooltip.setText("Unknown");
-                    }
-                });
-
-                // Hide tooltip on mouse exit
-                pane.setOnMouseExited(event -> tooltip.hide());
+            if(reshuffled) {
+                Tooltip.uninstall(pane, tooltip);
             }
+
+            Tooltip.install(pane, tooltip);
+
+            // Show tooltip on mouse enter
+            pane.setOnMouseEntered(event -> {
+                if (pane.getChildren().get(1).isVisible()) {
+                    tooltip.setText(hoverText);
+                    tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
+                } else {
+                    tooltip.setText("Unknown");
+                }
+            });
+
+            // Hide tooltip on mouse exit
+            pane.setOnMouseExited(event -> tooltip.hide());
         }
     }
 
@@ -611,12 +618,8 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void generateCardTooltips(StackPane[] cardPanes) {
-        for (String suit : suits) {
-            for (int i = 0; i < values.length; i++) {
-                cardTooltips.put(getReshuffleCards(cardPanes).getText(), i + "\n" + suit);
-            }
-        }
+    private void generateCardTooltips(String name) {
+        cardTooltips.put(name, name.replaceAll("of", "\n"));
 
         cardTooltips.put("Joker", "Wild Card, Can Be Matched With Anything Or, Added On Top Of Anything\n Will Card");
         cardTooltips.put("Blessings of Heart", "Add 5 Red Chips To Your Hand\n Will Card");
