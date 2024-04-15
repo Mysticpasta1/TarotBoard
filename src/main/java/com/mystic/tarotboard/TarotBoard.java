@@ -110,8 +110,6 @@ public class TarotBoard extends Application {
 
         startLayout.setBackground(background);
 
-        generateCardTooltips();
-
         // Create and position cards in the stack
         for (int i = 0; i < NUM_CARDS; i++) {
             // Load the custom images for the card fronts and backs
@@ -140,8 +138,6 @@ public class TarotBoard extends Application {
             cardFrontImageView.setFitHeight(CARD_HEIGHT);
             cardFrontImageView.setVisible(false);
 
-            makeCardTooltip(cardPane, cardNames[i]);
-
             cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
             cardPane.setTranslateX(50);
             cardPane.setTranslateY(50);
@@ -156,6 +152,8 @@ public class TarotBoard extends Application {
             // Add the card to the root pane
             gameRoot.getChildren().add(cardPane);
         }
+        generateCardTooltips(cardPanes);
+        makeCardTooltip(cardPanes);
 
         for (String color : colors) {
             for (int i = 0; i < NUM_CHIPS; i++) {
@@ -326,25 +324,28 @@ public class TarotBoard extends Application {
         return temp;
     }
 
-    private void makeCardTooltip(Pane pane, String cardName) {
-        String hoverText = cardTooltips.get(cardName);
-        if (hoverText != null) {
-            Tooltip tooltip = new Tooltip(hoverText);
-            tooltip.setStyle("-fx-font-size: 18pt;");
-            Tooltip.install(pane, tooltip);
+    private void makeCardTooltip(StackPane[] cardPanes) {
+        for (int i = 0; i < NUM_CARDS; i++) {
+            Pane pane = cardPanes[i];
+            String hoverText = cardTooltips.get(getReshuffleCards(cardPanes).getText());
+            if (hoverText != null) {
+                Tooltip tooltip = new Tooltip(hoverText);
+                tooltip.setStyle("-fx-font-size: 18pt;");
+                Tooltip.install(pane, tooltip);
 
-            // Show tooltip on mouse enter
-            pane.setOnMouseEntered(event -> {
-                if (pane.getChildren().get(1).isVisible()) {
-                    tooltip.setText(hoverText);
-                    tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
-                } else {
-                    tooltip.setText("Unknown");
-                }
-            });
+                // Show tooltip on mouse enter
+                pane.setOnMouseEntered(event -> {
+                    if (pane.getChildren().get(1).isVisible()) {
+                        tooltip.setText(hoverText);
+                        tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
+                    } else {
+                        tooltip.setText("Unknown");
+                    }
+                });
 
-            // Hide tooltip on mouse exit
-            pane.setOnMouseExited(event -> tooltip.hide());
+                // Hide tooltip on mouse exit
+                pane.setOnMouseExited(event -> tooltip.hide());
+            }
         }
     }
 
@@ -610,10 +611,10 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void generateCardTooltips() {
+    private void generateCardTooltips(StackPane[] cardPanes) {
         for (String suit : suits) {
             for (int i = 0; i < values.length; i++) {
-                cardTooltips.put(values[i] + " of " + suit, i + "\n" + suit);
+                cardTooltips.put(getReshuffleCards(cardPanes).getText(), i + "\n" + suit);
             }
         }
 
