@@ -619,8 +619,6 @@ public class TarotBoard extends Application {
     }
 
     private void generateCardTooltips(String name) {
-        cardTooltips.put(name, name.replaceAll("of", "\n"));
-
         cardTooltips.put("Joker", "Wild Card, Can Be Matched With Anything Or, Added On Top Of Anything\n Will Card");
         cardTooltips.put("Blessings of Heart", "Add 5 Red Chips To Your Hand\n Will Card");
         cardTooltips.put("Follow of Soul", "Add 5 Blue Chips To Your Hand\n Will Card");
@@ -656,6 +654,10 @@ public class TarotBoard extends Application {
         cardTooltips.put("Rain", "Add 3 Cyan Chips To Everyone's Hand\n Will Card");
         cardTooltips.put("Tempest", "Remove 2 Cards And 10 Red Chips From Your Hand\n Will Card");
         cardTooltips.put("Lovers", "Add 2 Cards And 10 Red Chips To Your Hand\n Will Card");
+
+        if(!cardTooltips.containsValue(name)) {
+            cardTooltips.put(name, name.replaceAll("of", "\n"));
+        }
     }
 
     private String[] generateShuffledCardNames() {
