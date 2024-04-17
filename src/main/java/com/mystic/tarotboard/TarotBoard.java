@@ -41,8 +41,8 @@ import java.util.*;
 public class TarotBoard extends Application {
 
     private static final int NUM_CARDS = 1091;
-    private static final double CARD_WIDTH = 150;
-    private static final double CARD_HEIGHT = 200;
+    private static final double CARD_WIDTH = 50;
+    private static final double CARD_HEIGHT = 67;
     private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
     private static final int NUM_CHIPS = 250;
     private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
@@ -120,7 +120,7 @@ public class TarotBoard extends Application {
             StackPane cardPane = new StackPane();
 
             Text cardNameText = new Text(cardNames[i]);
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
+            cardNameText.setStyle("-fx-font-size: 8pt; -fx-fill: lightblue;");
             cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
             cardNameText.setWrappingWidth(CARD_WIDTH); // Use the card width for centering
             cardNameText.setTextAlignment(TextAlignment.CENTER);
@@ -165,8 +165,8 @@ public class TarotBoard extends Application {
 
         generateChipTooltips();
 
-        double chipRadius = 50;
-        double spacing = 5;
+        double chipRadius = 30;
+        double spacing = 3;
 
         for (int i = 0; i < colors.length; i++) {
             String color = colors[i];
@@ -182,8 +182,8 @@ public class TarotBoard extends Application {
                 Color color1 = Color.valueOf(chip.color());
 
                 Circle circle = new Circle(chipRadius / 2);
-                circle.setCenterX(25.0);
-                circle.setCenterY(25.0);
+                circle.setCenterX(15.0);
+                circle.setCenterY(15.0);
 
                 // Apply color adjustment
                 Blend blend = new Blend(BlendMode.MULTIPLY);
@@ -193,7 +193,7 @@ public class TarotBoard extends Application {
                 StackPane chipPane = new StackPane();
 
                 // Create a new ImageView for each chip to apply different colors
-                BufferedImage resizedBackImage = resizeImage(bwBackImage);
+                BufferedImage resizedBackImage = resizeImage(bwBackImage, 30, 30);
                 ImageView chipBackImageView = new ImageView(SwingFXUtils.toFXImage(resizedBackImage, null));
                 chipBackImageView.setFitWidth(chipRadius);
                 chipBackImageView.setFitHeight(chipRadius);
@@ -201,7 +201,7 @@ public class TarotBoard extends Application {
                 chipBackImageView.setEffect(blend);
 
                 // Create an image view for the front of the chip
-                BufferedImage resizedFrontImage = resizeImage(bwFrontImage);
+                BufferedImage resizedFrontImage = resizeImage(bwFrontImage, 30, 30);
                 ImageView chipFrontImageView = new ImageView(SwingFXUtils.toFXImage(resizedFrontImage, null));
                 chipFrontImageView.setFitWidth(chipRadius);
                 chipFrontImageView.setFitHeight(chipRadius);
@@ -299,10 +299,10 @@ public class TarotBoard extends Application {
         return reshuffleCards;
     }
 
-    private BufferedImage resizeImage(BufferedImage originalImage) {
-        BufferedImage resizedImage = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+    private BufferedImage resizeImage(BufferedImage originalImage, int width, int height) {
+        BufferedImage resizedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics2D = resizedImage.createGraphics();
-        graphics2D.drawImage(originalImage, 0, 0, 50, 50, null);
+        graphics2D.drawImage(originalImage, 0, 0, width, height, null);
         graphics2D.dispose();
         return resizedImage;
     }
@@ -333,7 +333,7 @@ public class TarotBoard extends Application {
         String hoverText = cardTooltips.get(text);
         if (hoverText != null) {
             Tooltip tooltip = new Tooltip(hoverText);
-            tooltip.setStyle("-fx-font-size: 18pt;");
+            tooltip.setStyle("-fx-font-size: 10pt;");
 
             if(reshuffled) {
                 Tooltip.uninstall(pane, tooltip);
@@ -359,7 +359,7 @@ public class TarotBoard extends Application {
     private void makeChipTooltip(Pane pane, int i, int j, List<PokerChips> colorOfChips) {
         String hoverText = chipTooltips.get(Integer.toString(i * colorOfChips.size() + j));
         Tooltip tooltip = new Tooltip(hoverText);
-        tooltip.setStyle("-fx-font-size: 18pt;");
+        tooltip.setStyle("-fx-font-size: 10pt;");
         Tooltip.install(pane, tooltip);
 
         // Show tooltip on mouse enter
