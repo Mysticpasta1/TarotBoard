@@ -88,17 +88,18 @@ public class TarotBoard extends Application {
         Button singlePlayer = new Button("Single Player");
         singlePlayer.setStyle("-fx-font-size: 20pt;");
         singlePlayer.setOnAction(event -> switchToGame());
-        startLayout.setAlignment(Pos.CENTER);
+        Button solitaireButton = new Button("Solitaire");
+        solitaireButton.setStyle("-fx-font-size: 20pt;");
+        solitaireButton.setOnAction(event -> Solitaire.switchToSolitaireMode(primaryStage));
         Button quitButton = new Button("Quit");
         quitButton.setStyle("-fx-font-size: 20pt;");
         quitButton.setOnAction(event -> primaryStage.close());
-        startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
-
         Button howToPlayButton = new Button("How To Play: Tarot Poker IRL");
         howToPlayButton.setStyle("-fx-font-size: 20pt;");
         howToPlayButton.setOnAction(event -> displayHowToPlayDialog());
-
-        startLayout.getChildren().addAll(singlePlayer, howToPlayButton, quitButton);
+        startLayout.setAlignment(Pos.CENTER);
+        startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
+        startLayout.getChildren().addAll(singlePlayer, howToPlayButton, solitaireButton, quitButton);
         // Create the game scene
         Button backButton3 = new Button("Back to Start");
         backButton3.setOnAction(event -> switchToStart());
@@ -265,6 +266,23 @@ public class TarotBoard extends Application {
             }
         });
         return resetChips;
+    }
+
+    private void makeDraggable(StackPane pane) {
+        final double[] dragDeltaX = new double[1];
+        final double[] dragDeltaY = new double[1];
+
+        pane.setOnMousePressed(event -> {
+            dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
+            dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
+            pane.translateXProperty().unbind(); // Unbind translateX while dragging
+        });
+
+        pane.setOnMouseDragged(event -> {
+            pane.setTranslateX(event.getSceneX() - dragDeltaX[0]);
+            pane.setTranslateY(event.getSceneY() - dragDeltaY[0]);
+            pane.toFront();
+        });
     }
 
     private Button getReshuffleCards(StackPane[] cardPanes) {
@@ -601,59 +619,42 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void makeDraggable(StackPane pane) {
-        final double[] dragDeltaX = new double[1];
-        final double[] dragDeltaY = new double[1];
-
-        pane.setOnMousePressed(event -> {
-            dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
-            dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
-            pane.translateXProperty().unbind(); // Unbind translateX while dragging
-        });
-
-        pane.setOnMouseDragged(event -> {
-            pane.setTranslateX(event.getSceneX() - dragDeltaX[0]);
-            pane.setTranslateY(event.getSceneY() - dragDeltaY[0]);
-            pane.toFront();
-        });
-    }
-
     private void generateCardTooltips(String name) {
-        cardTooltips.put("Joker", "Wild Card, Can Be Matched With Anything Or, Added On Top Of Anything\n Will Card");
-        cardTooltips.put("Blessings of Heart", "Add 5 Red Chips To Your Hand\n Will Card");
-        cardTooltips.put("Follow of Soul", "Add 5 Blue Chips To Your Hand\n Will Card");
-        cardTooltips.put("Call of Light", "Add 2 Yellow Chips To Your Hand\n Will Card");
-        cardTooltips.put("Whisper of Dark", "Add 3 Dark Gray Chips To Your Hand\n Will Card");
-        cardTooltips.put("Judgement", "Pull Three Cards, Choose 1 For You, The Others Discards\n Will Card");
-        cardTooltips.put("Chorus", "Add 4 Purple Chips To Your Hand\n Will Card");
-        cardTooltips.put("Dawn of Death", "Remove All Chips From 1 Person\n Will Card");
-        cardTooltips.put("Night of Wrath", "Remove 2 Cards From Each Hand And The Draw Pile, Discard All\n Will Card");
-        cardTooltips.put("Voice", "Add A Card To Your Hand\n Will Card");
-        cardTooltips.put("Voices", "Add A Card To Everyone But Your Hand\n Will Card");
-        cardTooltips.put("Mother", "Add 5 Red Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Father", "Add 5 Red Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Brother", "Add 5 Red Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Sister", "Add 5 Red Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Duality", "Pull Two Card, Give Yourself One And One To A Friend Or Foe\n Will Card");
-        cardTooltips.put("Husband", "Remove 5 Red Chips From Everyone's Hand\n Will Card");
-        cardTooltips.put("Wife", "Remove 5 Red Chips To Another Player's Hand\n Will Card");
-        cardTooltips.put("Progeny", "Remove 15 Red Chips From Your Hand\n Will Card");
-        cardTooltips.put("Corridor", "Draw 10, Discard 5\n Will Card");
-        cardTooltips.put("Field", "Draw 20, Discard 10\n Will Card");
-        cardTooltips.put("Intellect", "Discard 10\n Will Card");
-        cardTooltips.put("Brawn", "Discard 20\n Will Card");
-        cardTooltips.put("Hope", "Add One Extra Card To Your Hand and One Face Up In The Middle\n Will Card");
-        cardTooltips.put("Despair", "Remove 3 Cards From A Person Of Your Choosing\n Will Card");
-        cardTooltips.put("Past", "Add 3 Cards From The Draw To Your Hand\n Will Card");
-        cardTooltips.put("Present", "Add 2 Cards From The Draw To Your Hand\n Will Card");
-        cardTooltips.put("Future", "Remove 3 Cards From Your Hand And Discard\n Will Card");
-        cardTooltips.put("Gate", "Remove 3 Red Chips (If You Have Some Chips) From Your Hand\n Will Card");
-        cardTooltips.put("Sign", "Draw 2 Cards And Discard 2 Other Cards\n Will Card");
-        cardTooltips.put("Ruin", "Reshuffle All Cards, All Player Draw 5\n Will Card");
-        cardTooltips.put("Snow", "Add 3 White Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Rain", "Add 3 Cyan Chips To Everyone's Hand\n Will Card");
-        cardTooltips.put("Tempest", "Remove 2 Cards And 10 Red Chips From Your Hand\n Will Card");
-        cardTooltips.put("Lovers", "Add 2 Cards And 10 Red Chips To Your Hand\n Will Card");
+        cardTooltips.put("Joker", "Wild Card");
+        cardTooltips.put("Blessings of Heart", "Wild Card");
+        cardTooltips.put("Follow of Soul", "Wild Card");
+        cardTooltips.put("Call of Light", "Wild Card");
+        cardTooltips.put("Whisper of Dark", "Wild Card");
+        cardTooltips.put("Judgement", "Wild Card");
+        cardTooltips.put("Chorus", "Wild Card");
+        cardTooltips.put("Dawn of Death", "Wild Card");
+        cardTooltips.put("Night of Wrath", "Wild Card");
+        cardTooltips.put("Voice", "Wild Card");
+        cardTooltips.put("Voices", "Wild Card");
+        cardTooltips.put("Mother", "Wild Card");
+        cardTooltips.put("Father", "Wild Card");
+        cardTooltips.put("Brother", "Wild Card");
+        cardTooltips.put("Sister", "Wild Card");
+        cardTooltips.put("Duality", "Wild Card");
+        cardTooltips.put("Husband", "Wild Card");
+        cardTooltips.put("Wife", "Wild Card");
+        cardTooltips.put("Progeny", "Wild Card");
+        cardTooltips.put("Corridor", "Wild Card");
+        cardTooltips.put("Field", "Wild Card");
+        cardTooltips.put("Intellect", "Wild Card");
+        cardTooltips.put("Brawn", "Wild Card");
+        cardTooltips.put("Hope", "Wild Card");
+        cardTooltips.put("Despair", "Wild Card");
+        cardTooltips.put("Past", "Wild Card");
+        cardTooltips.put("Present", "Wild Card");
+        cardTooltips.put("Future", "Wild Card");
+        cardTooltips.put("Gate", "Wild Card");
+        cardTooltips.put("Sign", "Wild Card");
+        cardTooltips.put("Ruin", "Wild Card");
+        cardTooltips.put("Snow", "Wild Card");
+        cardTooltips.put("Rain", "Wild Card");
+        cardTooltips.put("Tempest", "Wild Card");
+        cardTooltips.put("Lovers", "Wild Card");
 
         if(!cardTooltips.containsValue(name)) {
             cardTooltips.put(name, name.replaceAll("of", "\n"));
