@@ -46,7 +46,7 @@ public class TarotBoard extends Application {
     private static final int NUM_CARDS = 1091;
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
-    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "light-blue", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
+    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "lightblue", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
     private static final int NUM_CHIPS = 250;
     private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
     private int rotationAngle = 0;
@@ -125,53 +125,51 @@ public class TarotBoard extends Application {
             // Create a stack pane to overlay the front and back images
             StackPane cardPane = new StackPane();
 
-            for (String cardName : cardNames) {
-                Matcher matcher = CARD_PATTERN.matcher(cardName);
-                if (matcher.matches()) {
-                    String value = matcher.group("value");
-                    String suit = matcher.group("suit");
-                    Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT);
+            Matcher matcher = CARD_PATTERN.matcher(cardNames[i]);
+            if (matcher.matches()) {
+                String value = matcher.group("value");
+                String suit = matcher.group("suit");
+                Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT);
 
-                    rank = card.getRank();
+                rank = card.getRank();
 
-                    cardNameText = card.getCardName();
+                cardNameText = card.getCardName();
 
-                    StackPane pane = card.getCardPane();
+                StackPane pane = card.getCardPane();
 
-                    pane.setTranslateX(50);
-                    pane.setTranslateY(50);
+                pane.setTranslateX(50);
+                pane.setTranslateY(50);
 
-                    // Make the card movable
-                    makeDraggable(pane);
-                    makeFlippableAndRotatable(pane);
+                // Make the card movable
+                makeDraggable(pane);
+                makeFlippableAndRotatable(pane);
 
-                    cardPanes[i] = pane;
-                } else {
-                    cardNameText = getWildCardName(cardName);
+                cardPanes[i] = pane;
+            } else {
+                cardNameText = getWildCardName(cardNames[i]);
 
-                    // Initially show the back of the card
-                    ImageView cardBackImageView = new ImageView(cardBackImage);
-                    cardBackImageView.setFitWidth(CARD_WIDTH);
-                    cardBackImageView.setFitHeight(CARD_HEIGHT);
-                    cardBackImageView.setVisible(true);
+                // Initially show the back of the card
+                ImageView cardBackImageView = new ImageView(cardBackImage);
+                cardBackImageView.setFitWidth(CARD_WIDTH);
+                cardBackImageView.setFitHeight(CARD_HEIGHT);
+                cardBackImageView.setVisible(true);
 
-                    // Create an image view for the front of the card (hidden initially)
-                    ImageView cardFrontImageView = new ImageView(cardFrontImage);
-                    cardFrontImageView.setFitWidth(CARD_WIDTH);
-                    cardFrontImageView.setFitHeight(CARD_HEIGHT);
-                    cardFrontImageView.setVisible(false);
+                // Create an image view for the front of the card (hidden initially)
+                ImageView cardFrontImageView = new ImageView(cardFrontImage);
+                cardFrontImageView.setFitWidth(CARD_WIDTH);
+                cardFrontImageView.setFitHeight(CARD_HEIGHT);
+                cardFrontImageView.setVisible(false);
 
-                    cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+                cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
 
-                    cardPane.setTranslateX(50);
-                    cardPane.setTranslateY(50);
+                cardPane.setTranslateX(50);
+                cardPane.setTranslateY(50);
 
-                    // Make the card movable
-                    makeDraggable(cardPane);
-                    makeFlippableAndRotatable(cardPane);
+                // Make the card movable
+                makeDraggable(cardPane);
+                makeFlippableAndRotatable(cardPane);
 
-                    cardPanes[i] = cardPane;
-                }
+                cardPanes[i] = cardPane;
             }
 
             // Add the card pane to the array
