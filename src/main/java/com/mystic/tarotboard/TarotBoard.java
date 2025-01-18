@@ -88,9 +88,6 @@ public class TarotBoard extends Application {
         Button singlePlayer = new Button("Single Player");
         singlePlayer.setStyle("-fx-font-size: 20pt;");
         singlePlayer.setOnAction(event -> switchToGame());
-        Button solitaireButton = new Button("Solitaire");
-        solitaireButton.setStyle("-fx-font-size: 20pt;");
-        solitaireButton.setOnAction(event -> Solitaire.switchToSolitaireMode(primaryStage));
         Button quitButton = new Button("Quit");
         quitButton.setStyle("-fx-font-size: 20pt;");
         quitButton.setOnAction(event -> primaryStage.close());
@@ -99,7 +96,7 @@ public class TarotBoard extends Application {
         howToPlayButton.setOnAction(event -> displayHowToPlayDialog());
         startLayout.setAlignment(Pos.CENTER);
         startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
-        startLayout.getChildren().addAll(singlePlayer, howToPlayButton, solitaireButton, quitButton);
+        startLayout.getChildren().addAll(singlePlayer, howToPlayButton, quitButton);
         // Create the game scene
         Button backButton3 = new Button("Back to Start");
         backButton3.setOnAction(event -> switchToStart());
