@@ -691,9 +691,14 @@ public class TarotBoard extends Application {
         cardTooltips.put("Lovers", "Wild Card");
 
         if (!cardTooltips.containsValue(name)) {
-            cardTooltips.put(name,
-                    name.replaceAll("of", "\n") +
-                            "\n" + rank);
+            if(rank != Math.PI) {
+                cardTooltips.put(name,
+                        name.replaceAll("of", "\n") +
+                                "\n" + rank);
+            } else {
+                cardTooltips.put(name,
+                        name.replaceAll("of", "\n"));
+            }
         }
     }
 
