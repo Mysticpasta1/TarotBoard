@@ -9,21 +9,38 @@ import java.util.Objects;
 import java.util.Set;
 
 public class Card {
+    /*TODO
+       Make negative value cards with a black or darker color background to normal cards!
+       There would be 32 negative values in each suit!
+       Suit text color will still be Blue, Red, Yellow, Green, possibly more in the future!
+       Color of text will depend on color of card in Minecraft Mods variation!
+     */
+
     private final String value;
     private final String suit;
-    private boolean faceUp;
-    private final StackPane cardPane; // The visual representation of the card
+    private final StackPane cardPane;
+    private final Text cardName; // The visual representation of the card
 
     // List of suits categorized by color
-    public static final Set<String> RED_SUITS = Set.of(
-            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
-            "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers", "Hearts"
+    public static final Set<String> BLUE_SUITS = Set.of(
+            "Arcs", "Spades", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns"
     );
 
-    public Card(String value, String suit) {
+    public static final Set<String> RED_SUITS = Set.of(
+            "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers", "Hearts"
+    );
+
+    public static final Set<String> YELLOW_SUITS = Set.of(
+            "Arrows", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells"
+    );
+
+    public static final Set<String> GREEN_SUITS = Set.of(
+            "Shields", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
+    );
+
+    public Card(String value, String suit, double width, double height) {
         this.value = value;
         this.suit = suit;
-        this.faceUp = false; // Initially face down
 
         // Initialize the cardPane
         cardPane = new StackPane();
@@ -41,18 +58,28 @@ public class Card {
         cardBackImageView.setVisible(true);
 
         // Adjust image view size (match your card size)
-        cardFrontImageView.setFitWidth(150); // Use your CARD_WIDTH
-        cardFrontImageView.setFitHeight(200); // Use your CARD_HEIGHT
-        cardBackImageView.setFitWidth(150);
-        cardBackImageView.setFitHeight(200);
+        cardFrontImageView.setFitWidth(width); // Use your CARD_WIDTH
+        cardFrontImageView.setFitHeight(height); // Use your CARD_HEIGHT
+        cardBackImageView.setFitWidth(width);
+        cardBackImageView.setFitHeight(height);
 
         // Add text for card name
-        Text cardNameText = new Text(value + " of " + suit);
-        cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: " + (getColor().equals("red") ? "red" : "lightblue") + ";");
-        cardNameText.setVisible(false);
+        this.cardName = new Text(value + " of " + suit);
+
+        if (RED_SUITS.contains(suit)) {
+            this.cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "firebrick" + ";");
+        } else if (BLUE_SUITS.contains(suit)) {
+            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "light-blue" + ";");
+        } else if (YELLOW_SUITS.contains(suit)) {
+            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "yellow" + ";");
+        } else if (GREEN_SUITS.contains(suit)) {
+            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "green" + ";");
+        }
+
+        cardName.setVisible(false);
 
         // Add images and text to cardPane
-        cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+        cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardName);
     }
 
     public String getValue() {
@@ -63,27 +90,15 @@ public class Card {
         return suit;
     }
 
-    public boolean isFaceUp() {
-        return faceUp;
+    public Text getCardName() {
+        return cardName;
     }
 
-    public void flip() {
-        faceUp = !faceUp;
-        // Update the visual representation
-        cardPane.getChildren().get(0).setVisible(!faceUp); // cardBackImageView
-        cardPane.getChildren().get(1).setVisible(faceUp); // cardFrontImageView
-        cardPane.getChildren().get(2).setVisible(faceUp); // cardNameText
-    }
-
-    // Utility method to get the color of the card (red or black)
-    public String getColor() {
-        return RED_SUITS.contains(suit) ? "red" : "black";
-    }
-
-    public int getRank() {
+    //I want to use negative card value for later so using PI for an unknown value
+    public double getRank() {
         return switch (value) {
-            case "(0) Hold" -> 0;
-            case "(1) Ace" -> 1;
+            case "Hold" -> 0;
+            case "Ace" -> 1;
             case "2" -> 2;
             case "3" -> 3;
             case "4" -> 4;
@@ -93,29 +108,29 @@ public class Card {
             case "8" -> 8;
             case "9" -> 9;
             case "10" -> 10;
-            case "(11) Jack" -> 11;
-            case "(12) Queen" -> 12;
-            case "(13) King" -> 13;
-            case "(14) Nomad" -> 14;
-            case "(15) Prince" -> 15;
-            case "(16) Rune" -> 16;
-            case "(17) Fable" -> 17;
-            case "(18) Sorceress" -> 18;
-            case "(19) Utopia" -> 19;
-            case "(20) Wizard" -> 20;
-            case "(21) Titan" -> 21;
-            case "(22) Baron" -> 22;
-            case "(23) Illusionist" -> 23;
-            case "(24) Oracle" -> 24;
-            case "(25) Magician" -> 25;
-            case "(26) Luminary" -> 26;
-            case "(27) Eclipse" -> 27;
-            case "(28) Celestial" -> 28;
-            case "(29) Duke" -> 29;
-            case "(30) Genesis" -> 30;
-            case "(31) Zephyr" -> 31;
-            case "(32) Vesper" -> 32;
-            default -> -1; // Invalid or unknown value
+            case "Jack" -> 11;
+            case "Queen" -> 12;
+            case "King" -> 13;
+            case "Nomad" -> 14;
+            case "Prince" -> 15;
+            case "Rune" -> 16;
+            case "Fable" -> 17;
+            case "Sorceress" -> 18;
+            case "Utopia" -> 19;
+            case "Wizard" -> 20;
+            case "Titan" -> 21;
+            case "Baron" -> 22;
+            case "Illusionist" -> 23;
+            case "Oracle" -> 24;
+            case "Magician" -> 25;
+            case "Luminary" -> 26;
+            case "Eclipse" -> 27;
+            case "Celestial" -> 28;
+            case "Duke" -> 29;
+            case "Genesis" -> 30;
+            case "Zephyr" -> 31;
+            case "Vesper" -> 32;
+            default -> Math.PI; // Invalid or unknown value
         };
     }
 

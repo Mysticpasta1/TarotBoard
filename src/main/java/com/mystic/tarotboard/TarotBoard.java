@@ -37,13 +37,16 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TarotBoard extends Application {
 
+    private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[^ ]+) of (?<suit>.+)$");
     private static final int NUM_CARDS = 1091;
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
-    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
+    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "light-blue", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
     private static final int NUM_CHIPS = 250;
     private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
     private int rotationAngle = 0;
@@ -62,12 +65,12 @@ public class TarotBoard extends Application {
             "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
     };
     private final String[] values = {
-            "(0) Hold", "(1) Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-            "(11) Jack", "(12) Queen", "(13) King", "(14) Nomad", "(15) Prince",
-            "(16) Rune", "(17) Fable", "(18) Sorceress", "(19) Utopia", "(20) Wizard",
-            "(21) Titan", "(22) Baron", "(23) Illusionist", "(24) Oracle", "(25) Magician",
-            "(26) Luminary", "(27) Eclipse", "(28) Celestial", "(29) Duke", "(30) Genesis",
-            "(31) Zephyr", "(32) Vesper"
+            "Hold", "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+            "Jack", "Queen", "King", "Nomad", "Prince",
+            "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
+            "Titan", "Baron", "Illusionist", "Oracle", "Magician",
+            "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
+            "Zephyr", "Vesper"
     };
 
     @Override
@@ -111,44 +114,69 @@ public class TarotBoard extends Application {
 
         // Create and position cards in the stack
         for (int i = 0; i < NUM_CARDS; i++) {
+            Text cardNameText = new Text("");
+
+            //I want to use negative card value for later so using PI for an unknown value
+            double rank = Math.PI;
+
             // Load the custom images for the card fronts and backs
             Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
             Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
             // Create a stack pane to overlay the front and back images
             StackPane cardPane = new StackPane();
 
-            Text cardNameText = new Text(cardNames[i]);
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
-            cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
-            cardNameText.setWrappingWidth(CARD_WIDTH); // Use the card width for centering
-            cardNameText.setTextAlignment(TextAlignment.CENTER);
-            cardNameText.setTranslateY(0);
-            cardNameText.setVisible(false);
+            for (String cardName : cardNames) {
+                Matcher matcher = CARD_PATTERN.matcher(cardName);
+                if (matcher.matches()) {
+                    String value = matcher.group("value");
+                    String suit = matcher.group("suit");
+                    Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT);
 
-            // Initially show the back of the card
-            ImageView cardBackImageView = new ImageView(cardBackImage);
-            cardBackImageView.setFitWidth(CARD_WIDTH);
-            cardBackImageView.setFitHeight(CARD_HEIGHT);
-            cardBackImageView.setVisible(true);
+                    rank = card.getRank();
 
-            // Create an image view for the front of the card (hidden initially)
-            ImageView cardFrontImageView = new ImageView(cardFrontImage);
-            cardFrontImageView.setFitWidth(CARD_WIDTH);
-            cardFrontImageView.setFitHeight(CARD_HEIGHT);
-            cardFrontImageView.setVisible(false);
+                    cardNameText = card.getCardName();
 
-            cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
-            cardPane.setTranslateX(50);
-            cardPane.setTranslateY(50);
+                    StackPane pane = card.getCardPane();
 
-            // Make the card movable
-            makeDraggable(cardPane);
-            makeFlippableAndRotatable(cardPane);
+                    pane.setTranslateX(50);
+                    pane.setTranslateY(50);
+
+                    // Make the card movable
+                    makeDraggable(pane);
+                    makeFlippableAndRotatable(pane);
+
+                    cardPanes[i] = pane;
+                } else {
+                    cardNameText = getWildCardName(cardName);
+
+                    // Initially show the back of the card
+                    ImageView cardBackImageView = new ImageView(cardBackImage);
+                    cardBackImageView.setFitWidth(CARD_WIDTH);
+                    cardBackImageView.setFitHeight(CARD_HEIGHT);
+                    cardBackImageView.setVisible(true);
+
+                    // Create an image view for the front of the card (hidden initially)
+                    ImageView cardFrontImageView = new ImageView(cardFrontImage);
+                    cardFrontImageView.setFitWidth(CARD_WIDTH);
+                    cardFrontImageView.setFitHeight(CARD_HEIGHT);
+                    cardFrontImageView.setVisible(false);
+
+                    cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+
+                    cardPane.setTranslateX(50);
+                    cardPane.setTranslateY(50);
+
+                    // Make the card movable
+                    makeDraggable(cardPane);
+                    makeFlippableAndRotatable(cardPane);
+
+                    cardPanes[i] = cardPane;
+                }
+            }
 
             // Add the card pane to the array
-            cardPanes[i] = cardPane;
             reshuffled = false;
-            generateCardTooltips(cardNameText.getText());
+            generateCardTooltips(cardNameText.getText(), rank);
             makeCardTooltip(cardPane, cardNameText.getText(), reshuffled);
             // Add the card to the root pane
             gameRoot.getChildren().add(cardPane);
@@ -240,6 +268,17 @@ public class TarotBoard extends Application {
         primaryStage.setWidth(screenBounds.getWidth());
         primaryStage.setHeight(screenBounds.getHeight());
         primaryStage.show();
+    }
+
+    private static Text getWildCardName(String cardNames) {
+        Text cardNameText = new Text(cardNames);
+        cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
+        cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
+        cardNameText.setWrappingWidth(CARD_WIDTH); // Use the card width for centering
+        cardNameText.setTextAlignment(TextAlignment.CENTER);
+        cardNameText.setTranslateY(0);
+        cardNameText.setVisible(false);
+        return cardNameText;
     }
 
     private Button getResetButton(double chipRadius, double spacing) {
@@ -350,7 +389,7 @@ public class TarotBoard extends Application {
             Tooltip tooltip = new Tooltip(hoverText);
             tooltip.setStyle("-fx-font-size: 18pt;");
 
-            if(reshuffled) {
+            if (reshuffled) {
                 Tooltip.uninstall(pane, tooltip);
             }
 
@@ -616,7 +655,7 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void generateCardTooltips(String name) {
+    private void generateCardTooltips(String name, double rank) {
         cardTooltips.put("Joker", "Wild Card");
         cardTooltips.put("Blessings of Heart", "Wild Card");
         cardTooltips.put("Follow of Soul", "Wild Card");
@@ -653,8 +692,10 @@ public class TarotBoard extends Application {
         cardTooltips.put("Tempest", "Wild Card");
         cardTooltips.put("Lovers", "Wild Card");
 
-        if(!cardTooltips.containsValue(name)) {
-            cardTooltips.put(name, name.replaceAll("of", "\n"));
+        if (!cardTooltips.containsValue(name)) {
+            cardTooltips.put(name,
+                    name.replaceAll("of", "\n") +
+                            "\n" + rank);
         }
     }
 
