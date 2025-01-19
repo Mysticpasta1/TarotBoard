@@ -84,8 +84,6 @@ public class Card {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
         } else if (GREEN_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: green;");
-        } else {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
         }
 
         return cardNameText;

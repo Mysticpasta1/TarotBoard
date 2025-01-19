@@ -103,15 +103,34 @@ public class TarotBoard extends Application {
             if (matcher.matches()) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
 
-                rank = card.getRank();
+                if(TarotBoard.values.contains(value)) {
+                    Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
+                    rank = card.getRank();
+                    cardNameText = card.getCardName();
+                    StackPane pane = card.getCardPane();
+                    cardPanes[i] = pane;
+                } else {
+                    StackPane cardPane = new StackPane();
 
-                cardNameText = card.getCardName();
+                    cardNameText = getWildCardName(cardNames[i]);
 
-                StackPane pane = card.getCardPane();
+                    // Initially show the back of the card
+                    ImageView cardBackImageView = new ImageView(cardBackImage);
+                    cardBackImageView.setFitWidth(CARD_WIDTH);
+                    cardBackImageView.setFitHeight(CARD_HEIGHT);
+                    cardBackImageView.setVisible(true);
 
-                cardPanes[i] = pane;
+                    // Create an image view for the front of the card (hidden initially)
+                    ImageView cardFrontImageView = new ImageView(cardFrontImage);
+                    cardFrontImageView.setFitWidth(CARD_WIDTH);
+                    cardFrontImageView.setFitHeight(CARD_HEIGHT);
+                    cardFrontImageView.setVisible(false);
+
+                    cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+
+                    cardPanes[i] = cardPane;
+                }
             } else {
                 StackPane cardPane = new StackPane();
 
@@ -338,9 +357,15 @@ public class TarotBoard extends Application {
                 if (matcher.matches()) {
                     String value = matcher.group("value");
                     String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getText(value, suit).getText());
-                    cardNameText.setStyle(Card.getText(value, suit).getStyle());
-                    makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                    if(TarotBoard.values.contains(value)) {
+                        cardNameText.setText(Card.getText(value, suit).getText());
+                        cardNameText.setStyle(Card.getText(value, suit).getStyle());
+                        makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                    } else {
+                        cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
+                        cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
+                        makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                    }
                 } else {
                     cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
                     cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
@@ -477,9 +502,15 @@ public class TarotBoard extends Application {
             if (matcher.matches()) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                cardNameText.setText(Card.getText(value, suit).getText());
-                cardNameText.setStyle(Card.getText(value, suit).getStyle());
-                makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                if(TarotBoard.values.contains(value)) {
+                    cardNameText.setText(Card.getText(value, suit).getText());
+                    cardNameText.setStyle(Card.getText(value, suit).getStyle());
+                    makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                } else {
+                    cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
+                    cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
+                    makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                }
             } else {
                 cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
                 cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
