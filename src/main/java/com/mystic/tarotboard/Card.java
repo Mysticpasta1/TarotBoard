@@ -5,7 +5,6 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
 
-import java.util.Objects;
 import java.util.Set;
 
 public class Card {
@@ -17,7 +16,6 @@ public class Card {
      */
 
     private final String value;
-    private final String suit;
     private final StackPane cardPane;
     private final Text cardName; // The visual representation of the card
 
@@ -38,16 +36,11 @@ public class Card {
             "Shields", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
     );
 
-    public Card(String value, String suit, double width, double height) {
+    public Card(String value, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
         this.value = value;
-        this.suit = suit;
 
         // Initialize the cardPane
         cardPane = new StackPane();
-
-        // Load card images (ensure paths are correct)
-        Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
-        Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
 
         // Create ImageViews for front and back of the card
         ImageView cardFrontImageView = new ImageView(cardFrontImage);
@@ -64,30 +57,39 @@ public class Card {
         cardBackImageView.setFitHeight(height);
 
         // Add text for card name
-        this.cardName = new Text(value + " of " + suit);
-
-        if (RED_SUITS.contains(suit)) {
-            this.cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "firebrick" + ";");
-        } else if (BLUE_SUITS.contains(suit)) {
-            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "light-blue" + ";");
-        } else if (YELLOW_SUITS.contains(suit)) {
-            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "yellow" + ";");
-        } else if (GREEN_SUITS.contains(suit)) {
-            cardName.setStyle("-fx-font-size: 15pt; -fx-fill: " + "green" + ";");
-        }
-
-        cardName.setVisible(false);
+        Text cardNameText = getText(value, suit);
 
         // Add images and text to cardPane
-        cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardName);
+        cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
+
+        this.cardName = cardNameText;
+    }
+
+    public static Text getText(String value, String suit) {
+        Text cardNameText = new Text(value + " of " + suit);
+
+        if (RED_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
+        }
+
+        if (BLUE_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
+        }
+
+        if (YELLOW_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
+        }
+
+        if (GREEN_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: green;");
+        }
+
+        cardNameText.setVisible(false);
+        return cardNameText;
     }
 
     public String getValue() {
         return value;
-    }
-
-    public String getSuit() {
-        return suit;
     }
 
     public Text getCardName() {
