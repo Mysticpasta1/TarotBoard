@@ -1,21 +1,15 @@
 package com.mystic.tarotboard;
 
-import com.traneptora.jxlatte.JXLDecoder;
-import com.traneptora.jxlatte.JXLOptions;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
-import javafx.scene.effect.Blend;
-import javafx.scene.effect.BlendMode;
-import javafx.scene.effect.ColorAdjust;
-import javafx.scene.effect.ColorInput;
+import javafx.scene.effect.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
@@ -25,13 +19,10 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
+import javafx.scene.transform.Translate;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.util.List;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -39,11 +30,54 @@ import java.util.regex.Pattern;
 
 public class TarotBoard extends Application {
 
-    private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[^ ]+) of (?<suit>.+)$");
-    private static final int NUM_CARDS = 1091;
+    private static final List<String> wilds = List.of(
+            "Joker", "Soul", "Light", "Dark", "Judgement", "Chorus", "Life", "Death", "Wrath",
+            "Pride", "Greed", "Lust", "Envy", "Gluttony", "Sloth", "Chasity", "Temperance", "Charity",
+            "Diligence", "Kindness", "Patience", "Humility", "Voice", "Voices", "Mother", "Father", "Brother",
+            "Sister", "Duality", "Accord", "Husband", "Wife", "Progeny", "Corridor", "Field", "Intellect", "Brawn",
+            "Despair", "Past", "Present", "Future", "Gate", "Sign", "Ruin", "Snow", "Rain", "Tempest", "Lovers",
+            "Discord", "Concord", "Harmony", "Dissonance", "Earth", "Fire", "Water", "Air", "Spirit",
+            "Oblivion", "Obscurity", "Purgatory", "Nether", "Underworld", "Aether", "Overworld", "Limbo", "Chaos",
+            "Balance", "Doom", "Peace", "Evil", "Good", "Neutral", "Hope"
+    );
+
+    private static final List<String> suits = List.of(
+            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
+            "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
+            "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells",
+            "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves",
+            "Quasars", "Runes", "Omens", "Sigils", "Orbs", "Veils", "Looms", "Shards"
+    );
+
+    public static final List<String> values = List.of(
+            //Negative Cards
+            "Shadow", "Specter", "Phantom", "Void", "Wraith",
+            "Ghoul", "Banshee", "Reverent", "Eidolon", "Shade",
+            "Doppelganger", "Hollow", "Abyss", "Chimera", "Poltergeist",
+            "Wight", "Apparition", "Nightmare", "Succubus", "Incubus",
+            "Necromancer", "Fury", "Grim", "Harbinger", "Spectacle",
+            "Banshee", "Chimera", "Drake", "Eidolon", "Frost",
+            "Golem", "Hydra", "Inferno", "Juggernaut", "Kraken", "Abyss",
+            "Leviathan", "Manticore", "Naga", "Blight", "Serpent",
+
+            //Neutral Card
+            "Hold",
+
+            //Positive Cards
+            "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+            "Jack", "Queen", "King", "Nomad", "Prince",
+            "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
+            "Titan", "Baron", "Illusionist", "Oracle", "Magician",
+            "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
+            "Zephyr", "Vesper", "Umbra", "Valkyrie",
+            "Warden", "Zenith", "Yggdrasil", "Zodiac", "Phoenix", "Raven", "Cipher"
+    );
+
+    private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
+    private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
-    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "lightblue", "darkorchid", "purple", "gray", "darkgray", "white"};
+    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "lightblue", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
     private static final int NUM_CHIPS = 250;
     private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
     private static int rotationAngle = 0;
@@ -55,22 +89,7 @@ public class TarotBoard extends Application {
     private final List<PokerChips> pokerChips = new ArrayList<>();
     private final StackPane[] chipPanes = new StackPane[TOTAL_CHIPS];
     private static boolean reshuffled = false;
-
-    private static final Set<String> suits = Set.of(
-            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
-            "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
-            "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells",
-            "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
-    );
-
-    public static final Set<String> values = Set.of(
-            "Hold", "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-            "Jack", "Queen", "King", "Nomad", "Prince",
-            "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
-            "Titan", "Baron", "Illusionist", "Oracle", "Magician",
-            "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
-            "Zephyr", "Vesper"
-    );
+    private static final ObservableList<String> cardNames = FXCollections.observableArrayList();
 
     @Override
     public void start(Stage primaryStage) {
@@ -85,64 +104,39 @@ public class TarotBoard extends Application {
         Background background = new Background(backgroundImage);
         gameRoot.setBackground(background);
 
-        String[] cardNames = generateShuffledCardNames();
+        addCardNames();
+        generateShuffledCardNames();
         StackPane[] cardPanes = new StackPane[NUM_CARDS]; // Array to store card panes
 
-        // Create and position cards in the stack
+        // Preload card images only once
+        Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
+        Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
+
         for (int i = 0; i < NUM_CARDS; i++) {
+            double rank = Math.PI;
             Text cardNameText;
 
-            //I want to use negative card value for later so using PI for an unknown value
-            double rank = Math.PI;
-
-            // Load the custom images for the card fronts and backs
-            Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
-            Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
-
-            Matcher matcher = CARD_PATTERN.matcher(cardNames[i]);
-            if (matcher.matches()) {
+            Matcher matcher = CARD_PATTERN.matcher(cardNames.get(i));
+            if (matcher.matches() && !wilds.contains(cardNames.get(i))) {
+                // Process normal cards
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-
-                if(TarotBoard.values.contains(value)) {
-                    Card card = new Card(value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
-                    rank = card.getRank();
-                    cardNameText = card.getCardName();
-                    StackPane pane = card.getCardPane();
-                    cardPanes[i] = pane;
-                } else {
-                    StackPane cardPane = new StackPane();
-
-                    cardNameText = getWildCardName(cardNames[i]);
-
-                    // Initially show the back of the card
-                    ImageView cardBackImageView = new ImageView(cardBackImage);
-                    cardBackImageView.setFitWidth(CARD_WIDTH);
-                    cardBackImageView.setFitHeight(CARD_HEIGHT);
-                    cardBackImageView.setVisible(true);
-
-                    // Create an image view for the front of the card (hidden initially)
-                    ImageView cardFrontImageView = new ImageView(cardFrontImage);
-                    cardFrontImageView.setFitWidth(CARD_WIDTH);
-                    cardFrontImageView.setFitHeight(CARD_HEIGHT);
-                    cardFrontImageView.setVisible(false);
-
-                    cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
-
-                    cardPanes[i] = cardPane;
-                }
+                Card card = new Card(cardNames.get(i), suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
+                rank = Card.getRank(value);
+                cardNameText = card.getCardName();
+                cardPanes[i] = card.getCardPane();
             } else {
                 StackPane cardPane = new StackPane();
 
-                cardNameText = getWildCardName(cardNames[i]);
+                // Process wild cards
+                cardNameText = getWildCardName(new Text(cardNames.get(i)));
 
-                // Initially show the back of the card
+                // Set up the images (no need to create them multiple times)
                 ImageView cardBackImageView = new ImageView(cardBackImage);
                 cardBackImageView.setFitWidth(CARD_WIDTH);
                 cardBackImageView.setFitHeight(CARD_HEIGHT);
                 cardBackImageView.setVisible(true);
 
-                // Create an image view for the front of the card (hidden initially)
                 ImageView cardFrontImageView = new ImageView(cardFrontImage);
                 cardFrontImageView.setFitWidth(CARD_WIDTH);
                 cardFrontImageView.setFitHeight(CARD_HEIGHT);
@@ -153,21 +147,23 @@ public class TarotBoard extends Application {
                 cardPanes[i] = cardPane;
             }
 
+            // Set initial positions and make draggable and flippable
             cardPanes[i].setTranslateX(50);
             cardPanes[i].setTranslateY(50);
-
-            // Make the card movable
-            makeDraggable(cardPanes[i]);
+            makeDraggable(cardPanes[i], new Translate());
             makeFlippableAndRotatable(cardPanes[i]);
 
-            // Add the card pane to the array
+            // Tooltip setup
             reshuffled = false;
             generateCardTooltips(cardNameText.getText(), rank);
-            makeCardTooltip(cardPanes[i], cardNameText.getText(), reshuffled);
+            makeCardTooltip(cardPanes[i], cardNameText.getText(), reshuffled); //Set to 0 since reshuffled is false here!
+
             // Add the card to the root pane
             gameRoot.getChildren().add(cardPanes[i]);
-        }
 
+            // Store the card's reference for later use (if necessary)
+
+        }
 
         for (String color : colors) {
             for (int i = 0; i < NUM_CHIPS; i++) {
@@ -177,6 +173,11 @@ public class TarotBoard extends Application {
 
         generateChipTooltips();
 
+        // Preload poker chip images only once
+        Image bwFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/front_poker_chips.png")));
+        Image bwBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/back_poker_chips.png")));
+
+        // Define the chip color adjustment blend
         double chipRadius = 50;
         double spacing = 5;
 
@@ -184,67 +185,51 @@ public class TarotBoard extends Application {
             String color = colors[i];
             List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.color().equals(color)).toList();
 
-            BufferedImage bwFrontImage = loadImage("com/mystic/tarotboard/assets/front_poker_chips.jxl");
-            BufferedImage bwBackImage = loadImage("com/mystic/tarotboard/assets/back_poker_chips.jxl");
-
-            ColorAdjust colorAdjust = new ColorAdjust(0, 0, 0.5, 0);
-
             for (int j = 0; j < chipsOfColor.size(); j++) {
                 PokerChips chip = chipsOfColor.get(j);
-                Color color1 = Color.valueOf(chip.color());
+                Color chipColor = Color.valueOf(chip.color());
 
-                Circle circle = new Circle(chipRadius / 2);
-                circle.setCenterX(25.0);
-                circle.setCenterY(25.0);
+                // Create a Circle clip for the chip
+                Circle circleClip = new Circle(chipRadius / 2);
+                circleClip.setCenterX(chipRadius / 2);
+                circleClip.setCenterY(chipRadius / 2);
 
-                // Apply color adjustment
-                Blend blend = new Blend(BlendMode.MULTIPLY);
-                blend.setBottomInput(new ColorInput(0, 0, chipRadius, chipRadius, color1));
-                blend.setTopInput(colorAdjust);
-
+                // Create StackPane for chip
                 StackPane chipPane = new StackPane();
 
-                // Create a new ImageView for each chip to apply different colors
-                BufferedImage resizedBackImage = resizeImage(bwBackImage);
-                ImageView chipBackImageView = new ImageView(SwingFXUtils.toFXImage(resizedBackImage, null));
-                chipBackImageView.setFitWidth(chipRadius);
-                chipBackImageView.setFitHeight(chipRadius);
-                chipBackImageView.setVisible(false);
-                chipBackImageView.setEffect(blend);
+                // Front image with color applied using a Blend effect
+                ImageView chipFrontImageView = createChipImageView(bwFrontImage, chipRadius, chipColor);
 
-                // Create an image view for the front of the chip
-                BufferedImage resizedFrontImage = resizeImage(bwFrontImage);
-                ImageView chipFrontImageView = new ImageView(SwingFXUtils.toFXImage(resizedFrontImage, null));
-                chipFrontImageView.setFitWidth(chipRadius);
-                chipFrontImageView.setFitHeight(chipRadius);
-                chipFrontImageView.setVisible(true);
-                chipFrontImageView.setEffect(blend);
+                // Back image with color applied
+                ImageView chipBackImageView = createChipImageView(bwBackImage, chipRadius, chipColor);
+                chipBackImageView.setVisible(false); // Initially invisible
 
                 chipPane.getChildren().addAll(chipFrontImageView, chipBackImageView);
+                chipPane.setClip(circleClip);
 
-                chipPane.setClip(circle);
+                // Set initial positions
                 chipPane.translateXProperty().bind(gameScene.widthProperty().subtract(200).subtract(j));
-                chipPane.setTranslateY(((gameScene.getHeight() / 8) + (chipRadius + spacing) * i) - 75);
+                chipPane.setTranslateY((gameScene.getHeight() / 8) + (chipRadius + spacing) * i - 75);
 
-                makeDraggable(chipPane);
+                // Add interactivity
+                makeDraggable(chipPane, new Translate());
                 makeFlippableAndRotatable(chipPane);
                 makeChipTooltip(chipPane, i, j, chipsOfColor);
 
-                // Add the card pane to the array
+                // Store and display the chip
                 chipPanes[i * chipsOfColor.size() + j] = chipPane;
-
-                // Add the card to the root pane
                 gameRoot.getChildren().add(chipPane);
             }
         }
 
-        Button resetChips = getResetButton(chipRadius, spacing);
+        Button resetChips = getResetChipsButton(chipRadius, spacing);
         resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
         resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
 
-        Button reshuffleCards = getReshuffleCards(cardPanes);
+        Button reshuffleCards = getReshuffleCardsButton(cardPanes);
         reshuffleCards.layoutXProperty().bind(gameScene.widthProperty().subtract(reshuffleCards.widthProperty()).subtract(50));
         reshuffleCards.layoutYProperty().bind(gameScene.heightProperty().subtract(reshuffleCards.heightProperty()).subtract(100));
+
 
         // Create the start scene
         VBox startLayout = new VBox(10);
@@ -278,9 +263,8 @@ public class TarotBoard extends Application {
         primaryStage.show();
     }
 
-    private static Text getWildCardName(String cardNames) {
-        Text cardNameText = new Text(cardNames);
-        cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
+    private static Text getWildCardName(Text cardNameText) {
+        cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: white;");
         cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
         cardNameText.setWrappingWidth(CARD_WIDTH); // Use the card width for centering
         cardNameText.setTextAlignment(TextAlignment.CENTER);
@@ -289,47 +273,82 @@ public class TarotBoard extends Application {
         return cardNameText;
     }
 
-    private Button getResetButton(double chipRadius, double spacing) {
+    // Helper method to create chip images with color applied
+    private ImageView createChipImageView(Image image, double radius, Color chipColor) {
+        // Create an ImageView for the chip
+        ImageView imageView = new ImageView(image);
+        imageView.setFitWidth(radius);
+        imageView.setFitHeight(radius);
+
+        // Apply color to the chip using Blend effect
+        ColorInput colorInput = new ColorInput(0, 0, radius, radius, chipColor);
+        Blend blendEffect = new Blend(BlendMode.MULTIPLY, colorInput, null);
+        imageView.setEffect(blendEffect);  // Apply the blend effect to the ImageView
+
+        return imageView;
+    }
+
+    private Button getResetChipsButton(double chipRadius, double spacing) {
         Button resetChips = new Button("Reset Chips");
         resetChips.setOnAction(event -> {
             for (int i = 0; i < colors.length; i++) {
                 String color = colors[i];
                 List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.color().equals(color)).toList();
+
                 for (int j = 0; j < chipsOfColor.size(); j++) {
-                    StackPane pane1 = chipPanes[i * chipsOfColor.size() + j];
-                    ImageView chipBackImageView = (ImageView) pane1.getChildren().get(0);
-                    ImageView chipFrontImageView = (ImageView) pane1.getChildren().get(1);
+                    StackPane pane = chipPanes[i * chipsOfColor.size() + j];
+                    ImageView chipBackImageView = (ImageView) pane.getChildren().get(0);
+                    ImageView chipFrontImageView = (ImageView) pane.getChildren().get(1);
                     chipBackImageView.setRotate(0);
                     chipFrontImageView.setRotate(0);
                     chipBackImageView.setVisible(true);
                     chipFrontImageView.setVisible(false);
-                    pane1.translateXProperty().bind(gameScene.widthProperty().subtract(200).subtract(j));
-                    pane1.setTranslateY(((gameScene.getHeight() / 8) + (chipRadius + spacing) * i) - 75);
-                    pane1.toFront();
+
+                    pane.getTransforms().clear();
+                    pane.translateXProperty().bind(gameScene.widthProperty().subtract(200).subtract(j));
+                    pane.setTranslateY(((gameScene.getHeight() / 8) + (chipRadius + spacing) * i) - 75);
+                    makeDraggable(pane, new Translate());
+
+                    // Ensure the chip is on top of other elements
+                    pane.toFront();
                 }
             }
         });
+
         return resetChips;
     }
 
-    private void makeDraggable(StackPane pane) {
+    public static void makeDraggable(StackPane pane, Translate translate) {
         final double[] dragDeltaX = new double[1];
         final double[] dragDeltaY = new double[1];
 
+        // Use a Translate object to handle smooth dragging
+        pane.getTransforms().add(translate);
+
+        // When the mouse is pressed, record the starting position
         pane.setOnMousePressed(event -> {
-            dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
-            dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
-            pane.translateXProperty().unbind(); // Unbind translateX while dragging
+            // Record the delta of mouse position relative to the node's current translation
+            dragDeltaX[0] = event.getSceneX() - translate.getX();
+            dragDeltaY[0] = event.getSceneY() - translate.getY();
+
+            pane.toFront();
         });
 
+        // When the mouse is dragged, update the translation of the pane
         pane.setOnMouseDragged(event -> {
-            pane.setTranslateX(event.getSceneX() - dragDeltaX[0]);
-            pane.setTranslateY(event.getSceneY() - dragDeltaY[0]);
-            pane.toFront();
+            // Calculate the new translation values
+            double newTranslateX = event.getSceneX() - dragDeltaX[0];
+            double newTranslateY = event.getSceneY() - dragDeltaY[0];
+
+            // Update the translate values only if necessary (avoid redundant calls)
+            if (translate.getX() != newTranslateX || translate.getY() != newTranslateY) {
+                translate.setX(newTranslateX);
+                translate.setY(newTranslateY);
+            }
         });
     }
 
-    private Button getReshuffleCards(StackPane[] cardPanes) {
+    private Button getReshuffleCardsButton(StackPane[] cardPanes) {
         Button reshuffleCards = new Button("Reshuffle Cards");
         reshuffleCards.setOnAction(event -> {
             for (StackPane pane : cardPanes) {
@@ -343,68 +362,38 @@ public class TarotBoard extends Application {
                 cardBackImageView.setVisible(true);
                 cardFrontImageView.setVisible(false);
                 rotationAngle = 0;
-                pane.setTranslateY(50);
+
+                // Reset the translate positions after binding
+                pane.getTransforms().clear();
                 pane.setTranslateX(50);
+                pane.setTranslateY(50);
+                makeDraggable(pane, new Translate());
             }
 
-            String[] cardNames = generateShuffledCardNames();
+            // Shuffle and update card names
+            generateShuffledCardNames();
             reshuffled = true;
 
             // Update the card names
             for (int a = 0; a < NUM_CARDS; a++) {
-                Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
-                Matcher matcher = CARD_PATTERN.matcher(cardNames[a]);
-                if (matcher.matches()) {
-                    String value = matcher.group("value");
-                    String suit = matcher.group("suit");
-                    if(TarotBoard.values.contains(value)) {
-                        cardNameText.setText(Card.getText(value, suit).getText());
-                        cardNameText.setStyle(Card.getText(value, suit).getStyle());
-                        makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
+                    Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
+                    if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+                        String suit = matcher.group("suit");
+                        cardNameText.setText(Card.getStyle(cardNames.get(a), suit).getText());
+                        cardNameText.setStyle(Card.getStyle(cardNames.get(a), suit).getStyle());
                     } else {
-                        cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
-                        cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
-                        makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                        Text text = new Text(cardNames.get(a));
+                        cardNameText.setText(getWildCardName(text).getText());
+                        cardNameText.setStyle(getWildCardName(text).getStyle());
                     }
-                } else {
-                    cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
-                    cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
                     makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
                 }
             }
         });
+
         reshuffled = false;
         return reshuffleCards;
-    }
-
-    private BufferedImage resizeImage(BufferedImage originalImage) {
-        BufferedImage resizedImage = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics2D = resizedImage.createGraphics();
-        graphics2D.drawImage(originalImage, 0, 0, 50, 50, null);
-        graphics2D.dispose();
-        return resizedImage;
-    }
-
-    private BufferedImage loadImage(String name) {
-        BufferedImage temp;
-        if (name.endsWith(".jxl")) {
-            var is = Objects.requireNonNull(getClass().getResourceAsStream("/" + name));
-            var options = new JXLOptions();
-            options.hdr = JXLOptions.HDR_OFF;
-            options.threads = 2;
-            try {
-                temp = new JXLDecoder((is), options).decode().asBufferedImage();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            try {
-                temp = ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/" + name)));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return temp;
     }
 
     private static void makeCardTooltip(StackPane pane, String text, boolean reshuffled) {
@@ -477,43 +466,42 @@ public class TarotBoard extends Application {
     }
 
     private static void switchToGame(StackPane[] cardPanes) {
+        // Loop through each card pane
         for (StackPane pane : cardPanes) {
             ImageView cardBackImageView = (ImageView) pane.getChildren().get(0);
             ImageView cardFrontImageView = (ImageView) pane.getChildren().get(1);
             Text cardNameText = (Text) pane.getChildren().get(2);
+
+            // Reset rotations
             cardNameText.setRotate(0);
             cardBackImageView.setRotate(0);
             cardFrontImageView.setRotate(0);
+
+            // Reset visibility of front and back images, and name text
             cardNameText.setVisible(false);
             cardBackImageView.setVisible(true);
             cardFrontImageView.setVisible(false);
+
+            // Reset the rotation angle
             rotationAngle = 0;
-            pane.setTranslateY(50);
-            pane.setTranslateX(50);
         }
 
-        String[] cardNames = generateShuffledCardNames();
+        generateShuffledCardNames();
         reshuffled = true;
 
-        // Update the card names
+        // Update the card names and setup tooltips
         for (int a = 0; a < NUM_CARDS; a++) {
-            Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
-            Matcher matcher = CARD_PATTERN.matcher(cardNames[a]);
-            if (matcher.matches()) {
-                String value = matcher.group("value");
-                String suit = matcher.group("suit");
-                if(TarotBoard.values.contains(value)) {
-                    cardNameText.setText(Card.getText(value, suit).getText());
-                    cardNameText.setStyle(Card.getText(value, suit).getStyle());
-                    makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+            if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
+                Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
+                if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+                    String suit = matcher.group("suit");
+                    cardNameText.setText(Card.getStyle(cardNames.get(a), suit).getText());
+                    cardNameText.setStyle(Card.getStyle(cardNames.get(a), suit).getStyle());
                 } else {
-                    cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
-                    cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
-                    makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
+                    Text text = new Text(cardNames.get(a));
+                    cardNameText.setText(getWildCardName(text).getText());
+                    cardNameText.setStyle(getWildCardName(text).getStyle());
                 }
-            } else {
-                cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
-                cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
                 makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
             }
         }
@@ -685,73 +673,31 @@ public class TarotBoard extends Application {
         });
     }
 
-    private void generateCardTooltips(String name, double rank) {
+    public static void generateCardTooltips(String name, double rank) {
         if (!cardTooltips.containsValue(name)) {
-            Matcher matcher = CARD_PATTERN.matcher(name);
-            if (!matcher.matches()) {
-                cardTooltips.put(name, name + "\n" + "Wild Card");
+            if (!wilds.contains(name)) {
+                cardTooltips.put(name,
+                        name.replaceAll("of", "\n") +
+                                "\n" + Math.round(rank));
             } else {
-                String value = matcher.group("value");
-                if (TarotBoard.values.contains(value)) {
-                    cardTooltips.put(name,
-                            name.replaceAll("of", "\n") +
-                                    "\n" + Math.round(rank));
-                } else {
-                    cardTooltips.put(name, name + "\n" + "Wild Card");
-                }
+                cardTooltips.put(name, name + "\n" + "Wild Card");
             }
         }
     }
 
-    private static String[] generateShuffledCardNames() {
-        ObservableList<String> cardNames = FXCollections.observableArrayList();
+    private void addCardNames() {
+        cardNames.addAll(wilds); //Add all wilds
 
         for (String suit : suits) {
             for (String value : values) {
-                cardNames.add(value + " of " + suit);
+                cardNames.add(value + " of " + suit); //build and add cards with suit and rank
             }
         }
+    }
 
-        cardNames.add("Joker");
-        cardNames.add("Blessings of Heart");
-        cardNames.add("Follow of Soul");
-        cardNames.add("Call of Light ");
-        cardNames.add("Whisper of Dark ");
-        cardNames.add("Judgement");
-        cardNames.add("Chorus");
-        cardNames.add("Dawn of Death");
-        cardNames.add("Night of Wrath");
-        cardNames.add("Voice");
-        cardNames.add("Voices");
-        cardNames.add("Mother");
-        cardNames.add("Father");
-        cardNames.add("Brother");
-        cardNames.add("Sister");
-        cardNames.add("Duality");
-        cardNames.add("Husband");
-        cardNames.add("Wife");
-        cardNames.add("Progeny");
-        cardNames.add("Corridor");
-        cardNames.add("Field");
-        cardNames.add("Intellect");
-        cardNames.add("Brawn");
-        cardNames.add("Hope");
-        cardNames.add("Despair");
-        cardNames.add("Past");
-        cardNames.add("Present");
-        cardNames.add("Future");
-        cardNames.add("Gate");
-        cardNames.add("Sign");
-        cardNames.add("Ruin");
-        cardNames.add("Snow");
-        cardNames.add("Rain");
-        cardNames.add("Tempest");
-        cardNames.add("Lovers");
-
+    private static void generateShuffledCardNames() {
         // Shuffle the cards
         Collections.shuffle(cardNames);
-
-        return cardNames.toArray(new String[0]);
     }
 
     public static void main(String[] args) {

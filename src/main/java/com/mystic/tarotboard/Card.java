@@ -7,40 +7,34 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
 
-import java.util.Set;
+import java.util.List;
 
 public class Card {
-    /*TODO
-       Make negative value cards with a black or darker color background to normal cards!
-       There would be 32 negative values in each suit!
-       Suit text color will still be Blue, Red, Yellow, Green, possibly more in the future!
-       Color of text will depend on color of card in Minecraft Mods variation!
-     */
-
-    private final String value;
     private final StackPane cardPane;
     private final Text cardName; // The visual representation of the card
 
     // List of suits categorized by color
-    public static final Set<String> BLUE_SUITS = Set.of(
+    public static final List<String> BLUE_SUITS = List.of(
             "Arcs", "Spades", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns"
     );
 
-    public static final Set<String> RED_SUITS = Set.of(
+    public static final List<String> RED_SUITS = List.of(
             "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers", "Hearts"
     );
 
-    public static final Set<String> YELLOW_SUITS = Set.of(
+    public static final List<String> YELLOW_SUITS = List.of(
             "Arrows", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells"
     );
 
-    public static final Set<String> GREEN_SUITS = Set.of(
+    public static final List<String> GREEN_SUITS = List.of(
             "Shields", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
     );
 
-    public Card(String value, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
-        this.value = value;
+    public static final List<String> PURPLE_SUITS = List.of(
+            "Quasars", "Runes", "Omens", "Sigils", "Orbs", "Veils", "Looms", "Shards"
+    );
 
+    public Card(String text, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
         // Initialize the cardPane
         cardPane = new StackPane();
 
@@ -59,7 +53,7 @@ public class Card {
         cardBackImageView.setFitHeight(height);
 
         // Add text for card name
-        Text cardNameText = getText(value, suit);
+        Text cardNameText = getStyle(text, suit);
 
         cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
         cardNameText.setWrappingWidth(width); // Use the card width for centering
@@ -73,68 +67,34 @@ public class Card {
         this.cardName = cardNameText;
     }
 
-    public static Text getText(String value, String suit) {
-        Text cardNameText = new Text(value + " of " + suit);
+    public static Text getStyle(String cardText, String suit) {
+        Text cardNameText = new Text(cardText);
 
         if (RED_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
         } else if (BLUE_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: blue;");
         } else if (YELLOW_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
         } else if (GREEN_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: green;");
+        } else if (PURPLE_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
         }
 
         return cardNameText;
-    }
-
-    public String getValue() {
-        return value;
     }
 
     public Text getCardName() {
         return cardName;
     }
 
-    //I want to use negative card value for later so using PI for an unknown value
-    public double getRank() {
-        return switch (value) {
-            case "Hold" -> 0;
-            case "Ace" -> 1;
-            case "2" -> 2;
-            case "3" -> 3;
-            case "4" -> 4;
-            case "5" -> 5;
-            case "6" -> 6;
-            case "7" -> 7;
-            case "8" -> 8;
-            case "9" -> 9;
-            case "10" -> 10;
-            case "Jack" -> 11;
-            case "Queen" -> 12;
-            case "King" -> 13;
-            case "Nomad" -> 14;
-            case "Prince" -> 15;
-            case "Rune" -> 16;
-            case "Fable" -> 17;
-            case "Sorceress" -> 18;
-            case "Utopia" -> 19;
-            case "Wizard" -> 20;
-            case "Titan" -> 21;
-            case "Baron" -> 22;
-            case "Illusionist" -> 23;
-            case "Oracle" -> 24;
-            case "Magician" -> 25;
-            case "Luminary" -> 26;
-            case "Eclipse" -> 27;
-            case "Celestial" -> 28;
-            case "Duke" -> 29;
-            case "Genesis" -> 30;
-            case "Zephyr" -> 31;
-            case "Vesper" -> 32;
-            default -> Math.PI; // Invalid or unknown value
-        };
+    public static double getRank(String value) {
+        int index = TarotBoard.values.indexOf(value);
+        if (index == -1) {
+            return Math.PI;
+        }
+        return index - 41;
     }
 
     // Getter for the cardPane
