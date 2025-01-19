@@ -4,6 +4,8 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextAlignment;
+import javafx.scene.text.TextBoundsType;
 
 import java.util.Set;
 
@@ -59,6 +61,12 @@ public class Card {
         // Add text for card name
         Text cardNameText = getText(value, suit);
 
+        cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
+        cardNameText.setWrappingWidth(width); // Use the card width for centering
+        cardNameText.setTextAlignment(TextAlignment.CENTER);
+        cardNameText.setTranslateY(0);
+        cardNameText.setVisible(false);
+
         // Add images and text to cardPane
         cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
 
@@ -70,21 +78,16 @@ public class Card {
 
         if (RED_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
-        }
-
-        if (BLUE_SUITS.contains(suit)) {
+        } else if (BLUE_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: lightblue;");
-        }
-
-        if (YELLOW_SUITS.contains(suit)) {
+        } else if (YELLOW_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
-        }
-
-        if (GREEN_SUITS.contains(suit)) {
+        } else if (GREEN_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: green;");
+        } else {
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
         }
 
-        cardNameText.setVisible(false);
         return cardNameText;
     }
 

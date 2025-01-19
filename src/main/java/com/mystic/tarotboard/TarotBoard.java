@@ -43,7 +43,7 @@ public class TarotBoard extends Application {
     private static final int NUM_CARDS = 1091;
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
-    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "lightblue", "blue", "darkorchid", "purple", "gray", "darkgray", "white"};
+    private static final String[] colors = {"firebrick", "orange", "goldenrod", "yellow", "yellowgreen", "green", "cyan", "lightblue", "darkorchid", "purple", "gray", "darkgray", "white"};
     private static final int NUM_CHIPS = 250;
     private static final int TOTAL_CHIPS = colors.length * NUM_CHIPS;
     private static int rotationAngle = 0;
@@ -55,20 +55,22 @@ public class TarotBoard extends Application {
     private final List<PokerChips> pokerChips = new ArrayList<>();
     private final StackPane[] chipPanes = new StackPane[TOTAL_CHIPS];
     private static boolean reshuffled = false;
-    private static final String[] suits = {
+
+    private static final Set<String> suits = Set.of(
             "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
             "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
             "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells",
             "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
-    };
-    private static final String[] values = {
+    );
+
+    public static final Set<String> values = Set.of(
             "Hold", "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
             "Jack", "Queen", "King", "Nomad", "Prince",
             "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
             "Titan", "Baron", "Illusionist", "Oracle", "Magician",
             "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
             "Zephyr", "Vesper"
-    };
+    );
 
     @Override
     public void start(Stage primaryStage) {
@@ -331,14 +333,17 @@ public class TarotBoard extends Application {
 
             // Update the card names
             for (int a = 0; a < NUM_CARDS; a++) {
+                Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
                 Matcher matcher = CARD_PATTERN.matcher(cardNames[a]);
                 if (matcher.matches()) {
                     String value = matcher.group("value");
                     String suit = matcher.group("suit");
-                    Text cardNameText = Card.getText(value, suit);
+                    cardNameText.setText(Card.getText(value, suit).getText());
+                    cardNameText.setStyle(Card.getText(value, suit).getStyle());
                     makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
                 } else {
-                    Text cardNameText = getWildCardName(cardNames[a]);
+                    cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
+                    cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
                     makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
                 }
             }
@@ -467,14 +472,17 @@ public class TarotBoard extends Application {
 
         // Update the card names
         for (int a = 0; a < NUM_CARDS; a++) {
+            Text cardNameText = (Text) cardPanes[a].getChildren().get(2);
             Matcher matcher = CARD_PATTERN.matcher(cardNames[a]);
             if (matcher.matches()) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                Text cardNameText = Card.getText(value, suit);
+                cardNameText.setText(Card.getText(value, suit).getText());
+                cardNameText.setStyle(Card.getText(value, suit).getStyle());
                 makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
             } else {
-                Text cardNameText = getWildCardName(cardNames[a]);
+                cardNameText.setText(getWildCardName(cardNameText.getText()).getText());
+                cardNameText.setStyle(getWildCardName(cardNameText.getText()).getStyle());
                 makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
             }
         }
@@ -652,9 +660,14 @@ public class TarotBoard extends Application {
             if (!matcher.matches()) {
                 cardTooltips.put(name, name + "\n" + "Wild Card");
             } else {
-                cardTooltips.put(name,
-                        name.replaceAll("of", "\n") +
-                                "\n" + Math.round(rank));
+                String value = matcher.group("value");
+                if (TarotBoard.values.contains(value)) {
+                    cardTooltips.put(name,
+                            name.replaceAll("of", "\n") +
+                                    "\n" + Math.round(rank));
+                } else {
+                    cardTooltips.put(name, name + "\n" + "Wild Card");
+                }
             }
         }
     }
