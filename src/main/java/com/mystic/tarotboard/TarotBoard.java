@@ -121,7 +121,7 @@ public class TarotBoard extends Application {
                 // Process normal cards
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                Card card = new Card(cardNames.get(i), suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
+                Card card = new Card(cardNames.get(i), value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
                 rank = Card.getRank(value);
                 cardNameText = card.getCardName();
                 cardPanes[i] = card.getCardPane();
@@ -129,7 +129,7 @@ public class TarotBoard extends Application {
                 StackPane cardPane = new StackPane();
 
                 // Process wild cards
-                cardNameText = getWildCardName(new Text(cardNames.get(i)));
+                cardNameText = getWildCardName(new Text(cardNames.get(i) + "\n \n" + "(Wild)"));
 
                 // Set up the images (no need to create them multiple times)
                 ImageView cardBackImageView = new ImageView(cardBackImage);
@@ -379,12 +379,13 @@ public class TarotBoard extends Application {
                 if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
                     Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
                     if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+                        String value = matcher.group("value");
                         String suit = matcher.group("suit");
-                        cardNameText.setText(Card.getStyle(cardNames.get(a), suit).getText());
-                        cardNameText.setStyle(Card.getStyle(cardNames.get(a), suit).getStyle());
+                        cardNameText.setText(Card.getStyle(cardNames.get(a), value, suit).getText());
+                        cardNameText.setStyle(Card.getStyle(cardNames.get(a), value, suit).getStyle());
                     } else {
                         Text text = new Text(cardNames.get(a));
-                        cardNameText.setText(getWildCardName(text).getText());
+                        cardNameText.setText(getWildCardName(text).getText() + "\n \n" + "(Wild)");
                         cardNameText.setStyle(getWildCardName(text).getStyle());
                     }
                     makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
@@ -494,12 +495,13 @@ public class TarotBoard extends Application {
             if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
                 Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
                 if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+                    String value = matcher.group("value");
                     String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getStyle(cardNames.get(a), suit).getText());
-                    cardNameText.setStyle(Card.getStyle(cardNames.get(a), suit).getStyle());
+                    cardNameText.setText(Card.getStyle(cardNames.get(a), value, suit).getText());
+                    cardNameText.setStyle(Card.getStyle(cardNames.get(a), value, suit).getStyle());
                 } else {
                     Text text = new Text(cardNames.get(a));
-                    cardNameText.setText(getWildCardName(text).getText());
+                    cardNameText.setText(getWildCardName(text).getText() + "\n \n" + "(Wild)");
                     cardNameText.setStyle(getWildCardName(text).getStyle());
                 }
                 makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled);
@@ -677,10 +679,9 @@ public class TarotBoard extends Application {
         if (!cardTooltips.containsValue(name)) {
             if (!wilds.contains(name)) {
                 cardTooltips.put(name,
-                        name.replaceAll("of", "\n") +
-                                "\n" + Math.round(rank));
+                        name.replaceAll("of", "\n"));
             } else {
-                cardTooltips.put(name, name + "\n" + "Wild Card");
+                cardTooltips.put(name, name);
             }
         }
     }

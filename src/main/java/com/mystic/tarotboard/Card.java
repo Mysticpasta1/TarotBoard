@@ -34,7 +34,7 @@ public class Card {
             "Quasars", "Runes", "Omens", "Sigils", "Orbs", "Veils", "Looms", "Shards"
     );
 
-    public Card(String text, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
+    public Card(String text, String value, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
         // Initialize the cardPane
         cardPane = new StackPane();
 
@@ -53,7 +53,7 @@ public class Card {
         cardBackImageView.setFitHeight(height);
 
         // Add text for card name
-        Text cardNameText = getStyle(text, suit);
+        Text cardNameText = getStyle(text, value, suit);
 
         cardNameText.setBoundsType(TextBoundsType.VISUAL); // Use visual bounds to get accurate text size
         cardNameText.setWrappingWidth(width); // Use the card width for centering
@@ -67,8 +67,8 @@ public class Card {
         this.cardName = cardNameText;
     }
 
-    public static Text getStyle(String cardText, String suit) {
-        Text cardNameText = new Text(cardText);
+    public static Text getStyle(String cardText, String value, String suit) {
+        Text cardNameText = new Text(cardText + "\n \n (" + Math.round(getRank(value)) + ")");
 
         if (RED_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
