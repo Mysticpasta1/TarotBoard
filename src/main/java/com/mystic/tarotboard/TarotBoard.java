@@ -56,8 +56,8 @@ public class TarotBoard extends Application {
             "Doppelganger", "Hollow", "Abyss", "Chimera", "Poltergeist",
             "Wight", "Apparition", "Nightmare", "Succubus", "Incubus",
             "Necromancer", "Fury", "Grim", "Harbinger", "Spectacle",
-            "Lich", "Gorgon", "Drake", "Eidolon", "Frost",
-            "Golem", "Hydra", "Inferno", "Juggernaut", "Kraken", "Abyss",
+            "Lich", "Gorgon", "Drake", "Demon", "Frost",
+            "Golem", "Hydra", "Inferno", "Juggernaut", "Kraken", "Reaper",
             "Leviathan", "Manticore", "Naga", "Blight", "Serpent",
 
             //Neutral Card
