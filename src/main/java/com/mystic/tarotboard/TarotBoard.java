@@ -112,6 +112,8 @@ public class TarotBoard extends Application {
         Image cardFrontImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_front.png")));
         Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
 
+        System.out.println("Adding " + NUM_CARDS + " cards to the board");
+
         for (int i = 0; i < NUM_CARDS; i++) {
             double rank = Math.PI;
             Text cardNameText;
