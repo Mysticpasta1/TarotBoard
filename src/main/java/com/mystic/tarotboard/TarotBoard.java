@@ -38,7 +38,7 @@ public class TarotBoard extends Application {
             "Despair", "Past", "Present", "Future", "Gate", "Sign", "Ruin", "Snow", "Rain", "Tempest", "Lovers",
             "Discord", "Concord", "Harmony", "Dissonance", "Earth", "Fire", "Water", "Air", "Spirit",
             "Oblivion", "Obscurity", "Purgatory", "Nether", "Underworld", "Aether", "Overworld", "Limbo", "Chaos",
-            "Balance", "Doom", "Peace", "Evil", "Good", "Neutral", "Hope"
+            "Balance", "Doom", "Peace", "Evil", "Good", "Neutral", "Hope", "Monster", "Human"
     );
 
     private static final List<String> suits = List.of(
@@ -51,7 +51,7 @@ public class TarotBoard extends Application {
 
     public static final List<String> values = List.of(
             //Negative Cards
-            "Shadow", "Specter", "Phantom", "Void", "Wraith",
+            "Devil", "Shadow", "Specter", "Phantom", "Void", "Wraith",
             "Ghoul", "Banshee", "Reverent", "Eidolon", "Shade",
             "Doppelganger", "Hollow", "Abyss", "Chimera", "Poltergeist",
             "Wight", "Apparition", "Nightmare", "Succubus", "Incubus",
@@ -69,8 +69,9 @@ public class TarotBoard extends Application {
             "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
             "Titan", "Baron", "Illusionist", "Oracle", "Magician",
             "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
-            "Zephyr", "Vesper", "Umbra", "Valkyrie",
-            "Warden", "Zenith", "Yggdrasil", "Zodiac", "Phoenix", "Raven", "Cipher"
+            "Zephyr", "Vesper", "Umbra", "Valkyrie", "Warden",
+            "Zenith", "Yggdrasil", "Zodiac", "Phoenix", "Raven",
+            "Cipher", "Angel"
     );
 
     private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
@@ -237,19 +238,19 @@ public class TarotBoard extends Application {
         VBox startLayout = new VBox(10);
         Button singlePlayer = new Button("Single Player");
         singlePlayer.setStyle("-fx-font-size: 20pt;");
-        singlePlayer.setOnAction(event -> switchToGame(cardPanes));
+        singlePlayer.setOnAction(_ -> switchToGame(cardPanes));
         Button quitButton = new Button("Quit");
         quitButton.setStyle("-fx-font-size: 20pt;");
-        quitButton.setOnAction(event -> primaryStage.close());
+        quitButton.setOnAction(_ -> primaryStage.close());
         Button continueButton = new Button("Continue");
         continueButton.setStyle("-fx-font-size: 20pt;");
-        continueButton.setOnAction(event -> continueGame());
+        continueButton.setOnAction(_ -> continueGame());
         startLayout.setAlignment(Pos.CENTER);
         startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
         startLayout.getChildren().addAll(singlePlayer, continueButton, quitButton);
         // Create the game scene
         Button backButton3 = new Button("Back to Start");
-        backButton3.setOnAction(event -> switchToStart());
+        backButton3.setOnAction(_ -> switchToStart());
         // Position the button as needed
         backButton3.layoutXProperty().bind(gameScene.widthProperty().subtract(backButton3.widthProperty()).subtract(50));
         backButton3.layoutYProperty().bind(gameScene.heightProperty().subtract(backButton3.heightProperty()).subtract(50));
@@ -292,7 +293,7 @@ public class TarotBoard extends Application {
 
     private Button getResetChipsButton(double chipRadius, double spacing) {
         Button resetChips = new Button("Reset Chips");
-        resetChips.setOnAction(event -> {
+        resetChips.setOnAction(_ -> {
             for (int i = 0; i < colors.length; i++) {
                 String color = colors[i];
                 List<PokerChips> chipsOfColor = pokerChips.stream().filter(chip -> chip.color().equals(color)).toList();
@@ -342,7 +343,7 @@ public class TarotBoard extends Application {
             double newTranslateX = event.getSceneX() - dragDeltaX[0];
             double newTranslateY = event.getSceneY() - dragDeltaY[0];
 
-            // Update the translate values only if necessary (avoid redundant calls)
+            // Update the translation values only if necessary (avoid redundant calls)
             if (translate.getX() != newTranslateX || translate.getY() != newTranslateY) {
                 translate.setX(newTranslateX);
                 translate.setY(newTranslateY);
@@ -352,7 +353,7 @@ public class TarotBoard extends Application {
 
     private Button getReshuffleCardsButton(StackPane[] cardPanes) {
         Button reshuffleCards = new Button("Reshuffle Cards");
-        reshuffleCards.setOnAction(event -> {
+        reshuffleCards.setOnAction(_ -> {
             for (StackPane pane : cardPanes) {
                 ImageView cardBackImageView = (ImageView) pane.getChildren().get(0);
                 ImageView cardFrontImageView = (ImageView) pane.getChildren().get(1);
@@ -365,7 +366,7 @@ public class TarotBoard extends Application {
                 cardFrontImageView.setVisible(false);
                 rotationAngle = 0;
 
-                // Reset the translate positions after binding
+                // Reset the translation positions after binding
                 pane.getTransforms().clear();
                 pane.setTranslateX(50);
                 pane.setTranslateY(50);
@@ -422,7 +423,7 @@ public class TarotBoard extends Application {
             });
 
             // Hide tooltip on mouse exit
-            pane.setOnMouseExited(event -> tooltip.hide());
+            pane.setOnMouseExited(_ -> tooltip.hide());
         }
     }
 
@@ -434,7 +435,7 @@ public class TarotBoard extends Application {
 
         // Show tooltip on mouse enter
         pane.setOnMouseEntered(event -> {
-            if (pane.getChildren().get(0).isVisible()) {
+            if (pane.getChildren().getFirst().isVisible()) {
                 tooltip.setText(hoverText);
                 tooltip.show(pane, event.getScreenX(), event.getScreenY() + 5); // Offset tooltip position
             } else {
@@ -443,7 +444,7 @@ public class TarotBoard extends Application {
         });
 
         // Hide tooltip on mouse exit
-        pane.setOnMouseExited(event -> tooltip.hide());
+        pane.setOnMouseExited(_ -> tooltip.hide());
     }
 
     private void generateChipTooltips() {

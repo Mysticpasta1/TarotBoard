@@ -73,7 +73,7 @@ public class Card {
         if (RED_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
         } else if (BLUE_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: blue;");
+            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: darkcyan;");
         } else if (YELLOW_SUITS.contains(suit)) {
             cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
         } else if (GREEN_SUITS.contains(suit)) {
