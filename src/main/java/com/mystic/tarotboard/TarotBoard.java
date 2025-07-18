@@ -116,7 +116,6 @@ public class TarotBoard extends Application {
         System.out.println("Adding " + NUM_CARDS + " cards to the board");
 
         for (int i = 0; i < NUM_CARDS; i++) {
-            double rank = Math.PI;
             Text cardNameText;
 
             Matcher matcher = CARD_PATTERN.matcher(cardNames.get(i));
@@ -125,7 +124,6 @@ public class TarotBoard extends Application {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
                 Card card = new Card(cardNames.get(i), value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage);
-                rank = Card.getRank(value);
                 cardNameText = card.getCardName();
                 cardPanes[i] = card.getCardPane();
             } else {
@@ -158,7 +156,7 @@ public class TarotBoard extends Application {
 
             // Tooltip setup
             reshuffled = false;
-            generateCardTooltips(cardNameText.getText(), rank);
+            generateCardTooltips(cardNameText.getText());
             makeCardTooltip(cardPanes[i], cardNameText.getText(), reshuffled); //Set to 0 since reshuffled is false here!
 
             // Add the card to the root pane
@@ -678,7 +676,7 @@ public class TarotBoard extends Application {
         });
     }
 
-    public static void generateCardTooltips(String name, double rank) {
+    public static void generateCardTooltips(String name) {
         if (!cardTooltips.containsValue(name)) {
             if (!wilds.contains(name)) {
                 cardTooltips.put(name,
