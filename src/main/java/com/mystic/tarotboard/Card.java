@@ -3,6 +3,7 @@ package com.mystic.tarotboard;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
@@ -13,25 +14,31 @@ public class Card {
     private final StackPane cardPane;
     private final Text cardName; // The visual representation of the card
 
+    public static final Color CELESTIAL_COURT = Color.web("#FFD700"); // Gold
+    public static final Color UMBRAL_DOMINION = Color.web("#4B0082"); // Indigo
+    public static final Color INFERNAL_PACT = Color.web("#DC143C");    // Crimson
+    public static final Color VERDANT_CYCLE = Color.web("#228B22");    // ForestGreen
+    public static final Color AETHERIC_LOOM = Color.web("#1E90FF");    // DodgerBlue
+
     // List of suits categorized by color
-    public static final List<String> BLUE_SUITS = List.of(
-            "Arcs", "Spades", "Clouds", "Clovers", "Comets", "Crescents", "Crosses", "Crowns"
+    public static final List<String> CELESTIAL_COURT_SUITS = List.of(
+            "Stars", "Suns", "Crowns", "Quasars", "Crescents", "Sigils", "Comets", "Glyphs"
     );
 
-    public static final List<String> RED_SUITS = List.of(
-            "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers", "Hearts"
+    public static final List<String> UMBRAL_DOMINION_SUITS = List.of(
+            "Veils", "Runes", "Hearts", "Spirals", "Eyes", "Omens", "Diamonds", "Orbs"
     );
 
-    public static final List<String> YELLOW_SUITS = List.of(
-            "Arrows", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells"
+    public static final List<String> INFERNAL_PACT_SUITS = List.of(
+            "Arrows", "Flames", "Locks", "Arcs", "Swords", "Points", "Embers", "Gears"
     );
 
-    public static final List<String> GREEN_SUITS = List.of(
-            "Shields", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves"
+    public static final List<String> VERDANT_CYCLE_SUITS = List.of(
+            "Flowers", "Leaves", "Mountains", "Shells", "Clovers", "Tridents", "Trees", "Waves"
     );
 
-    public static final List<String> PURPLE_SUITS = List.of(
-            "Quasars", "Runes", "Omens", "Sigils", "Orbs", "Veils", "Looms", "Shards"
+    public static final List<String> AETHERIC_LOOM_SUITS = List.of(
+            "Clouds", "Crosses", "Shields", "Keys", "Spades", "Scrolls", "Looms", "Shards"
     );
 
     public Card(String text, String value, String suit, double width, double height, Image cardFrontImage, Image cardBackImage) {
@@ -70,16 +77,21 @@ public class Card {
     public static Text getStyle(String cardText, String value, String suit) {
         Text cardNameText = new Text(cardText + "\n \n (" + Math.round(getRank(value)) + ")");
 
-        if (RED_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: firebrick;");
-        } else if (BLUE_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: darkcyan;");
-        } else if (YELLOW_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: yellow;");
-        } else if (GREEN_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: green;");
-        } else if (PURPLE_SUITS.contains(suit)) {
-            cardNameText.setStyle("-fx-font-size: 15pt; -fx-fill: purple;");
+        if (CELESTIAL_COURT_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt;");
+            cardNameText.setFill(CELESTIAL_COURT);
+        } else if (UMBRAL_DOMINION_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt;");
+            cardNameText.setFill(UMBRAL_DOMINION);
+        } else if (INFERNAL_PACT_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt;");
+            cardNameText.setFill(INFERNAL_PACT);
+        } else if (VERDANT_CYCLE_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt;");
+            cardNameText.setFill(VERDANT_CYCLE);
+        } else if (AETHERIC_LOOM_SUITS.contains(suit)) {
+            cardNameText.setStyle("-fx-font-size: 15pt;");
+            cardNameText.setFill(AETHERIC_LOOM);
         }
 
         return cardNameText;
@@ -94,7 +106,7 @@ public class Card {
         if (index == -1) {
             return Math.PI;
         }
-        return index - 41;
+        return index - (TarotBoard.values.size() - 1) / 2;
     }
 
     // Getter for the cardPane

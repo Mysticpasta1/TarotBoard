@@ -23,6 +23,12 @@ application {
     mainClass = 'com.mystic.tarotboard.TarotBoard'
 }
 
+repositories {
+    maven {
+        url "https://sandec.jfrog.io/artifactory/repo"
+    }
+}
+
 javafx {
     version = '22-ea+11'
     modules = ['javafx.controls', 'javafx.fxml', "javafx.graphics", "javafx.swing"]
@@ -36,7 +42,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.traneptora:jxlatte:2.0.0")
+    implementation 'com.vladsch.flexmark:flexmark-all:0.64.8'
+    implementation("com.sandec:mdfx:0.2.12")
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
 }

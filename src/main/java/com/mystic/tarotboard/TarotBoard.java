@@ -1,5 +1,9 @@
 package com.mystic.tarotboard;
 
+import com.sandec.mdfx.MarkdownView;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.sequence.BasedSequence;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,6 +12,8 @@ import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.*;
 import javafx.scene.image.Image;
@@ -20,9 +26,19 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextBoundsType;
 import javafx.scene.transform.Translate;
+import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.html.HtmlRenderer;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -114,6 +130,7 @@ public class TarotBoard extends Application {
         Image cardBackImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/mystic/tarotboard/assets/card_back.png")));
 
         System.out.println("Adding " + NUM_CARDS + " cards to the board");
+        System.out.println(suits.size() + " Suits, " + values.size() + " Values per suit, and " + wilds.size() + " Wilds");
 
         for (int i = 0; i < NUM_CARDS; i++) {
             Text cardNameText;
@@ -161,9 +178,6 @@ public class TarotBoard extends Application {
 
             // Add the card to the root pane
             gameRoot.getChildren().add(cardPanes[i]);
-
-            // Store the card's reference for later use (if necessary)
-
         }
 
         for (String color : colors) {
@@ -171,6 +185,9 @@ public class TarotBoard extends Application {
                 pokerChips.add(new PokerChips(color, i));
             }
         }
+
+        System.out.println("Adding " + (NUM_CHIPS * colors.length));
+        System.out.println(NUM_CHIPS + " Chips per " + colors.length + " Colors");
 
         generateChipTooltips();
 
@@ -224,37 +241,51 @@ public class TarotBoard extends Application {
         }
 
         Button resetChips = getResetChipsButton(chipRadius, spacing);
+        resetChips.setStyle("-fx-font-size: 15pt;");
         resetChips.layoutXProperty().bind(gameScene.widthProperty().subtract(resetChips.widthProperty()).subtract(50));
-        resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(150));
+        resetChips.layoutYProperty().bind(gameScene.heightProperty().subtract(resetChips.heightProperty()).subtract(200));
 
         Button reshuffleCards = getReshuffleCardsButton(cardPanes);
+        reshuffleCards.setStyle("-fx-font-size: 15pt;");
         reshuffleCards.layoutXProperty().bind(gameScene.widthProperty().subtract(reshuffleCards.widthProperty()).subtract(50));
-        reshuffleCards.layoutYProperty().bind(gameScene.heightProperty().subtract(reshuffleCards.heightProperty()).subtract(100));
-
+        reshuffleCards.layoutYProperty().bind(gameScene.heightProperty().subtract(reshuffleCards.heightProperty()).subtract(150));
 
         // Create the start scene
         VBox startLayout = new VBox(10);
+
         Button singlePlayer = new Button("Single Player");
         singlePlayer.setStyle("-fx-font-size: 20pt;");
         singlePlayer.setOnAction(_ -> switchToGame(cardPanes));
-        Button quitButton = new Button("Quit");
-        quitButton.setStyle("-fx-font-size: 20pt;");
-        quitButton.setOnAction(_ -> primaryStage.close());
+
         Button continueButton = new Button("Continue");
         continueButton.setStyle("-fx-font-size: 20pt;");
         continueButton.setOnAction(_ -> continueGame());
+
+        Button helpButton = createHelpButton();
+        helpButton.setStyle("-fx-font-size: 20pt;");
+
+        Button quitButton = new Button("Quit");
+        quitButton.setStyle("-fx-font-size: 20pt;");
+        quitButton.setOnAction(_ -> primaryStage.close());
+
         startLayout.setAlignment(Pos.CENTER);
         startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
-        startLayout.getChildren().addAll(singlePlayer, continueButton, quitButton);
+        startLayout.getChildren().addAll(singlePlayer, continueButton, helpButton, quitButton);
         // Create the game scene
+
+        Button helpButton2 = createHelpButton();
+        helpButton2.setStyle("-fx-font-size: 15pt;");
+        helpButton2.layoutXProperty().bind(gameScene.widthProperty().subtract(helpButton2.widthProperty()).subtract(50));
+        helpButton2.layoutYProperty().bind(gameScene.heightProperty().subtract(helpButton2.heightProperty()).subtract(100));
+
         Button backButton3 = new Button("Back to Start");
         backButton3.setOnAction(_ -> switchToStart());
-        // Position the button as needed
+        backButton3.setStyle("-fx-font-size: 15pt;");
         backButton3.layoutXProperty().bind(gameScene.widthProperty().subtract(backButton3.widthProperty()).subtract(50));
         backButton3.layoutYProperty().bind(gameScene.heightProperty().subtract(backButton3.heightProperty()).subtract(50));
         startLayout.setBackground(background);
 
-        gameRoot.getChildren().addAll(resetChips, reshuffleCards, backButton3);
+        gameRoot.getChildren().addAll(resetChips, reshuffleCards, helpButton2, backButton3);
 
         primaryStage.setScene(startScene);
         primaryStage.setX(screenBounds.getMinX());
@@ -347,6 +378,54 @@ public class TarotBoard extends Application {
                 translate.setY(newTranslateY);
             }
         });
+    }
+
+    private Button createHelpButton() {
+        Button helpButton = new Button("Help");
+        helpButton.setOnAction(event -> {
+            Stage helpStage = new Stage();
+            helpStage.setTitle("TarotBoard Poker — Help");
+            helpStage.initModality(Modality.APPLICATION_MODAL);
+            helpStage.initOwner(primaryStage);
+
+            MarkdownView mdView = new MarkdownView();
+            mdView.setPrefWidth(1800);  // slightly smaller than 1920 for padding
+
+            // Wrap in a ScrollPane for scrolling
+            ScrollPane scrollPane = new ScrollPane(mdView);
+            scrollPane.setFitToWidth(true);
+            scrollPane.setFitToHeight(true);
+            scrollPane.setPrefViewportWidth(1800);
+            scrollPane.setPrefViewportHeight(980); // leave space for button
+
+            // Load markdown text
+            try (InputStream is = getClass().getResourceAsStream("/com/mystic/tarotboard/assets/TarotBoard_Poker_Rules.md")) {
+                if (is != null) {
+                    String markdown = new String(is.readAllBytes());
+                    mdView.setMdString(markdown);
+                } else {
+                    mdView.setMdString("Could not find help file.");
+                }
+            } catch (IOException e) {
+                mdView.setMdString("Could not load help file.");
+            }
+
+            Button closeButton = new Button("Back");
+            closeButton.setStyle("-fx-font-size: 16pt;");
+            closeButton.setOnAction(e -> helpStage.close());
+
+            VBox helpLayout = new VBox(10, scrollPane, closeButton);
+            helpLayout.setPrefSize(1920, 1080);
+            helpLayout.setSpacing(20);
+            helpLayout.setStyle("-fx-padding: 20;");
+            helpLayout.setAlignment(javafx.geometry.Pos.TOP_CENTER);
+
+            helpStage.setScene(new Scene(helpLayout, 1920, 1080));
+            helpStage.centerOnScreen();
+            helpStage.showAndWait();
+        });
+
+        return helpButton;
     }
 
     private Button getReshuffleCardsButton(StackPane[] cardPanes) {
