@@ -4,10 +4,7 @@ import javafx.application.Platform;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ClientNetwork {
@@ -18,9 +15,11 @@ public class ClientNetwork {
     private final String playerName;
     private final GameUI gameUI;
     private volatile boolean running = true;
-
+    private List<TarotBoardPoker.Card> holeCards = new ArrayList<>();
+    private List<TarotBoardPoker.Card> communityCards = new ArrayList<>();
     private List<String> playerOrder = new ArrayList<>();
     private Set<String> foldedPlayers = ConcurrentHashMap.newKeySet();
+    private final Map<String, List<TarotBoardPoker.Card>> playerHands = new HashMap<>();
 
     public ClientNetwork(String host, int port, String playerName, GameUI gameUI) throws IOException {
         this.playerName = playerName;
@@ -67,52 +66,118 @@ public class ClientNetwork {
 
         switch (command) {
             case "WELCOME" -> gameUI.showMessage("Welcome, " + payload);
-            case "PLAYERS" -> gameUI.updatePlayers(Arrays.asList(payload.split(",")));
+
+            case "PLAYERS" -> {
+                List<String> players;
+                if (!payload.isEmpty()) {
+                    players = Arrays.asList(payload.split(","));
+                } else {
+                    players = new ArrayList<>();
+                }
+
+                // Remove any hands for players who left
+                playerHands.keySet().removeIf(player -> !players.contains(player));
+
+                // Update player list UI
+                gameUI.updatePlayers(players);
+
+                // Restore hands for existing players
+                for (String player : players) {
+                    if (playerHands.containsKey(player)) {
+                        gameUI.updatePlayerHand(player, playerHands.get(player));
+                    }
+                }
+            }
+
+            case "CHIPS" -> {
+                String[] entries = payload.split(",");
+                for (String entry : entries) {
+                    String[] part = entry.split("=");
+                    if (part.length == 2) {
+                        String player = part[0].trim();
+                        int chips = Integer.parseInt(part[1].trim());
+                        gameUI.setPlayerChips(player, chips);
+                    }
+                }
+                gameUI.showMessage("Chip counts synced.");
+            }
+
             case "HAND" -> {
                 String[] hp = payload.split(" ", 2);
                 if (hp.length == 2) {
                     String player = hp[0].trim();
                     String[] cardStrings = hp[1].split(",");
                     List<TarotBoardPoker.Card> cards = new ArrayList<>();
+
                     for (String cardStr : cardStrings) {
-                        TarotBoardPoker.Card card = parseCard(cardStr.trim());
+                        cardStr = cardStr.trim();
+                        TarotBoardPoker.Card card;
+                        if ("FACEDOWN".equalsIgnoreCase(cardStr)) {
+                            card = TarotBoardPoker.Card.createFaceDown();
+                        } else {
+                            card = parseCard(cardStr);
+                        }
                         if (card != null) cards.add(card);
                     }
+
+                    // Save hand state here
+                    playerHands.put(player, cards);
+
+                    // Update UI with new hand
                     gameUI.updatePlayerHand(player, cards);
-                    if (cards.size() == 5) {
-                        TarotBoardPoker.Hand hand = TarotBoardPoker.HandEvaluator.evaluate(cards);
-                        gameUI.showMessage(player + " has a " + hand.getHandRank() +
-                                " (Score: " + hand.getScore() + ")");
+
+                    // If this is YOUR hand, show evaluation message
+                    if (player.equals(playerName)) {
+                        boolean hasFaceUp = cards.stream().noneMatch(TarotBoardPoker.Card::isFaceDown);
+                        if (hasFaceUp && cards.size() >= 7) {
+                            TarotBoardPoker.Hand hand = TarotBoardPoker.HandEvaluator.evaluate(cards);
+                            gameUI.showMessage("You have a " + hand.getHandRank() +
+                                    " (Score: " + hand.getScore() + ")");
+                        }
                     }
                 }
             }
+
             case "CALL" -> {
                 String player = payload.trim();
                 gameUI.showMessage(player + " calls.");
                 gameUI.updatePlayerAction(player, "calls");
             }
+
             case "BET" -> {
                 String[] bp = payload.split(" ");
                 if (bp.length == 2) {
-                    gameUI.updatePlayerBet(bp[0], Integer.parseInt(bp[1]));
-                    gameUI.updatePlayerAction(bp[0], "bets");
+                    String player = bp[0];
+                    int betAmount = Integer.parseInt(bp[1]);
+                    gameUI.showMessage(player + " bets " + betAmount);
+                    gameUI.updatePlayerBet(player, betAmount);
+                    gameUI.updatePlayerAction(player, "bets");
                 }
             }
+
             case "RAISE" -> {
                 String[] rp = payload.split(" ");
-                if (rp.length == 2) {
-                    gameUI.updatePlayerBet(rp[0], Integer.parseInt(rp[1]));
-                    gameUI.updatePlayerAction(rp[0], "raises");
+                if (rp.length == 3) {
+                    String player = rp[0];
+                    int raiseBy = Integer.parseInt(rp[1]);
+                    int toCall = Integer.parseInt(rp[2]);
+                    int total = raiseBy + toCall;
+
+                    gameUI.showMessage(player + " raises by " + raiseBy);
+                    gameUI.updatePlayerBet(player, total);
+                    gameUI.updatePlayerAction(player, "raises");
                 }
             }
+
             case "CHECK" -> {
                 String player = payload.trim();
                 gameUI.showMessage(player + " checks.");
                 gameUI.updatePlayerAction(player, "checks");
             }
+
             case "COMMUNITY" -> {
                 String payloadTrim = payload.trim();
-                List<TarotBoardPoker.Card> communityCards = new ArrayList<>();
+                communityCards.clear();
                 if (!payloadTrim.isEmpty()) {
                     String[] cardStrings = payloadTrim.split(",");
                     for (String cardStr : cardStrings) {
@@ -123,7 +188,22 @@ public class ClientNetwork {
                     }
                 }
                 gameUI.updateCommunityCards(communityCards);
+
+                // Evaluate your hand only if you have at least 7 cards total
+                if (holeCards.size() + communityCards.size() >= 7) {
+                    List<TarotBoardPoker.Card> fullHand = new ArrayList<>(holeCards);
+                    fullHand.addAll(communityCards);
+                    try {
+                        TarotBoardPoker.Hand hand = TarotBoardPoker.HandEvaluator.evaluate(fullHand);
+                        gameUI.showMessage("You have a " + hand.getHandRank() +
+                                " (Score: " + hand.getScore() + ")");
+                    } catch (IllegalArgumentException e) {
+                        // Just in case evaluation fails, ignore for now or log
+                        System.err.println("Hand evaluation failed: " + e.getMessage());
+                    }
+                }
             }
+
             case "FOLD" -> {
                 String player = payload.trim();
                 foldedPlayers.add(player);
@@ -131,10 +211,12 @@ public class ClientNetwork {
                 gameUI.updatePlayerAction(player, "folds");
                 gameUI.markPlayerFolded(player);
             }
+
             case "POT" -> {
                 int potAmount = Integer.parseInt(payload.trim());
                 gameUI.updatePot(potAmount);
             }
+
             case "SHOWDOWN" -> {
                 gameUI.showMessage("Showdown!");
                 String[] partsShowdown = payload.split(";");
@@ -156,28 +238,33 @@ public class ClientNetwork {
                         }
                         gameUI.updatePlayerHand(player, finalHand);
                         TarotBoardPoker.Hand hand = TarotBoardPoker.HandEvaluator.evaluate(finalHand);
-                        gameUI.showMessage(player + " final hand: " + hand.getHandRank() + " (Score: " + hand.getScore() + ")");
+                        gameUI.showMessage(player + " final hand: " + hand.getHandRank() +
+                                " (Score: " + hand.getScore() + ")");
                     }
                 }
                 if (!winners.isEmpty()) {
                     gameUI.showMessage("Winner(s): " + String.join(", ", winners));
                 }
             }
+
             case "NEWROUND" -> {
                 foldedPlayers.clear();
-                playerOrder = Arrays.asList(payload.split(","));
-                gameUI.startNewRound(playerOrder);
-                gameUI.showMessage("New round started!");
+                List<String> players = new ArrayList<>();
+                if (!payload.isEmpty()) {
+                    players = Arrays.asList(payload.split(","));
+                }
+
+                gameUI.startNewRound(players);
             }
+
             case "TURN" -> {
                 gameUI.setCurrentTurn(payload);
-                if (payload.equals(playerName)) {
-                    gameUI.enableActions(true);
-                } else {
-                    gameUI.enableActions(false);
-                }
+                boolean myTurn = payload.equals(playerName);
+                gameUI.enableActions(myTurn);
             }
+
             case "MESSAGE" -> gameUI.showMessage(payload);
+
             default -> System.out.println("Unknown command from server: " + command);
         }
     }
@@ -194,16 +281,20 @@ public class ClientNetwork {
     private TarotBoardPoker.Card parseCard(String cardString) {
         if (cardString == null || cardString.isEmpty()) return null;
 
-        if (TarotBoardPoker.ValueCategory.WILD.name().equals(cardString) || isWildCard(cardString)) {
-            TarotBoardPoker.Value val = TarotBoardPoker.Value.valueOf(cardString.toUpperCase());
-            return new TarotBoardPoker.Card(null, val);
+        if (TarotBoardPoker.ValueCategory.WILD.name().equalsIgnoreCase(cardString) || isWildCard(cardString)) {
+            try {
+                TarotBoardPoker.Value val = TarotBoardPoker.Value.valueOf(cardString.toUpperCase());
+                return new TarotBoardPoker.Card(null, val, false);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         } else if (cardString.contains(" of ")) {
             String[] parts = cardString.split(" of ");
             if (parts.length == 2) {
                 try {
                     TarotBoardPoker.Value val = TarotBoardPoker.Value.valueOf(parts[0].toUpperCase());
                     TarotBoardPoker.Suit suit = TarotBoardPoker.Suit.valueOf(parts[1].toUpperCase());
-                    return new TarotBoardPoker.Card(suit, val);
+                    return new TarotBoardPoker.Card(suit, val, false);
                 } catch (IllegalArgumentException e) {
                     return null;
                 }

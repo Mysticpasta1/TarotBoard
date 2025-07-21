@@ -3,6 +3,19 @@
     -fx-background-color: #1e1e1e;
 }
 
+/* Labels: light text */
+.label {
+    -fx-text-fill: #ddd;
+}
+
+/* Common text style for Label now */
+.text {
+    -fx-text-fill: #ccc;  /* CHANGED from -fx-fill */
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+
 /* Buttons: dark with light text */
 .button {
     -fx-background-color: #333;
@@ -14,16 +27,119 @@
     -fx-background-color: #555;
 }
 
-/* Labels: light text */
-.label {
-    -fx-text-fill: #ddd;
+/* ScrollPane for player hands */
+.scroll-pane-hand {
+    -fx-background-color: transparent;
+    -fx-border-color: #666;
+    -fx-border-width: 1;
+    -fx-padding: 2;
 }
 
-/* Text elements in VBox messages */
-.text {
-    -fx-fill: #ccc;
-    -fx-font-size: 14px;
+/* Style the scrollbar (optional, for better look) */
+.scroll-pane-hand > .viewport {
+    -fx-background-color: transparent;
 }
+
+.scroll-pane-hand > .scroll-bar:horizontal {
+    -fx-background-color: #333;
+    -fx-pref-height: 12px;
+}
+
+.scroll-pane-hand > .scroll-bar:horizontal > .thumb {
+    -fx-background-color: #666;
+    -fx-background-insets: 2;
+    -fx-background-radius: 4;
+}
+
+/* Common button styling */
+.button {
+    -fx-background-color: #333;
+    -fx-text-fill: #eee;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-padding: 8 16 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #555;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 2, 0, 0, 1);
+    -fx-transition: background-color 0.3s ease;
+}
+
+.button:hover {
+    -fx-background-color: #555;
+    -fx-border-color: #aaa;
+}
+
+/* Specific colors for each action */
+.button-bet {
+    -fx-background-color: #2e7d32; /* dark green */
+}
+
+.button-bet:hover {
+    -fx-background-color: #4caf50; /* bright green */
+}
+
+.button-raise {
+    -fx-background-color: #f57c00; /* dark orange */
+}
+
+.button-raise:hover {
+    -fx-background-color: #ff9800; /* bright orange */
+}
+
+.button-call {
+    -fx-background-color: #0288d1; /* dark blue */
+}
+
+.button-call:hover {
+    -fx-background-color: #03a9f4; /* bright blue */
+}
+
+.button-fold {
+    -fx-background-color: #c62828; /* dark red */
+}
+
+.button-fold:hover {
+    -fx-background-color: #e53935; /* bright red */
+}
+
+.button-check {
+    -fx-background-color: #6a1b9a; /* dark purple */
+}
+
+.button-check:hover {
+    -fx-background-color: #8e24aa; /* bright purple */
+}
+
+.text-field {
+    -fx-background-color: #222;
+    -fx-text-fill: #eee;
+    -fx-prompt-text-fill: #888;
+    -fx-font-size: 14px;
+    -fx-padding: 6 8 6 8;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #555;
+    -fx-border-width: 1;
+    -fx-cursor: text;
+}
+
+.text-field:focused {
+    -fx-border-color: #1E90FF; /* Dodger Blue highlight */
+    -fx-background-color: #333;
+    -fx-prompt-text-fill: #bbb;
+}
+
+/* Suit colors for Label */
+.card-facedown { -fx-text-fill: gray; }
+.card-wild     { -fx-text-fill: purple; }
+.card-celestial { -fx-text-fill: #FFD700; } /* Gold */
+.card-umbral    { -fx-text-fill: #4B0082; } /* Indigo */
+.card-infernal  { -fx-text-fill: #DC143C; } /* Crimson */
+.card-verdant   { -fx-text-fill: #228B22; } /* Forest Green */
+.card-aetheric  { -fx-text-fill: #1E90FF; } /* Dodger Blue */
 
 /* ScrollPane background */
 .scroll-pane {

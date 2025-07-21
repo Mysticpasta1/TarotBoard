@@ -4,15 +4,17 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 public class PokerServer {
     private ServerSocket serverSocket;
+    Set<String> activePlayers = new HashSet<>();
     private final Map<String, ClientHandler> clients = new ConcurrentHashMap<>();
     private final List<String> playerOrder = new ArrayList<>();
     private final Set<String> foldedPlayers = ConcurrentHashMap.newKeySet();
     private final Map<String, Integer> playerChips = new ConcurrentHashMap<>();
     private final Map<String, Integer> playerBets = new ConcurrentHashMap<>();
-
+    Set<String> playerHasActedThisRound = new HashSet<>();
     private List<TarotBoardPoker.Card> deck;
     private List<TarotBoardPoker.Card> communityCards = new ArrayList<>();
 
@@ -52,17 +54,6 @@ public class PokerServer {
         PokerServer server = new PokerServer();
         server.start(host, port);
     }
-
-    private synchronized void checkIfBettingComplete() {
-        for (String player : playerOrder) {
-            if (foldedPlayers.contains(player)) continue;
-            int bet = playerBets.getOrDefault(player, 0);
-            if (bet != currentBet) return; // Someone hasn't matched bet yet
-        }
-        // All matched - proceed
-        proceedToNextPhase();
-    }
-
 
     public void start(String host, int port) throws IOException {
         if (host == null) {
@@ -108,87 +99,110 @@ public class PokerServer {
     }
 
     private synchronized void startNewRound() {
-        // Reset everything for new round
+        activePlayers.clear();
+        activePlayers.addAll(playerOrder);
+        playerHasActedThisRound.clear();
         foldedPlayers.clear();
         playerBets.clear();
         pot = 0;
         currentBet = 0;
         communityCards.clear();
 
-        // Rotate dealer
+        // Rotate dealer and turn
         if (!playerOrder.isEmpty()) {
             dealerIndex = (dealerIndex + 1) % playerOrder.size();
-            currentTurnIndex = (dealerIndex + 1) % playerOrder.size(); // first to act is left of dealer
+            currentTurnIndex = (dealerIndex + 1) % playerOrder.size();
         }
 
-        // Reset player chips if new players joined
+        // Reset chips if new
         for (String player : playerOrder) {
-            playerChips.putIfAbsent(player, 1000);
+            playerChips.putIfAbsent(player, 10000);
             playerBets.put(player, 0);
         }
 
-        // Prepare deck and shuffle
         deck = generateDeck();
         Collections.shuffle(deck);
 
-        // Deal 2 hole cards to each player and send **privately**
+        // Send NEWROUND with player list
+        String playerList = String.join(",", playerOrder);
+        broadcast("NEWROUND " + playerList);
+
+        // Deal 2 hole cards and send HAND messages
         for (String player : playerOrder) {
             List<TarotBoardPoker.Card> hand = new ArrayList<>(deck.subList(0, 2));
             deck.subList(0, 2).clear();
             clients.get(player).hand = hand;
 
+            // Send real cards to owner
             List<String> cardStrings = hand.stream()
                     .map(TarotBoardPoker.Card::toString)
                     .toList();
-
-            // Send to the specific client ONLY, NOT broadcast
             clients.get(player).sendMessage("HAND " + player + " " + String.join(",", cardStrings));
+
+            // Send facedown cards to everyone else
+            for (String recipient : playerOrder) {
+                if (!recipient.equals(player)) {
+                    clients.get(recipient).sendMessage("HAND " + player + " FACEDOWN,FACEDOWN");
+                }
+            }
         }
 
         phase = GamePhase.PRE_FLOP;
         broadcast("MESSAGE New round started! Dealer is " + playerOrder.get(dealerIndex));
-        broadcast("COMMUNITY"); // empty community cards
+        broadcast("COMMUNITY");
         broadcast("POT " + pot);
         broadcast("TURN " + playerOrder.get(currentTurnIndex));
     }
 
+
     private synchronized void proceedToNextPhase() {
+        playerHasActedThisRound.clear();
         switch (phase) {
-            case PRE_FLOP -> {
+            case PRE_FLOP: {
                 phase = GamePhase.FLOP;
                 // Deal 3 community cards
                 communityCards.addAll(deck.subList(0, 3));
                 deck.subList(0, 3).clear();
+                break;
             }
-            case FLOP -> {
+            case FLOP: {
                 phase = GamePhase.TURN;
                 // Deal 1 community card
                 communityCards.add(deck.remove(0));
+                break;
             }
-            case TURN -> {
+            case TURN: {
                 phase = GamePhase.RIVER;
                 // Deal 1 community card
                 communityCards.add(deck.remove(0));
+                break;
             }
-            case RIVER -> {
+            case RIVER: {
                 phase = GamePhase.SHOWDOWN;
+                break;
             }
-            default -> {
-            }
+            default:
+                break;
         }
+
         broadcast("COMMUNITY " + communityCards.stream()
                 .map(TarotBoardPoker.Card::toString)
                 .reduce((a, b) -> a + "," + b).orElse(""));
 
         if (phase != GamePhase.SHOWDOWN) {
-            // Reset bets and turn for new betting round
             resetBetsForNewRound();
             currentTurnIndex = (dealerIndex + 1) % playerOrder.size();
             broadcast("TURN " + playerOrder.get(currentTurnIndex));
         } else {
-            // Showdown
             doShowdown();
         }
+    }
+
+    private synchronized void broadcastChips() {
+        String chipsLine = playerOrder.stream()
+                .map(p -> p + "=" + playerChips.getOrDefault(p, 0))
+                .collect(Collectors.joining(","));
+        broadcast("CHIPS " + chipsLine);
     }
 
     private synchronized void resetBetsForNewRound() {
@@ -199,9 +213,8 @@ public class PokerServer {
     }
 
     private synchronized void doShowdown() {
-        // Evaluate hands of all players who didn't fold
+        // 1️⃣ Evaluate active hands
         Map<String, TarotBoardPoker.Hand> playerHands = new HashMap<>();
-
         for (String player : playerOrder) {
             if (!foldedPlayers.contains(player)) {
                 List<TarotBoardPoker.Card> fullHand = new ArrayList<>(communityCards);
@@ -211,25 +224,77 @@ public class PokerServer {
             }
         }
 
-        // Find best hand
-        String winner = null;
-        TarotBoardPoker.Hand bestHand = null;
-        for (var entry : playerHands.entrySet()) {
-            if (bestHand == null || entry.getValue().compareTo(bestHand) > 0) {
-                bestHand = entry.getValue();
-                winner = entry.getKey();
+        if (playerHands.isEmpty()) {
+            // Only one player left (all others folded earlier)
+            String lastStanding = playerOrder.stream()
+                    .filter(p -> !foldedPlayers.contains(p))
+                    .findFirst().orElse(null);
+            if (lastStanding != null) {
+                playerChips.put(lastStanding, playerChips.getOrDefault(lastStanding, 0) + pot);
+                broadcast("MESSAGE " + lastStanding + " wins the pot of " + pot + " chips by default!");
+            } else {
+                broadcast("MESSAGE Nobody left to win the pot!");
             }
+            pot = 0;
+            broadcast("POT " + pot);
+            broadcastChips();
+            phase = GamePhase.WAITING;
+            startNewRound();
+            return;
         }
 
-        if (winner != null) {
-            playerChips.put(winner, playerChips.get(winner) + pot);
-            broadcast("MESSAGE " + winner + " wins the pot of " + pot + " chips with " + bestHand.getHandRank());
+        // 2️⃣ Reveal hole cards for all
+        for (String player : playerHands.keySet()) {
+            List<TarotBoardPoker.Card> hand = clients.get(player).hand;
+            List<String> cardStrings = hand.stream()
+                    .map(TarotBoardPoker.Card::toString)
+                    .toList();
+            broadcast("HAND " + player + " " + String.join(",", cardStrings));
+        }
+
+        // 3️⃣ Determine best score
+        int bestScore = playerHands.values().stream()
+                .mapToInt(TarotBoardPoker.Hand::getScore)
+                .max().orElse(-1);
+
+        // 4️⃣ Collect all winners with best score
+        List<String> winners = playerHands.entrySet().stream()
+                .filter(e -> e.getValue().getScore() == bestScore)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        // 5️⃣ Split pot safely
+        int splitPot = winners.isEmpty() ? 0 : pot / winners.size();
+        int leftover = pot - (splitPot * winners.size());
+
+        for (String winner : winners) {
+            playerChips.put(winner, playerChips.getOrDefault(winner, 0) + splitPot);
+        }
+
+        // 6️⃣ Give leftover to first winner (rounding)
+        if (leftover > 0 && !winners.isEmpty()) {
+            String firstWinner = winners.get(0);
+            playerChips.put(firstWinner, playerChips.get(firstWinner) + leftover);
+        }
+
+        // 7️⃣ Announce winner(s) with hand details
+        if (!winners.isEmpty()) {
+            String bestHandName = playerHands.get(winners.get(0)).getHandRank().name();
+            String bestHandScore = String.valueOf(bestScore);
+            broadcast("MESSAGE Winner(s): " + String.join(", ", winners)
+                    + " — " + bestHandName + " (Score: " + bestHandScore + ") "
+                    + " — Pot split: " + splitPot
+                    + (leftover > 0 ? " + leftover: " + leftover : ""));
         } else {
-            broadcast("MESSAGE No winner this round.");
+            broadcast("MESSAGE No valid winner found. Pot lost!");
         }
 
+        // 8️⃣ Reset pot and update chips
         pot = 0;
         broadcast("POT " + pot);
+        broadcastChips();
+
+        // 9️⃣ New round
         phase = GamePhase.WAITING;
         startNewRound();
     }
@@ -261,13 +326,13 @@ public class PokerServer {
         for (TarotBoardPoker.Suit suit : TarotBoardPoker.Suit.values()) {
             for (TarotBoardPoker.Value value : TarotBoardPoker.Value.values()) {
                 if (value.getCategory() != TarotBoardPoker.ValueCategory.WILD) {
-                    deck.add(new TarotBoardPoker.Card(suit, value));
+                    deck.add(new TarotBoardPoker.Card(suit, value, false));
                 }
             }
         }
         for (TarotBoardPoker.Value wildValue : TarotBoardPoker.Value.values()) {
             if (wildValue.getCategory() == TarotBoardPoker.ValueCategory.WILD) {
-                deck.add(new TarotBoardPoker.Card(null, wildValue));
+                deck.add(new TarotBoardPoker.Card(null, wildValue, false));
             }
         }
         return deck;
@@ -311,206 +376,175 @@ public class PokerServer {
                                     playerName = payload;
                                     clients.put(playerName, this);
                                     playerOrder.add(playerName);
-                                    playerChips.put(playerName, 1000);
+                                    playerChips.putIfAbsent(playerName, 10000);
                                     sendMessage("WELCOME " + playerName);
                                     broadcast("PLAYERS " + String.join(",", playerOrder));
 
                                     if (phase == GamePhase.WAITING && playerOrder.size() >= 2) {
                                         startNewRound();
+                                    } else if (phase != GamePhase.WAITING) {
+                                        // Mid-round join: deal hole cards to new player
+                                        hand = new ArrayList<>(deck.subList(0, 2));
+                                        deck.subList(0, 2).clear();
+
+                                        // Send hole cards to the new player
+                                        List<String> cardStrings = hand.stream()
+                                                .map(TarotBoardPoker.Card::toString)
+                                                .toList();
+                                        sendMessage("HAND " + playerName + " " + String.join(",", cardStrings));
+
+                                        // Send community cards to the new player
+                                        if (!communityCards.isEmpty()) {
+                                            sendMessage("COMMUNITY " + String.join(",", communityCards.stream()
+                                                    .map(TarotBoardPoker.Card::toString).toList()));
+                                        } else {
+                                            sendMessage("COMMUNITY");
+                                        }
+
+                                        // Send pot and turn info
+                                        sendMessage("POT " + pot);
+                                        sendMessage("TURN " + playerOrder.get(currentTurnIndex));
+
+                                        // Send facedown info about other players' hole cards (if needed)
+                                        for (String otherPlayer : playerOrder) {
+                                            if (!otherPlayer.equals(playerName)) {
+                                                sendMessage("HAND " + otherPlayer + " FACEDOWN,FACEDOWN");
+                                            }
+                                        }
+
+                                        // Send current chips too
+                                        broadcastChips();
                                     }
                                 }
                             }
+
                             case "BET" -> {
-                                // Split payload into playerName and amount
                                 String[] betParts = payload.split(" ", 2);
                                 if (betParts.length != 2) {
                                     sendMessage("MESSAGE Invalid BET command format");
                                     break;
                                 }
-                                String playerName = betParts[0];
-                                String amountStr = betParts[1];
+                                String name = betParts[0];
+                                int betAmount = parseAmount(betParts[1], "bet");
+                                if (betAmount <= 0) break;
 
-                                if (!(phase == GamePhase.PRE_FLOP || phase == GamePhase.FLOP || phase == GamePhase.TURN || phase == GamePhase.RIVER)) {
-                                    sendMessage("MESSAGE Betting is not allowed now");
-                                    break;
-                                }
-
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
-                                    break;
-                                }
-
+                                if (checkTurn(name)) break;
                                 if (currentBet > 0) {
                                     sendMessage("MESSAGE Cannot place a new bet, must CALL or RAISE");
                                     break;
                                 }
 
-                                int betAmount;
-                                try {
-                                    betAmount = Integer.parseInt(amountStr);
-                                } catch (NumberFormatException e) {
-                                    sendMessage("MESSAGE Invalid bet amount");
-                                    break;
-                                }
+                                if (deductChips(name, betAmount)) break;
+                                broadcastChips();
 
-                                if (betAmount <= 0) {
-                                    sendMessage("MESSAGE Bet must be greater than zero");
-                                    break;
-                                }
-
-                                int playerChipCount = playerChips.getOrDefault(playerName, 0);
-                                if (betAmount > playerChipCount) {
-                                    sendMessage("MESSAGE Not enough chips to bet that amount");
-                                    break;
-                                }
-
-                                // Deduct chips and update bet
-                                playerChips.put(playerName, playerChipCount - betAmount);
-                                playerBets.put(playerName, betAmount);
+                                playerBets.put(name, betAmount);
                                 pot += betAmount;
                                 currentBet = betAmount;
 
-                                System.out.println("Pot updated to: " + pot);
+                                playerHasActedThisRound.add(name);
 
-                                broadcast("BET " + playerName + " " + betAmount);
+                                broadcast("BET " + name + " " + betAmount);
                                 broadcast("POT " + pot);
+                                broadcastChips();
 
-                                checkIfBettingComplete();
-                                if (phase != GamePhase.SHOWDOWN) {
-                                    advanceTurn();
-                                }
+                                finishActionOrAdvance();
                             }
 
                             case "RAISE" -> {
-                                // Split payload into playerName and amount
                                 String[] raiseParts = payload.split(" ", 2);
                                 if (raiseParts.length != 2) {
                                     sendMessage("MESSAGE Invalid RAISE command format");
                                     break;
                                 }
-                                String playerName = raiseParts[0];
-                                String amountStr = raiseParts[1];
+                                String name = raiseParts[0];
+                                int raiseBy = parseAmount(raiseParts[1], "raise");
+                                if (raiseBy <= 0) break;
 
-                                if (!(phase == GamePhase.PRE_FLOP || phase == GamePhase.FLOP || phase == GamePhase.TURN || phase == GamePhase.RIVER)) {
-                                    sendMessage("MESSAGE Raising is not allowed now");
-                                    break;
-                                }
+                                if (checkTurn(name)) break;
 
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
-                                    break;
-                                }
-
-                                int raiseBy;
-                                try {
-                                    raiseBy = Integer.parseInt(amountStr);
-                                } catch (NumberFormatException e) {
-                                    sendMessage("MESSAGE Invalid raise amount");
-                                    break;
-                                }
-
-                                if (raiseBy <= 0) {
-                                    sendMessage("MESSAGE Raise must be greater than zero");
-                                    break;
-                                }
-
-                                int playerChipCount = playerChips.getOrDefault(playerName, 0);
-                                int playerBetSoFar = playerBets.getOrDefault(playerName, 0);
-                                int toCall = currentBet - playerBetSoFar;
-
+                                int betSoFar = playerBets.getOrDefault(name, 0);
+                                int toCall = currentBet - betSoFar;
                                 int totalNeeded = toCall + raiseBy;
-                                if (totalNeeded > playerChipCount) {
-                                    sendMessage("MESSAGE Not enough chips to call and raise");
-                                    break;
-                                }
 
-                                // Deduct chips and update bets and pot
-                                playerChips.put(playerName, playerChipCount - totalNeeded);
-                                int newBet = currentBet + raiseBy;
-                                playerBets.put(playerName, newBet);
+                                if (deductChips(name, totalNeeded)) break;
+                                broadcastChips();
+
+                                currentBet += raiseBy;
+                                playerBets.put(name, currentBet);
                                 pot += totalNeeded;
-                                currentBet = newBet;
 
-                                System.out.println("Pot updated to: " + pot);
+                                playerHasActedThisRound.add(name);
 
-                                broadcast("RAISE " + playerName + " " + newBet);
+                                broadcast("RAISE " + name + " " + raiseBy + " " + toCall);
                                 broadcast("POT " + pot);
+                                broadcastChips();
 
-                                checkIfBettingComplete();
-                                if (phase != GamePhase.SHOWDOWN) {
-                                    advanceTurn();
-                                }
+                                finishActionOrAdvance();
                             }
-                            case "FOLD" -> {
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
-                                    break;
-                                }
-                                foldedPlayers.add(playerName);
-                                broadcast("FOLD " + playerName);
 
-                                if (activePlayersCount() <= 1) {
-                                    broadcast("MESSAGE Round ended due to folds.");
-                                    phase = GamePhase.WAITING;
-                                    startNewRound();
-                                } else {
-                                    advanceTurn();
-                                }
-                            }
-                            case "CHECK" -> {
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
-                                    break;
-                                }
-
-                                int playerBet = playerBets.getOrDefault(playerName, 0);
-                                if (playerBet < currentBet) {
-                                    sendMessage("MESSAGE Cannot check, must call or raise");
-                                    break;
-                                }
-                                broadcast("CHECK " + playerName);
-                                advanceTurn();
-                            }
                             case "CALL" -> {
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
-                                    break;
-                                }
+                                if (checkTurn(playerName)) break;
 
-                                int playerBetSoFar = playerBets.getOrDefault(playerName, 0);
-                                int toCall = currentBet - playerBetSoFar;
-
+                                int betSoFar = playerBets.getOrDefault(playerName, 0);
+                                int toCall = currentBet - betSoFar;
                                 if (toCall <= 0) {
-                                    sendMessage("MESSAGE Nothing to call, you should CHECK instead");
+                                    sendMessage("MESSAGE Nothing to call, use CHECK instead");
                                     break;
                                 }
+                                if (deductChips(playerName, toCall)) break;
+                                broadcastChips();
 
-                                int chips = playerChips.getOrDefault(playerName, 0);
-                                if (chips < toCall) {
-                                    sendMessage("MESSAGE Not enough chips to call");
-                                    break;
-                                }
-
-                                playerChips.put(playerName, chips - toCall);
                                 playerBets.put(playerName, currentBet);
                                 pot += toCall;
 
+                                playerHasActedThisRound.add(playerName);
+
                                 broadcast("CALL " + playerName);
                                 broadcast("POT " + pot);
+                                broadcastChips();
 
-                                if (isBettingComplete()) {
-                                    proceedToNextPhase();
-                                } else {
-                                    advanceTurn();
-                                }
+                                finishActionOrAdvance();
                             }
-                            case "ENDTURN" -> {
-                                if (!playerName.equals(playerOrder.get(currentTurnIndex))) {
-                                    sendMessage("MESSAGE Not your turn");
+
+                            case "CHECK" -> {
+                                if (checkTurn(playerName)) break;
+
+                                int betSoFar = playerBets.getOrDefault(playerName, 0);
+                                if (betSoFar < currentBet) {
+                                    sendMessage("MESSAGE Cannot check, must CALL or RAISE");
                                     break;
                                 }
-                                advanceTurn();
+
+                                playerHasActedThisRound.add(playerName);
+
+                                broadcast("CHECK " + playerName);
+                                finishActionOrAdvance();
                             }
+
+                            case "FOLD" -> {
+                                if (!checkTurn(playerName)) {
+                                    foldedPlayers.add(playerName);
+                                    playerHasActedThisRound.add(playerName);
+
+                                    // Remove from active players if you have a list/set
+                                    activePlayers.remove(playerName);  // Make sure activePlayers is a modifiable list or set
+
+                                    broadcast("FOLD " + playerName);
+
+                                    if (activePlayers.size() == 1) {
+                                        String winner = activePlayers.iterator().next();  // or get(0) if list
+                                        playerChips.put(winner, playerChips.getOrDefault(winner, 0) + pot);
+                                        broadcast("MESSAGE " + winner + " wins the pot of " + pot + " chips by default!");
+                                        broadcast("POT " + pot);  // Broadcast pot before resetting
+                                        broadcastChips();
+                                        startNewRound();
+                                    } else {
+                                        advanceTurn();
+                                    }
+                                }
+                            }
+
+
                             default -> sendMessage("MESSAGE Unknown command: " + command);
                         }
                     }
@@ -518,30 +552,88 @@ public class PokerServer {
             } catch (IOException e) {
                 System.out.println("Connection lost to " + playerName);
             } finally {
-                synchronized (PokerServer.this) {
-                    if (playerName != null) {
-                        clients.remove(playerName);
-                        playerOrder.remove(playerName);
-                        foldedPlayers.remove(playerName);
-                        playerChips.remove(playerName);
-                        playerBets.remove(playerName);
-                        broadcast("PLAYERS " + String.join(",", playerOrder));
-                    }
-                }
-                try {
-                    socket.close();
-                } catch (IOException ignored) {
-                }
+                handleDisconnect();
             }
         }
-    }
 
-    private boolean isBettingComplete() {
-        for (String player : playerOrder) {
-            if (foldedPlayers.contains(player)) continue;
-            int bet = playerBets.getOrDefault(player, 0);
-            if (bet != currentBet) return false;
+        private int parseAmount(String str, String type) {
+            try {
+                int amt = Integer.parseInt(str);
+                if (amt <= 0) {
+                    sendMessage("MESSAGE " + type + " amount must be positive");
+                    return -1;
+                }
+                return amt;
+            } catch (NumberFormatException e) {
+                sendMessage("MESSAGE Invalid " + type + " amount");
+                return -1;
+            }
         }
-        return true;
+
+        private boolean deductChips(String player, int amount) {
+            int current = playerChips.getOrDefault(player, 0);
+
+            if (amount > current) {
+                // Not enough chips — deny and notify this player
+                ClientHandler handler = clients.get(player);
+                if (handler != null) {
+                    handler.sendMessage("MESSAGE Not enough chips. You have: " + current);
+                }
+                return true;
+            }
+
+            // Deduct and save new value
+            playerChips.put(player, current - amount);
+            return false;
+        }
+
+        private boolean checkTurn(String name) {
+            if (!name.equals(playerOrder.get(currentTurnIndex))) {
+                sendMessage("MESSAGE Not your turn");
+                return true;
+            }
+            return false;
+        }
+
+        private void finishActionOrAdvance() {
+            if (isBettingComplete()) {
+                proceedToNextPhase();
+            } else {
+                advanceTurn();
+            }
+        }
+
+        private void handleDisconnect() {
+            synchronized (PokerServer.this) {
+                if (playerName != null) {
+                    clients.remove(playerName);
+                    playerOrder.remove(playerName);
+                    foldedPlayers.remove(playerName);
+                    playerChips.remove(playerName);
+                    playerBets.remove(playerName);
+                    broadcast("PLAYERS " + String.join(",", playerOrder));
+                }
+            }
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+            }
+        }
+
+        private boolean isBettingComplete() {
+            for (String player : playerOrder) {
+                if (foldedPlayers.contains(player)) continue;
+
+                int bet = playerBets.getOrDefault(player, 0);
+
+                // 1. If their bet is lower → they must act
+                if (bet < currentBet) return false;
+
+                // 2. If their bet is equal but they never acted, they could still raise.
+                if (!playerHasActedThisRound.contains(player)) return false;
+            }
+            return true;
+        }
+
     }
 }

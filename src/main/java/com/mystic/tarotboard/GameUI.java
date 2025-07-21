@@ -6,7 +6,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -24,6 +23,7 @@ public class GameUI {
     private final VBox messagesBox;
     private ClientNetwork clientNetwork;
     private String currentTurn = "";
+    private final Map<String, List<TarotBoardPoker.Card>> playerHands = new HashMap<>();
 
     // Map player names to their card display
     private final Map<String, HBox> playerHandsMap = new HashMap<>();
@@ -52,9 +52,14 @@ public class GameUI {
 
         playersBox = new VBox(10);
         playersBox.setPadding(new Insets(10));
-        playersBox.setPrefHeight(200);
+        playersBox.setPrefHeight(500);
         playersBox.setStyle("-fx-background-color: #2b2b2b;");
-        root.setTop(playersBox);
+
+        ScrollPane playerPane = new ScrollPane(playersBox);
+        playerPane.setFitToWidth(true);
+        playerPane.setPrefHeight(500);
+
+        root.setTop(playerPane);
 
         messagesBox = new VBox(5);
         messagesBox.setPadding(new Insets(10));
@@ -65,7 +70,12 @@ public class GameUI {
         // Add community cards box to center
         communityCardsBox.setPadding(new Insets(10));
         communityCardsBox.setStyle("-fx-background-color: #222;");
-        root.setCenter(communityCardsBox);
+        ScrollPane communityPane = new ScrollPane(communityCardsBox);
+        communityPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        communityPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
+        communityPane.setPrefHeight(200);
+
+        root.setCenter(communityPane);
 
         // Pot label styling
         potLabel.setStyle("-fx-text-fill: gold; -fx-font-weight: bold; -fx-font-size: 16px;");
@@ -77,10 +87,17 @@ public class GameUI {
         btnFold = new Button("Fold");
         btnCheck = new Button("Check");
 
+        btnBet.getStyleClass().add("button-bet");
+        btnRaise.getStyleClass().add("button-raise");
+        btnCall.getStyleClass().add("button-call");
+        btnFold.getStyleClass().add("button-fold");
+        btnCheck.getStyleClass().add("button-check");
+
         // Create TextField for entering bet/raise amount
         betAmountField = new TextField();
         betAmountField.setPrefWidth(60);
         betAmountField.setPromptText("Amount");
+        betAmountField.getStyleClass().add("text-field");
 
         // Initially disable action buttons and input
         betAmountField.setDisable(true);
@@ -167,30 +184,28 @@ public class GameUI {
         HBox handBox = playerHandsMap.get(playerName);
         if (handBox == null) return;
 
-        handBox.setStyle("-fx-background-color: #555555; -fx-opacity: 0.5; -fx-border-color: darkred; -fx-border-width: 2;");
+        // Apply *just* the style for folded background & border
+        handBox.setStyle("-fx-background-color: #555555; -fx-border-color: darkred; -fx-border-width: 2;");
 
+        // Apply opacity separately — clearer and safer
+        handBox.setOpacity(0.5);
+
+        // Add folded label if not already there
         for (Node parent : playersBox.getChildren()) {
-            if (parent instanceof VBox vbox) {
-                if (!vbox.getChildren().isEmpty()) {
-                    Node firstChild = vbox.getChildren().get(0);
-                    if (firstChild instanceof HBox infoBox) {
-                        for (Node node : infoBox.getChildren()) {
-                            if (node instanceof Label label && label.getText().equals(playerName)) {
-                                Label foldedLabel = null;
-                                for (Node n : infoBox.getChildren()) {
-                                    if ("foldedLabel".equals(n.getId())) {
-                                        foldedLabel = (Label) n;
-                                        break;
-                                    }
-                                }
-                                if (foldedLabel == null) {
-                                    foldedLabel = new Label(" (Folded)");
-                                    foldedLabel.setId("foldedLabel");
-                                    foldedLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                                    infoBox.getChildren().add(foldedLabel);
-                                }
-                                return;
+            if (parent instanceof VBox vbox && !vbox.getChildren().isEmpty()) {
+                Node firstChild = vbox.getChildren().get(0);
+                if (firstChild instanceof HBox infoBox) {
+                    for (Node node : infoBox.getChildren()) {
+                        if (node instanceof Label label && label.getText().equals(playerName)) {
+                            boolean hasFoldedLabel = infoBox.getChildren().stream()
+                                    .anyMatch(n -> "foldedLabel".equals(n.getId()));
+                            if (!hasFoldedLabel) {
+                                Label foldedLabel = new Label(" (Folded)");
+                                foldedLabel.setId("foldedLabel");
+                                foldedLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                                infoBox.getChildren().add(foldedLabel);
                             }
+                            return;
                         }
                     }
                 }
@@ -203,13 +218,12 @@ public class GameUI {
         playersBox.getChildren().clear();
         playerHandsMap.clear();
         playerChipBoxes.clear();
-        playerChips.clear();
 
         for (String player : players) {
             Label nameLabel = new Label(player);
             nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
 
-            Label chipCountLabel = new Label("Chips: 1000"); // default chips
+            Label chipCountLabel = new Label("Chips:");
             chipCountLabel.setStyle("-fx-text-fill: gold; -fx-font-weight: bold;");
 
             HBox chipStack = new HBox(3);
@@ -232,8 +246,13 @@ public class GameUI {
             playersBox.getChildren().add(playerBox);
             playerHandsMap.put(player, handBox);
 
-            playerChips.put(player, 1000);
+            playerChips.putIfAbsent(player, 10000);
             updateChipDisplay(player);
+
+            // Restore previously saved hand, if any
+            if (playerHands.containsKey(player)) {
+                updatePlayerHand(player, playerHands.get(player));
+            }
         }
         showMessage("Players updated: " + String.join(", ", players));
     }
@@ -246,7 +265,7 @@ public class GameUI {
 
         int totalChips = playerChips.getOrDefault(playerName, 0);
 
-        int[] chipValues = {100, 25, 10, 5, 1};
+        int[] chipValues = {10000, 7500, 5000, 2500, 1000, 750, 500, 100, 75, 25, 10, 5, 1};
 
         for (int value : chipValues) {
             int count = totalChips / value;
@@ -283,6 +302,9 @@ public class GameUI {
 
     // UPDATE PLAYER'S HAND DISPLAY
     public void updatePlayerHand(String playerName, List<TarotBoardPoker.Card> cards) {
+        // Save the hand state
+        playerHands.put(playerName, cards);
+
         HBox handBox = playerHandsMap.get(playerName);
         if (handBox == null) return;
         handBox.getChildren().clear();
@@ -290,9 +312,13 @@ public class GameUI {
         for (TarotBoardPoker.Card card : cards) {
             CardView cardView = new CardView(card);
             cardView.setUserData(card);
-
             handBox.getChildren().add(cardView);
         }
+    }
+
+    public void setPlayerChips(String player, int chips) {
+        playerChips.put(player, chips);
+        updateChipDisplay(player);
     }
 
     // SET CURRENT TURN AND HIGHLIGHT
@@ -366,29 +392,44 @@ public class GameUI {
      */
     public void startNewRound(List<String> playerOrder) {
         Platform.runLater(() -> {
-            // Clear community cards
+            // Clear community cards UI
             communityCardsBox.getChildren().clear();
 
-            // Reset player hands display (clear cards)
-            for (String player : playerOrder) {
+            // Reset all players' hand UI (including folded players)
+            for (String player : new HashSet<>(playerHandsMap.keySet())) {
                 HBox handBox = playerHandsMap.get(player);
                 if (handBox != null) {
-                    handBox.getChildren().clear();
+                    // Reset hand box style and opacity (undo fold gray-out)
                     handBox.setStyle("-fx-background-color: #444; -fx-border-color: black;");
-                }
-            }
+                    handBox.setOpacity(1.0);
 
-            // Remove folded labels and restore opacity for all players
-            for (Node playerNode : playersBox.getChildren()) {
-                if (playerNode instanceof VBox vbox && !vbox.getChildren().isEmpty()) {
-                    Node infoNode = vbox.getChildren().get(0);
-                    if (infoNode instanceof HBox infoBox) {
-                        infoBox.getChildren().removeIf(n -> "foldedLabel".equals(n.getId()));
+                    // Remove folded labels if any
+                    for (Node node : playersBox.getChildren()) {
+                        if (node instanceof VBox vbox && !vbox.getChildren().isEmpty()) {
+                            Node infoNode = vbox.getChildren().get(0);
+                            if (infoNode instanceof HBox infoBox) {
+                                // Find the player label to match this player
+                                boolean isThisPlayer = infoBox.getChildren().stream()
+                                        .filter(n -> n instanceof Label)
+                                        .map(n -> ((Label) n).getText())
+                                        .anyMatch(text -> text.equals(player));
+
+                                if (isThisPlayer) {
+                                    infoBox.getChildren().removeIf(n -> "foldedLabel".equals(n.getId()));
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
 
+            // Update players list UI with new players order
+            updatePlayers(playerOrder);
+
+            // Reset pot display
             updatePot(0);
+
             showMessage("New round started.");
         });
     }

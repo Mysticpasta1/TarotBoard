@@ -17,7 +17,13 @@ public class TarotBoard extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        ChoiceDialog<String> choiceDialog = new ChoiceDialog<>("Join Server", Arrays.asList("Create Server", "Join Server"));
+        String playerName = askPlayerName();
+        if (playerName == null || playerName.isBlank()) {
+            playerName = "Player" + (int) (Math.random() * 10000);
+        }
+
+        primaryStage.setTitle("TarotBoard Poker - " + playerName);
+        ChoiceDialog<String> choiceDialog = new ChoiceDialog<>("Create Server", Arrays.asList("Create Server", "Join Server"));
         choiceDialog.setTitle("TarotBoard Poker");
         choiceDialog.setHeaderText("Choose an option");
         choiceDialog.setContentText("Create or Join:");
@@ -30,14 +36,13 @@ public class TarotBoard extends Application {
         String choice = choiceOpt.get();
 
         if (choice.equals("Create Server")) {
-            createServerFlow(primaryStage);
+            createServerFlow(primaryStage, playerName);
         } else {
-            joinServerFlow(primaryStage);
+            joinServerFlow(primaryStage, playerName);
         }
     }
 
-    private void createServerFlow(Stage primaryStage) {
-        // Prompt for IP to bind
+    private void createServerFlow(Stage primaryStage, String playerName) {
         TextInputDialog ipDialog = new TextInputDialog("");
         ipDialog.setTitle("Create Server");
         ipDialog.setHeaderText("Enter IP to bind (leave empty for all interfaces):");
@@ -45,10 +50,8 @@ public class TarotBoard extends Application {
         String host = ipDialog.showAndWait().orElse("");
         if (host.isBlank()) host = null;
 
-        // Prompt for port
         int port = promptPort("Create Server", 55555);
 
-        // Start server in background thread
         String finalHost = host;
         new Thread(() -> {
             server = new PokerServer();
@@ -63,12 +66,10 @@ public class TarotBoard extends Application {
             }
         }, "PokerServer-Thread").start();
 
-        // Then connect client locally to same server
-        joinServer(primaryStage, "localhost", port);
+        joinServer(primaryStage, "localhost", port, playerName);
     }
 
-    private void joinServerFlow(Stage primaryStage) {
-        // Prompt for server IP and port to join
+    private void joinServerFlow(Stage primaryStage, String playerName) {
         TextInputDialog ipDialog = new TextInputDialog("localhost");
         ipDialog.setTitle("Join Server");
         ipDialog.setHeaderText("Enter Server IP:");
@@ -77,8 +78,9 @@ public class TarotBoard extends Application {
 
         int port = promptPort("Join Server", 55555);
 
-        joinServer(primaryStage, host, port);
+        joinServer(primaryStage, host, port, playerName);
     }
+
 
     private int promptPort(String title, int defaultPort) {
         TextInputDialog portDialog = new TextInputDialog(Integer.toString(defaultPort));
@@ -94,14 +96,8 @@ public class TarotBoard extends Application {
         return port;
     }
 
-    private void joinServer(Stage primaryStage, String host, int port) {
+    private void joinServer(Stage primaryStage, String host, int port, String playerName) {
         gameUI = new GameUI(primaryStage);
-
-        // Prompt for player name
-        String playerName = askPlayerName();
-        if (playerName == null || playerName.isBlank()) {
-            playerName = "Player" + (int) (Math.random() * 1000);
-        }
 
         try {
             clientNetwork = new ClientNetwork(host, port, playerName, gameUI);

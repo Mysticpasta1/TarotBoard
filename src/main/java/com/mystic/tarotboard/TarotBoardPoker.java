@@ -309,19 +309,32 @@ public class TarotBoardPoker {
     // --- Card Class ---
 
     public static class Card {
-        private final Suit suit;  // null for wild cards with no suit
-        private final Value value;
+        private final Suit suit;  // null for wild cards with no suit or face-down cards
+        private final Value value; // null for face-down cards
 
-        public Card(Suit suit, Value value) {
-            if (value == null)
-                throw new IllegalArgumentException("Card value cannot be null");
-            if (value.isWild() && suit != null)
-                throw new IllegalArgumentException("Wild cards do not have suits");
-            if (!value.isWild() && suit == null)
-                throw new IllegalArgumentException("Non-wild cards must have a suit");
+        private final boolean faceDown;
+
+        public Card(Suit suit, Value value, boolean faceDown) {
+            this.faceDown = faceDown;
+            if (!faceDown) {  // only check these if NOT face down
+                if (value == null)
+                    throw new IllegalArgumentException("Card value cannot be null");
+                if (value.isWild() && suit != null)
+                    throw new IllegalArgumentException("Wild cards do not have suits");
+                if (!value.isWild() && suit == null)
+                    throw new IllegalArgumentException("Non-wild cards must have a suit");
+            }
 
             this.suit = suit;
             this.value = value;
+        }
+
+        public static Card createFaceDown() {
+            return new Card(null, null, true);
+        }
+
+        public boolean isFaceDown() {
+            return faceDown;
         }
 
         public Suit getSuit() {
@@ -337,11 +350,13 @@ public class TarotBoardPoker {
         }
 
         public boolean isWild() {
+            if (faceDown) return false;  // Face down cards are never wild
             return value.isWild();
         }
 
         @Override
         public String toString() {
+            if (faceDown) return "[Face Down]";
             if (isWild())
                 return value.name();
             else
@@ -406,7 +421,7 @@ public class TarotBoardPoker {
 
     // --- Poker Hand ---
 
-    public static class Hand  implements Comparable<Hand> {
+    public static class Hand implements Comparable<Hand> {
         private final List<Card> cards;
 
         // Calculated fields
@@ -451,7 +466,7 @@ public class TarotBoardPoker {
 
     public static class HandEvaluator {
 
-        private static final int HAND_SIZE = 5;
+        private static final int HAND_SIZE = 7;
 
         private static final List<Value> WILD_VALUES = Arrays.stream(Value.values())
                 .filter(Value::isWild)
@@ -536,7 +551,25 @@ public class TarotBoardPoker {
             if (isFourOfAKind(cards)) {
                 hand.handRank = HandRank.FOUR_OF_A_KIND;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, Long> counts = countValues(cards);
+                long wildCount = cards.stream().filter(Card::isWild).count();
+
+                Value quadValue = counts.entrySet().stream()
+                        .filter(e -> e.getValue() + wildCount >= 4)
+                        .max(Map.Entry.comparingByKey(Comparator.comparingInt(Value::getRankValue)))
+                        .map(Map.Entry::getKey)
+                        .orElse(null);
+
+                int quadNum = quadValue != null ? quadValue.getRankValue() : 0;
+
+                // Best kicker
+                int kicker = cards.stream()
+                        .filter(c -> !c.isWild() && !c.getValue().equals(quadValue))
+                        .mapToInt(c -> c.getValue().getRankValue())
+                        .max().orElse(0);
+
+                hand.score = hand.handRank.getScore(dominantCategory) + quadNum * 10 + kicker;
                 return hand;
             }
 
@@ -544,7 +577,25 @@ public class TarotBoardPoker {
             if (isFullHouse(cards)) {
                 hand.handRank = HandRank.FULL_HOUSE;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, Long> counts = countValues(cards);
+
+                Value trips = counts.entrySet().stream()
+                        .filter(e -> e.getValue() >= 3)
+                        .map(Map.Entry::getKey)
+                        .max(Comparator.comparingInt(Value::getRankValue))
+                        .orElse(null);
+
+                Value pair = counts.entrySet().stream()
+                        .filter(e -> !e.getKey().equals(trips) && e.getValue() >= 2)
+                        .map(Map.Entry::getKey)
+                        .max(Comparator.comparingInt(Value::getRankValue))
+                        .orElse(null);
+
+                int tripsNum = trips != null ? trips.getRankValue() : 0;
+                int pairNum = pair != null ? pair.getRankValue() : 0;
+
+                hand.score = hand.handRank.getScore(dominantCategory) + tripsNum * 10 + pairNum * 5;
                 return hand;
             }
 
@@ -592,15 +643,50 @@ public class TarotBoardPoker {
             if (isThreeOfAKind(cards)) {
                 hand.handRank = HandRank.THREE_OF_A_KIND;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, Long> counts = countValues(cards);
+
+                Value trips = counts.entrySet().stream()
+                        .filter(e -> e.getValue() >= 3)
+                        .map(Map.Entry::getKey)
+                        .max(Comparator.comparingInt(Value::getRankValue))
+                        .orElse(null);
+
+                int tripsNum = trips != null ? trips.getRankValue() : 0;
+
+                // Best kicker
+                int kicker = cards.stream()
+                        .filter(c -> !c.isWild() && !c.getValue().equals(trips))
+                        .mapToInt(c -> c.getValue().getRankValue())
+                        .max().orElse(0);
+
+                hand.score = hand.handRank.getScore(dominantCategory) + tripsNum * 10 + kicker;
                 return hand;
             }
 
-            // 16. Twin Realm
+            // 16. Twin Realm (same as Two Pair but across different CourtSets)
             if (isTwinRealm(cards)) {
                 hand.handRank = HandRank.TWIN_REALM;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, List<Card>> pairs = findPairs(cards);
+
+                List<Integer> pairValues = pairs.keySet().stream()
+                        .map(Value::getRankValue)
+                        .sorted(Comparator.reverseOrder())
+                        .limit(2)
+                        .toList();
+
+                int highPair = pairValues.size() > 0 ? pairValues.get(0) : 0;
+                int lowPair = pairValues.size() > 1 ? pairValues.get(1) : 0;
+
+                // Best kicker
+                int kicker = cards.stream()
+                        .filter(c -> !c.isWild() && !pairValues.contains(c.getValue().getRankValue()))
+                        .mapToInt(c -> c.getValue().getRankValue())
+                        .max().orElse(0);
+
+                hand.score = hand.handRank.getScore(dominantCategory) + highPair * 10 + lowPair * 5 + kicker;
                 return hand;
             }
 
@@ -608,22 +694,74 @@ public class TarotBoardPoker {
             if (isTwoPair(cards)) {
                 hand.handRank = HandRank.TWO_PAIR;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, List<Card>> pairs = findPairs(cards);
+
+                List<Integer> pairValues = pairs.keySet().stream()
+                        .map(Value::getRankValue)
+                        .sorted(Comparator.reverseOrder())
+                        .limit(2)
+                        .toList();
+
+                int highPair = pairValues.size() > 0 ? pairValues.get(0) : 0;
+                int lowPair = pairValues.size() > 1 ? pairValues.get(1) : 0;
+
+                // Best kicker
+                int kicker = cards.stream()
+                        .filter(c -> !c.isWild() && !pairValues.contains(c.getValue().getRankValue()))
+                        .mapToInt(c -> c.getValue().getRankValue())
+                        .max().orElse(0);
+
+                hand.score = hand.handRank.getScore(dominantCategory) + highPair * 10 + lowPair * 5 + kicker;
                 return hand;
             }
 
             // 18. One Pair
+            // Example: One Pair
             if (isOnePair(cards)) {
                 hand.handRank = HandRank.ONE_PAIR;
                 hand.category = dominantCategory;
-                hand.score = hand.handRank.getScore(dominantCategory);
+
+                Map<Value, List<Card>> pairs = findPairs(cards);
+
+                Value pairValue = pairs.keySet().stream()
+                        .max(Comparator.comparingInt(Value::getRankValue))
+                        .orElse(null);
+
+                int pairNumeric = pairValue.getRankValue();
+
+                // Find highest kicker outside pair
+                List<Value> remaining = cards.stream()
+                        .filter(c -> !c.isWild() && c.getValue() != pairValue)
+                        .map(Card::getValue)
+                        .sorted(Comparator.comparingInt(Value::getRankValue).reversed())
+                        .collect(Collectors.toList());
+
+                int kicker = remaining.isEmpty() ? 0 : remaining.get(0).getRankValue();
+
+                hand.score = hand.handRank.getScore(dominantCategory)
+                        + pairNumeric * 10  // pair multiplier
+                        + kicker;
+
                 return hand;
             }
 
+
+            // 19. High Card
             // 19. High Card
             hand.handRank = HandRank.HIGH_CARD;
             hand.category = dominantCategory;
-            hand.score = hand.handRank.getScore(dominantCategory);
+
+            // Find highest value among non-wild cards
+            OptionalInt highestValue = nonWildCards.stream()
+                    .mapToInt(c -> c.value.getRankValue()) // assume your Value enum has getNumericValue()
+                    .max();
+
+            int highCardValue = highestValue.orElse(0);
+
+            // Combine base rank score with kicker
+            hand.score = hand.handRank.getScore(dominantCategory) + highCardValue;
+
             return hand;
         }
 
