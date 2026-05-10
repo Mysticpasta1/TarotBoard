@@ -7,7 +7,7 @@
         <option name="delegatedBuild" value="false" />
         <option name="testRunner" value="PLATFORM" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleJvm" value="graalvm-ce-24" />
+        <option name="gradleJvm" value="temurin-26" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
