@@ -1,7 +1,6 @@
 package com.mystic.tarotboard.theming;
 
 import java.io.Serializable;
-import java.util.List;
 
 public class SuitStyle implements Serializable {
     private String groupName;

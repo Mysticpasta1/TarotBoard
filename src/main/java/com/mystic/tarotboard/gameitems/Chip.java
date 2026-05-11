@@ -13,7 +13,7 @@ import javafx.scene.control.Tooltip;
 public class Chip {
     private final StackPane chipPane;
     private final Color chipColor;
-    private static final double CHIP_RADIUS = 50;
+    public static final double CHIP_RADIUS = 50;
 
     public Chip(Color chipColor, Image bwFrontImage, Image bwBackImage) {
         this.chipColor = chipColor;
@@ -49,5 +49,15 @@ public class Chip {
 
     public Color getColor() {
         return chipColor;
+    }
+
+    // New method to update chip images
+    public void updateImages(Image newFrontImage, Image newBackImage) {
+        if (chipPane.getChildren().getFirst() instanceof ImageView) {
+            ((ImageView) chipPane.getChildren().getFirst()).setImage(newFrontImage);
+        }
+        if (chipPane.getChildren().get(1) instanceof ImageView) {
+            ((ImageView) chipPane.getChildren().get(1)).setImage(newBackImage);
+        }
     }
 }

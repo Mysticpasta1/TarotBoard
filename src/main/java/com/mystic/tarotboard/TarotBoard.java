@@ -4,15 +4,16 @@ import com.mystic.tarotboard.gameitems.Card;
 import com.mystic.tarotboard.gameitems.Chip;
 import com.mystic.tarotboard.gameitems.Die;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
+import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.utils.CardDataHelper;
 import com.mystic.tarotboard.utils.SaveData;
-import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.utils.UIUtils;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ColorPicker;
@@ -29,6 +30,7 @@ import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
 import java.io.*;
+import java.nio.file.*;
 import java.util.List;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -84,7 +86,6 @@ public class TarotBoard extends Application {
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
     private static final String SAVE_FILE = System.getProperty("user.home") + File.separator + ".tarotboard" + File.separator + "save.dat";
-    private static final Map<String, String> cardTooltips = new HashMap<>();
     private static Stage primaryStage;
     private Scene startScene;
     private static Scene gameScene;
@@ -92,7 +93,7 @@ public class TarotBoard extends Application {
     private StackPane discardZone;
     private Image bwFrontImage;
     private Image bwBackImage;
-    private StackPane[] cardPanes;
+    private Card[] cards; // Changed from StackPane[] cardPanes
     private final List<Die> dice = new ArrayList<>();
     private static boolean reshuffled = false;
     private static final ObservableList<String> cardNames = FXCollections.observableArrayList();
@@ -121,18 +122,18 @@ public class TarotBoard extends Application {
 
         CardDataHelper.addCardNames(cardNames, wilds, suits, values);
         CardDataHelper.generateShuffledCardNames(cardNames);
-        cardPanes = new StackPane[NUM_CARDS];
+        cards = new Card[NUM_CARDS]; // Initialize cards array
 
         loadAndCreateCards(gameRoot);
 
         // Load chip images
-        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath());
-        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath());
+        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
+        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
         // Create buttons that will be moved to the control panel
         Button resetChips = getResetChipsButton(gameRoot);
         Button reshuffleCards = new Button("Reshuffle Cards");
-        reshuffleCards.setOnAction(_ -> getReshuffleCardsButton(gameRoot));
+        reshuffleCards.setOnAction(_ -> getReshuffleCardsButton());
         Button newGameButton = new Button("New Game");
         newGameButton.setOnAction(_ -> newGame(gameRoot));
         Button helpButton2 = createHelpButton();
@@ -245,7 +246,7 @@ public class TarotBoard extends Application {
             customChipFrontPath = null; // Clear custom chip paths too
             customChipBackPath = null;  // Clear custom chip paths too
             customBackgroundPath = null; // Clear custom background path too
-            newGame(gameRoot); // This will re-initialize cards with the new theme
+            applyCurrentTheme(gameRoot); // Call new method to apply theme without new game
         });
 
         resetChips.setStyle("-fx-font-size: 11pt;");
@@ -314,90 +315,139 @@ public class TarotBoard extends Application {
         primaryStage.show();
     }
 
-    private Image loadImage(String customPath, String defaultResourcePath) {
+    private Image loadImage(String customPath, String themeDefinedPath, ThemeConfiguration theme) {
+        Image originalImage = null;
+        String finalPath;
+
+        // Try to load from customPath first (always treated as a file path)
         if (customPath != null && !customPath.trim().isEmpty()) {
+            finalPath = customPath;
             try {
-                File file = new File(customPath);
+                File file = new File(finalPath);
                 if (file.exists()) {
-                    return new Image(file.toURI().toString());
+                    originalImage = new Image(file.toURI().toString());
+                } else {
+                    System.err.println("ERROR: Custom image file not found: " + finalPath);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to load custom image from: " + customPath + ". Falling back to default. Error: " + e.getMessage());
+                System.err.println("ERROR: Failed to load custom image from file: " + finalPath + ". Falling back to theme-defined path. Error: " + e.getMessage());
             }
         }
-        // Fallback to default resource
-        try {
-            return new Image(Objects.requireNonNull(getClass().getResourceAsStream(defaultResourcePath)));
-        } catch (NullPointerException e) {
-            System.err.println("Default resource not found: " + defaultResourcePath);
-            return null; // Or a placeholder image
+
+        // Fallback to themeDefinedPath if customPath failed or was not provided
+        if (originalImage == null && themeDefinedPath != null && !themeDefinedPath.trim().isEmpty()) {
+            if (themeDefinedPath.startsWith("/")) {
+                // Treat as an internal resource path
+                finalPath = themeDefinedPath;
+                try {
+                    InputStream is = getClass().getResourceAsStream(finalPath);
+                    if (is != null) {
+                        originalImage = new Image(is);
+                    } else {
+                        System.err.println("ERROR: Theme-defined resource not found: " + finalPath);
+                    }
+                } catch (Exception e) {
+                    System.err.println("ERROR: Failed to load theme-defined image from resource: " + finalPath + ". Error: " + e.getMessage());
+                }
+            } else {
+                // Treat as an external file system path, potentially relative to basePath
+                if (theme.getBasePath() != null) {
+                    finalPath = Paths.get(theme.getBasePath(), themeDefinedPath).toString();
+                } else {
+                    finalPath = themeDefinedPath; // Assume it's an absolute path or relative to current working directory
+                }
+
+                try {
+                    File file = new File(finalPath);
+                    if (file.exists()) {
+                        originalImage = new Image(file.toURI().toString());
+                    } else {
+                        System.err.println("ERROR: Theme-defined file not found: " + finalPath);
+                    }
+                } catch (Exception e) {
+                    System.err.println("ERROR: Failed to load theme-defined image from file system: " + finalPath + ". Error: " + e.getMessage());
+                }
+            }
         }
+
+        if (originalImage == null) {
+            System.err.println("ERROR: No image could be loaded. Custom path: " + customPath + ", Theme-defined path: " + themeDefinedPath);
+            return null; // Return null if no image could be loaded
+        }
+
+        return originalImage;
     }
 
     private void updateBackground(Pane gameRoot) {
-        Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath());
-        BackgroundSize backgroundSize = new BackgroundSize(gameScene.getWidth(), gameScene.getHeight(), false, false, true, false);
-        gameRoot.setBackground(new Background(new BackgroundImage(Objects.requireNonNull(backgroundImage), BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+        Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath(), currentCardTheme);
+        if (backgroundImage != null) {
+            BackgroundSize backgroundSize = new BackgroundSize(gameScene.getWidth(), gameScene.getHeight(), false, false, true, false);
+            gameRoot.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+        } else {
+            System.err.println("WARNING: Background image could not be loaded. Using default/no background.");
+            gameRoot.setBackground(Background.EMPTY); // Or set a solid color background
+        }
     }
 
     private void updateStartSceneBackground() {
         if (startLayout != null && startScene != null) {
-            Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath());
-            BackgroundSize backgroundSize = new BackgroundSize(startScene.getWidth(), startScene.getHeight(), false, false, true, false);
-            startLayout.setBackground(new Background(new BackgroundImage(Objects.requireNonNull(backgroundImage), BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+            Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath(), currentCardTheme);
+            if (backgroundImage != null) {
+                BackgroundSize backgroundSize = new BackgroundSize(startScene.getWidth(), startScene.getHeight(), false, false, true, false);
+                startLayout.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+            } else {
+                System.err.println("WARNING: Start scene background image could not be loaded. Using default/no background.");
+                startLayout.setBackground(Background.EMPTY); // Or set a solid color background
+            }
         }
     }
 
     private void loadAndCreateCards(Pane gameRoot) {
         // Clear existing cards from gameRoot if any
-        if (cardPanes != null) {
-            for (StackPane pane : cardPanes) {
-                gameRoot.getChildren().remove(pane);
+        if (cards != null) {
+            for (Card card : cards) {
+                if (card != null) {
+                    gameRoot.getChildren().remove(card.getCardPane());
+                }
             }
         }
 
-        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath());
-        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath());
+        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
+        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
+
+        // Handle case where images might not load
+        if (cardFrontImage == null || cardBackImage == null) {
+            System.err.println("ERROR: Card images could not be loaded. Cannot create cards.");
+            // Potentially display an error to the user or use placeholder images
+            return;
+        }
 
         System.out.println("Adding " + NUM_CARDS + " cards to the board");
         System.out.println(suits.size() + " Suits, " + values.size() + " Values per suit, and " + wilds.size() + " Wilds");
 
         for (int i = 0; i < NUM_CARDS; i++) {
-            Text cardNameText;
+            Card card;
+            String cardLogicalName = cardNames.get(i);
 
-            Matcher matcher = CARD_PATTERN.matcher(cardNames.get(i));
-            if (matcher.matches() && !wilds.contains(cardNames.get(i))) {
+            Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+            if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                Card card = new Card(cardNames.get(i), value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme);
-                cardNameText = card.getCardName();
-                cardPanes[i] = card.getCardPane();
+                card = new Card(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
-                StackPane cardPane = new StackPane();
-                cardNameText = CardDataHelper.getWildCardName(new Text(cardNames.get(i) + "\n \n" + "(Wild)"));
-                ImageView cardBackImageView = new ImageView(cardBackImage);
-                cardBackImageView.setFitWidth(CARD_WIDTH);
-                cardBackImageView.setFitHeight(CARD_HEIGHT);
-                cardBackImageView.setVisible(true);
-
-                ImageView cardFrontImageView = new ImageView(cardFrontImage);
-                cardFrontImageView.setFitWidth(CARD_WIDTH);
-                cardFrontImageView.setFitHeight(CARD_HEIGHT);
-                cardFrontImageView.setVisible(false);
-
-                cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
-
-                cardPanes[i] = cardPane;
+                card = new Card(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds); // Pass empty strings for value/suit for wild cards
+                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
+                // Manually set text and style for wild cards as Card constructor doesn't handle it directly
+                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
+                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
+            cards[i] = card; // Store Card object
 
-            cardPanes[i].setTranslateX(50);
-            cardPanes[i].setTranslateY(50);
-            UIUtils.makeDraggable(cardPanes[i], new Translate());
-            UIUtils.makeFlippableAndRotatable(cardPanes[i], false);
-            reshuffled = false;
-            CardDataHelper.generateCardTooltips(cardNameText.getText(), cardTooltips, wilds);
-            CardDataHelper.makeCardTooltip(cardPanes[i], cardNameText.getText(), reshuffled, cardTooltips);
-            gameRoot.getChildren().add(cardPanes[i]);
+            cards[i].getCardPane().setTranslateX(50);
+            cards[i].getCardPane().setTranslateY(50);
+            UIUtils.makeDraggable(cards[i].getCardPane(), new Translate());
+            UIUtils.makeFlippableAndRotatable(cards[i].getCardPane(), false);
+            gameRoot.getChildren().add(cards[i].getCardPane());
         }
     }
 
@@ -448,27 +498,46 @@ public class TarotBoard extends Application {
         return helpButton;
     }
 
-    private void getReshuffleCardsButton(Pane gameRoot) {
-        loadAndCreateCards(gameRoot);
-
+    private void getReshuffleCardsButton() {
         CardDataHelper.generateShuffledCardNames(cardNames);
         reshuffled = true;
 
-        // Re-apply styles and tooltips for the new card order
+        // Re-apply styles and tooltips for the new card order to existing cards
         for (int a = 0; a < NUM_CARDS; a++) {
-            if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
-                Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
-                if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+            if (cards[a] != null) { // Ensure the card object exists
+                StackPane cardPane = cards[a].getCardPane();
+                Text cardNameText = cards[a].getCardName(); // Get the Text object from the existing Card
+                String cardLogicalName = cardNames.get(a);
+                Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+
+                // Reset position and rotation
+                cardPane.setTranslateX(50);
+                cardPane.setTranslateY(50);
+                cardPane.getTransforms().removeAll(cardPane.getTransforms());
+                cardPane.setRotate(0);
+
+                // Reset flip state (face down)
+                ImageView backView = (ImageView) cardPane.getChildren().get(0);
+                ImageView frontView = (ImageView) cardPane.getChildren().get(1);
+                Node textNode = cardPane.getChildren().get(2);
+                backView.setVisible(true);
+                frontView.setVisible(false);
+                textNode.setVisible(false);
+
+                if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                     String value = matcher.group("value");
                     String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getStyle(cardNames.get(a), value, suit, currentCardTheme).getText());
-                    cardNameText.setStyle(Card.getStyle(cardNames.get(a), value, suit, currentCardTheme).getStyle());
+                    cardNameText.setText(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                    cardNameText.setStyle(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
                 } else {
-                    Text text = new Text(cardNames.get(a));
+                    Text text = new Text(cardLogicalName);
                     cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
                     cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
                 }
-                CardDataHelper.makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled, cardTooltips);
+                cards[a].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
+
+                UIUtils.makeDraggable(cardPane, new Translate());
+                UIUtils.makeFlippableAndRotatable(cardPane, false);
             }
         }
         reshuffled = false;
@@ -490,9 +559,9 @@ public class TarotBoard extends Application {
         StackPane diePane = die.getPane();
         UIUtils.makeDraggable(diePane, new Translate());
         this.makeDiscardable(diePane, gameRoot, discardZone);
-        int offset = dice.size() % 8;
-        diePane.setTranslateX(gameScene.getWidth() / 2 + offset * 50 - 175);
-        diePane.setTranslateY(gameScene.getHeight() / 2 + ((double) dice.size() / 8) * 50 - 100);
+
+        diePane.setTranslateX(gameScene.getWidth() / 2);
+        diePane.setTranslateY(gameScene.getHeight() / 2);
         gameRoot.getChildren().add(diePane);
         dice.add(die);
     }
@@ -501,9 +570,8 @@ public class TarotBoard extends Application {
         Chip chip = new Chip(chipColor, bwFrontImage, bwBackImage);
         StackPane chipPane = chip.getChipPane();
 
-        int offset = chips.size() % 8;
-        chipPane.setTranslateX(gameScene.getWidth() / 2 + offset * 50 - 175);
-        chipPane.setTranslateY(gameScene.getHeight() / 2 + ((double) chips.size() / 8) * 50 + 100);
+        chipPane.setTranslateX(gameScene.getWidth() / 2);
+        chipPane.setTranslateY(gameScene.getHeight() / 2);
 
         UIUtils.makeDraggable(chipPane, new Translate());
         this.makeDiscardable(chipPane, gameRoot, discardZone);
@@ -515,53 +583,98 @@ public class TarotBoard extends Application {
 
     private void newGame(Pane gameRoot) {
         // Clear existing cards from gameRoot
-        if (cardPanes != null) {
-            for (StackPane pane : cardPanes) {
-                gameRoot.getChildren().remove(pane);
+        if (cards != null) {
+            for (Card card : cards) {
+                if (card != null) {
+                    gameRoot.getChildren().remove(card.getCardPane());
+                }
             }
         }
-        // Re-initialize cardPanes array
-        cardPanes = new StackPane[NUM_CARDS];
-        loadAndCreateCards(gameRoot); // Load cards with the current theme
+        // Clear existing chips from gameRoot
+        for (Chip chip : chips) {
+            gameRoot.getChildren().remove(chip.getChipPane());
+        }
+        chips.clear();
 
-        // Reload chip images in case custom paths changed
-        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath());
-        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath());
-        updateBackground(gameRoot); // Update background in case custom path changed
-        updateStartSceneBackground(); // Update start scene background
-
+        // Clear existing dice from gameRoot
         for (Die die : dice) {
             gameRoot.getChildren().remove(die.getPane());
         }
         dice.clear();
 
-        for (Chip chip : chips) {
-            gameRoot.getChildren().remove(chip.getChipPane());
-        }
-        chips.clear();
+        // Re-initialize cards array
+        cards = new Card[NUM_CARDS];
+        loadAndCreateCards(gameRoot); // Load cards with the current theme
 
         CardDataHelper.generateShuffledCardNames(cardNames);
         reshuffled = true;
 
         // Re-apply styles and tooltips for the new card order
         for (int a = 0; a < NUM_CARDS; a++) {
-            if (cardPanes[a].getChildren().get(2) instanceof Text cardNameText) {
-                Matcher matcher = CARD_PATTERN.matcher(cardNames.get(a));
-                if (matcher.matches() && !wilds.contains(cardNames.get(a))) {
+            if (cards[a] != null) { // Ensure the card object exists
+                Text cardNameText = cards[a].getCardName();
+                String cardLogicalName = cardNames.get(a);
+                Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+                if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                     String value = matcher.group("value");
                     String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getStyle(cardNames.get(a), value, suit, currentCardTheme).getText());
-                    cardNameText.setStyle(Card.getStyle(cardNames.get(a), value, suit, currentCardTheme).getStyle());
+                    cardNameText.setText(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                    cardNameText.setStyle(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
                 } else {
-                    Text text = new Text(cardNames.get(a));
+                    Text text = new Text(cardLogicalName);
                     cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
                     cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
                 }
-                CardDataHelper.makeCardTooltip(cardPanes[a], cardNameText.getText(), reshuffled, cardTooltips);
+                cards[a].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
             }
         }
         reshuffled = false;
+        applyCurrentTheme(gameRoot); // Apply theme after new game setup
     }
+
+    // New method to apply the current theme to existing game items
+    private void applyCurrentTheme(Pane gameRoot) {
+        // Update background
+        updateBackground(gameRoot);
+        updateStartSceneBackground();
+
+        // Reload chip images
+        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
+        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
+
+        // Update existing chips
+        for (Chip chip : chips) {
+            chip.updateImages(bwFrontImage, bwBackImage);
+        }
+
+        // Reload card images
+        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
+        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
+
+        // Update existing cards
+        if (cards != null) {
+            for (Card card : cards) {
+                if (card != null) {
+                    card.updateImages(cardFrontImage, cardBackImage);
+                    // Also update card text style if needed (e.g., color changes with theme)
+                    Text cardNameText = card.getCardName();
+                    String cardName = cardNameText.getText().split("\n")[0].trim(); // Extract actual card name
+                    Matcher matcher = CARD_PATTERN.matcher(cardName);
+                    if (matcher.matches() && !wilds.contains(cardName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        cardNameText.setStyle(Card.getStyle(cardName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        // For wild cards, re-apply wild card style
+                        Text tempText = new Text(cardName);
+                        cardNameText.setStyle(CardDataHelper.getWildCardName(tempText).getStyle());
+                    }
+                    card.refreshTooltipContent(cardName, wilds); // Refresh the tooltip content
+                }
+            }
+        }
+    }
+
 
     @Override
     public void stop() {
@@ -569,7 +682,7 @@ public class TarotBoard extends Application {
     }
 
     private void saveGame() {
-        if (cardPanes == null) return;
+        if (cards == null) return; // Changed from cardPanes
 
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(SAVE_FILE))) {
             oos.writeObject(getSaveData(new ArrayList<>())); // Pass an empty list, as cardStates are generated in getSaveData
@@ -580,7 +693,9 @@ public class TarotBoard extends Application {
 
     private SaveData getSaveData(List<SaveData.CardState> cardStates) {
         // Populate cardStates here, as it's needed for the SaveData constructor
-        for (StackPane pane : cardPanes) {
+        for (Card card : cards) { // Iterate through Card objects
+            if (card == null) continue;
+            StackPane pane = card.getCardPane(); // Get the pane from the Card object
             double tx = pane.getTranslateX();
             double ty = pane.getTranslateY();
             for (var t : pane.getTransforms()) {
@@ -605,10 +720,10 @@ public class TarotBoard extends Application {
         List<SaveData.ChipState> chipStates = getChipStates();
         List<SaveData.DieState> dieStates = new ArrayList<>();
         for (Die die : dice) {
-            StackPane pane = die.getPane();
-            double tx = pane.getTranslateX();
-            double ty = pane.getTranslateY();
-            for (var t : pane.getTransforms()) {
+            StackPane diePane = die.getPane();
+            double tx = diePane.getTranslateX();
+            double ty = diePane.getTranslateY();
+            for (var t : diePane.getTransforms()) {
                 if (t instanceof Translate tr) {
                     tx += tr.getX();
                     ty += tr.getY();
@@ -618,7 +733,7 @@ public class TarotBoard extends Application {
 
             dieStates.add(new SaveData.DieState(
                     tx, ty,
-                    pane.getRotate(),
+                    diePane.getRotate(),
                     die.getSides(),
                     die.getCurrentValue(),
                     dieColor.getRed(), dieColor.getGreen(), dieColor.getBlue(), dieColor.getOpacity()
@@ -633,18 +748,18 @@ public class TarotBoard extends Application {
     private List<SaveData.ChipState> getChipStates() {
         List<SaveData.ChipState> chipStates = new ArrayList<>();
         for (Chip chip : chips) {
-            StackPane pane = chip.getChipPane();
-            double tx = pane.getTranslateX();
-            double ty = pane.getTranslateY();
-            for (var t : pane.getTransforms()) {
+            StackPane chipPane = chip.getChipPane();
+            double tx = chipPane.getTranslateX();
+            double ty = chipPane.getTranslateY();
+            for (var t : chipPane.getTransforms()) {
                 if (t instanceof Translate tr) {
                     tx += tr.getX();
                     ty += tr.getY();
                 }
             }
 
-            ImageView frontView = (ImageView) pane.getChildren().get(0);
-            ImageView backView = (ImageView) pane.getChildren().get(1);
+            ImageView frontView = (ImageView) chipPane.getChildren().get(0);
+            ImageView backView = (ImageView) chipPane.getChildren().get(1);
             Color chipColor = chip.getColor();
 
             chipStates.add(new SaveData.ChipState(
@@ -685,50 +800,45 @@ public class TarotBoard extends Application {
 
         // Remove existing cards from gameRoot before loading new ones
         Pane gameRoot = (Pane) gameScene.getRoot();
-        if (cardPanes != null) {
-            for (StackPane pane : cardPanes) {
-                gameRoot.getChildren().remove(pane);
+        if (cards != null) { // Changed from cardPanes
+            for (Card card : cards) { // Iterate through Card objects
+                if (card != null) {
+                    gameRoot.getChildren().remove(card.getCardPane());
+                }
             }
         }
-        cardPanes = new StackPane[NUM_CARDS]; // Re-initialize cardPanes array
+        cards = new Card[NUM_CARDS]; // Re-initialize cards array
 
         // Load images for the current theme (assuming theme is saved or default)
-        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath());
-        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath());
+        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
+        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
 
         // Update background and chip images based on loaded custom paths
         updateBackground(gameRoot);
         updateStartSceneBackground(); // Update start scene background
-        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath());
-        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath());
+        bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
+        bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
         int idx = 0;
         for (var cs : save.cards()) {
-            Text cardNameText;
-            Matcher matcher = CARD_PATTERN.matcher(cardNames.get(idx));
-            if (matcher.matches() && !wilds.contains(cardNames.get(idx))) {
+            Card card; // Declare Card object
+            String cardLogicalName = cardNames.get(idx);
+
+            Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+            if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                Card card = new Card(cardNames.get(idx), value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme);
-                cardPanes[idx] = card.getCardPane();
+                card = new Card(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
-                StackPane cardPane = new StackPane();
-                cardNameText = CardDataHelper.getWildCardName(new Text(cardNames.get(idx) + "\n \n" + "(Wild)"));
-                ImageView cardBackImageView = new ImageView(cardBackImage);
-                cardBackImageView.setFitWidth(CARD_WIDTH);
-                cardBackImageView.setFitHeight(CARD_HEIGHT);
-                cardBackImageView.setVisible(true);
-
-                ImageView cardFrontImageView = new ImageView(cardFrontImage);
-                cardFrontImageView.setFitWidth(CARD_WIDTH);
-                cardFrontImageView.setFitHeight(CARD_HEIGHT);
-                cardFrontImageView.setVisible(false);
-
-                cardPane.getChildren().addAll(cardBackImageView, cardFrontImageView, cardNameText);
-                cardPanes[idx] = cardPane;
+                card = new Card(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds); // Pass empty strings for value/suit for wild cards
+                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
+                // Manually set text and style for wild cards as Card constructor doesn't handle it directly
+                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
+                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
+            cards[idx] = card; // Store Card object
 
-            StackPane pane = cardPanes[idx];
+            StackPane pane = cards[idx].getCardPane(); // Get pane from Card object
 
             ImageView backView = (ImageView) pane.getChildren().get(0);
             ImageView frontView = (ImageView) pane.getChildren().get(1);
@@ -748,49 +858,22 @@ public class TarotBoard extends Application {
             frontView.setVisible(cs.frontVisible());
             text.setVisible(cs.textVisible());
 
-            String cardName = save.cardNames().get(idx);
-            if (!wilds.contains(cardName)) {
-                Matcher matcher1 = CARD_PATTERN.matcher(cardName);
+            if (!wilds.contains(cardLogicalName)) {
+                Matcher matcher1 = CARD_PATTERN.matcher(cardLogicalName);
                 if (matcher1.matches()) {
                     String value = matcher1.group("value");
                     String suit = matcher1.group("suit");
-                    var styled = Card.getStyle(cardName, value, suit, currentCardTheme);
+                    var styled = Card.getStyle(cardLogicalName, value, suit, currentCardTheme);
                     text.setText(styled.getText());
                     text.setStyle(styled.getStyle());
                 }
             }
-            CardDataHelper.makeCardTooltip(pane, text.getText(), reshuffled, cardTooltips);
+            cards[idx].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
             gameRoot.getChildren().add(pane); // Add the card to the gameRoot
             idx++;
         }
 
-        for (var cs : save.chips()) {
-            Color loadedColor = new Color(cs.red(), cs.green(), cs.blue(), cs.opacity());
-            Chip chip = new Chip(loadedColor, bwFrontImage, bwBackImage);
-            StackPane chipPane = chip.getChipPane();
-
-            chipPane.translateXProperty().unbind();
-            chipPane.getTransforms().clear();
-            UIUtils.makeDraggable(chipPane, new Translate());
-            this.makeDiscardable(chipPane, gameRoot, discardZone);
-            UIUtils.makeFlippableAndRotatable(chipPane, true);
-
-            chipPane.setTranslateX(cs.translateX());
-            chipPane.setTranslateY(cs.translateY());
-
-            ImageView chipFrontImageView = (ImageView) chipPane.getChildren().get(0);
-            ImageView chipBackImageView = (ImageView) chipPane.getChildren().get(1);
-
-            chipFrontImageView.setRotate(cs.frontRotate());
-            chipBackImageView.setRotate(cs.backRotate());
-            chipFrontImageView.setVisible(cs.frontVisible());
-            chipBackImageView.setVisible(cs.backVisible());
-
-            chips.add(chip);
-            gameRoot.getChildren().add(chipPane);
-        }
-
-        for (var ds : save.dice()) {
+        for (var ds : save.dice()) { // Corrected loop to iterate over save.dice()
             Color loadedColor = new Color(ds.red(), ds.green(), ds.blue(), ds.opacity());
             Die die = new Die(ds.sides(), loadedColor);
             StackPane diePane = die.getPane();

@@ -46,6 +46,8 @@ public class ThemeManager {
                 }.getType();
                 List<ThemeConfiguration> loadedResourceThemes = gson.fromJson(new InputStreamReader(is), listType);
                 if (loadedResourceThemes != null && !loadedResourceThemes.isEmpty()) {
+                    // For resource themes, basePath is null
+                    loadedResourceThemes.forEach(theme -> theme.setBasePath(null));
                     themes.addAll(loadedResourceThemes);
                     System.out.println("Successfully loaded themes from resource: " + RESOURCE_THEMES_PATH);
                 }
@@ -66,13 +68,13 @@ public class ThemeManager {
 
     private static void addHardcodedDefaultTheme() {
         List<SuitStyle> defaultSuitStyles = new ArrayList<>();
-        defaultSuitStyles.add(new SuitStyle("CELESTIAL_COURT","#FFD700"));
-        defaultSuitStyles.add(new SuitStyle("UMBRAL_DOMINION","#FF8800"));
-        defaultSuitStyles.add(new SuitStyle("INFERNAL_PACT","#DC143C"));
-        defaultSuitStyles.add(new SuitStyle("VERDANT_CYCLE","#228B22"));
-        defaultSuitStyles.add(new SuitStyle("AETHERIC_LOOM","#1E90FF"));
-        defaultSuitStyles.add(new SuitStyle("DARK_EXPANSE","#AD03FC"));
-        defaultSuitStyles.add(new SuitStyle("WILDS","#E5E7EB"));
+        defaultSuitStyles.add(new SuitStyle("CELESTIAL_COURT", "#FFD700"));
+        defaultSuitStyles.add(new SuitStyle("UMBRAL_DOMINION", "#FF8800"));
+        defaultSuitStyles.add(new SuitStyle("INFERNAL_PACT", "#DC143C"));
+        defaultSuitStyles.add(new SuitStyle("VERDANT_CYCLE", "#228B22"));
+        defaultSuitStyles.add(new SuitStyle("AETHERIC_LOOM", "#1E90FF"));
+        defaultSuitStyles.add(new SuitStyle("DARK_EXPANSE", "#AD03FC"));
+        defaultSuitStyles.add(new SuitStyle("WILDS", "#E5E7EB"));
 
         ThemeConfiguration defaultTheme = new ThemeConfiguration(
                 DEFAULT_THEME_NAME,
@@ -81,7 +83,8 @@ public class ThemeManager {
                 "/com/mystic/tarotboard/assets/front_poker_chips.png",
                 "/com/mystic/tarotboard/assets/back_poker_chips.png",
                 "/com/mystic/tarotboard/assets/background_image.png",
-                defaultSuitStyles
+                defaultSuitStyles,
+                null // basePath is null for hardcoded resource themes
         );
         themes.add(defaultTheme);
     }
@@ -95,32 +98,41 @@ public class ThemeManager {
             Files.createDirectories(USER_THEMES_DIR);
 
             try (Stream<Path> paths = Files.list(USER_THEMES_DIR)) {
-                paths.filter(Files::isRegularFile)
-                        .filter(path -> path.toString().endsWith(".json"))
-                        .forEach(jsonFile -> {
-                            try (Reader reader = Files.newBufferedReader(jsonFile)) {
-                                List<ThemeConfiguration> loadedExternalThemes = gson.fromJson(reader, listType);
-                                if (loadedExternalThemes != null) {
-                                    for (ThemeConfiguration externalTheme : loadedExternalThemes) {
-                                        // Check if a theme with the same name already exists (from resources)
-                                        boolean replaced = false;
-                                        for (int i = 0; i < themes.size(); i++) {
-                                            if (themes.get(i).getThemeName().equalsIgnoreCase(externalTheme.getThemeName())) {
-                                                themes.set(i, externalTheme); // Replace existing theme
-                                                replaced = true;
-                                                break;
+                paths.filter(Files::isDirectory)
+                        .forEach(dir -> {
+                            try (Stream<Path> subPaths = Files.list(dir)) {
+                                subPaths.filter(Files::isRegularFile)
+                                        .filter(path -> path.toString().endsWith(".json"))
+                                        .forEach(jsonFile -> {
+                                            try (Reader reader = Files.newBufferedReader(jsonFile)) {
+                                                List<ThemeConfiguration> loadedExternalThemes = gson.fromJson(reader, listType);
+                                                if (loadedExternalThemes != null) {
+                                                    String basePath = jsonFile.getParent().toString(); // Get the directory of the JSON file
+                                                    for (ThemeConfiguration externalTheme : loadedExternalThemes) {
+                                                        externalTheme.setBasePath(basePath); // Set the base path for relative image resolution
+                                                        // Check if a theme with the same name already exists (from resources)
+                                                        boolean replaced = false;
+                                                        for (int i = 0; i < themes.size(); i++) {
+                                                            if (themes.get(i).getThemeName().equalsIgnoreCase(externalTheme.getThemeName())) {
+                                                                themes.set(i, externalTheme); // Replace existing theme
+                                                                replaced = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                        if (!replaced) {
+                                                            themes.add(externalTheme); // Add new external theme
+                                                        }
+                                                    }
+                                                    System.out.println("Successfully loaded themes from external file: " + jsonFile.getFileName());
+                                                }
+                                            } catch (JsonSyntaxException e) {
+                                                System.err.println("Error parsing JSON from " + jsonFile.getFileName() + ": " + e.getMessage());
+                                            } catch (IOException e) {
+                                                System.err.println("Error reading file " + jsonFile.getFileName() + ": " + e.getMessage());
                                             }
-                                        }
-                                        if (!replaced) {
-                                            themes.add(externalTheme); // Add new external theme
-                                        }
-                                    }
-                                    System.out.println("Successfully loaded themes from external file: " + jsonFile.getFileName());
-                                }
-                            } catch (JsonSyntaxException e) {
-                                System.err.println("Error parsing JSON from " + jsonFile.getFileName() + ": " + e.getMessage());
+                                        });
                             } catch (IOException e) {
-                                System.err.println("Error reading file " + jsonFile.getFileName() + ": " + e.getMessage());
+                                System.err.println("Error accessing directory " + dir.getFileName() + ": " + e.getMessage());
                             }
                         });
             }

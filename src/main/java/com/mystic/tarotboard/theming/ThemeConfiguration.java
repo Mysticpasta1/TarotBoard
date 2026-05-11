@@ -11,6 +11,7 @@ public class ThemeConfiguration implements Serializable {
     private String chipBackPath;
     private String backgroundPath;
     private List<SuitStyle> suitStyles;
+    private String basePath; // New field to store the base directory for resolving relative paths
 
     // Default constructor for serialization
     public ThemeConfiguration() {}
@@ -23,6 +24,13 @@ public class ThemeConfiguration implements Serializable {
         this.chipBackPath = chipBackPath;
         this.backgroundPath = backgroundPath;
         this.suitStyles = suitStyles;
+        this.basePath = null; // Default to null for themes without a specific base path (e.g., resource themes)
+    }
+
+    // New constructor to include basePath
+    public ThemeConfiguration(String themeName, String cardFrontPath, String cardBackPath, String chipFrontPath, String chipBackPath, String backgroundPath, List<SuitStyle> suitStyles, String basePath) {
+        this(themeName, cardFrontPath, cardBackPath, chipFrontPath, chipBackPath, backgroundPath, suitStyles);
+        this.basePath = basePath;
     }
 
     public String getThemeName() {
@@ -53,6 +61,10 @@ public class ThemeConfiguration implements Serializable {
         return suitStyles;
     }
 
+    public String getBasePath() {
+        return basePath;
+    }
+
     // Setters for serialization
     public void setThemeName(String themeName) {
         this.themeName = themeName;
@@ -80,5 +92,9 @@ public class ThemeConfiguration implements Serializable {
 
     public void setSuitStyles(List<SuitStyle> suitStyles) {
         this.suitStyles = suitStyles;
+    }
+
+    public void setBasePath(String basePath) {
+        this.basePath = basePath;
     }
 }

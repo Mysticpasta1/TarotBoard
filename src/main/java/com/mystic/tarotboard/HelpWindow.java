@@ -3,17 +3,24 @@ package com.mystic.tarotboard;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
-import com.vladsch.flexmark.ext.tables.TablesExtension; // Import TablesExtension
+import com.vladsch.flexmark.ext.tables.TablesExtension;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.layout.HBox; // Import HBox for buttons
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import java.util.List;
+import java.util.Objects; // Import Objects
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.util.stream.Collectors;
 
 public class HelpWindow {
 
@@ -205,7 +212,7 @@ public class HelpWindow {
             
             ---
             
-            # **Fortune smiles upon the bold. ✨🃏🌠**
+            # **Fortune smiles upon the bold. ✨✨✨**
             """;
 
     public static void show(Stage owner) {
@@ -219,18 +226,38 @@ public class HelpWindow {
         double winH = Math.min(screenBounds.getHeight() * 0.9, 1000);
 
         MutableDataSet options = new MutableDataSet();
-        options.set(Parser.EXTENSIONS, List.of(TablesExtension.create())); // Enable TablesExtension
+        options.set(Parser.EXTENSIONS, List.of(TablesExtension.create()));
 
         Parser parser = Parser.builder(options).build();
         HtmlRenderer renderer = HtmlRenderer.builder(options).build();
-        String html = renderer.render(parser.parse(MARKDOWN));
+        String htmlContent = renderer.render(parser.parse(MARKDOWN));
 
         WebView webView = new WebView();
-        webView.getEngine().loadContent("""
-                <html><body style="font-family: system-ui; font-size: 13pt; padding: 16px;">
+        
+        // Read CSS content directly from resources
+        String cssContent = "";
+        try (InputStream is = HelpWindow.class.getResourceAsStream("/css/help.css");
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+            cssContent = reader.lines().collect(Collectors.joining(System.lineSeparator()));
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Fallback or error handling if CSS cannot be loaded
+        }
+
+        String styledHtml = """
+                <html>
+                <head>
+                    <style>
+                        %s
+                    </style>
+                </head>
+                <body class="dark-mode" style="font-family: system-ui; font-size: 13pt; padding: 16px;">
                 %s
-                </body></html>
-                """.formatted(html));
+                </body>
+                </html>
+                """.formatted(cssContent, htmlContent);
+        webView.getEngine().loadContent(styledHtml);
+        
         webView.setPrefWidth(winW - 40);
         webView.setPrefHeight(winH - 40);
 
@@ -238,7 +265,19 @@ public class HelpWindow {
         closeButton.setStyle("-fx-font-size: 16pt;");
         closeButton.setOnAction(_ -> helpStage.close());
 
-        VBox helpLayout = new VBox(10, webView, closeButton);
+        Button toggleThemeButton = new Button("Toggle Theme");
+        toggleThemeButton.setStyle("-fx-font-size: 16pt;");
+        toggleThemeButton.setOnAction(_ -> {
+            // Execute JavaScript to toggle the theme class on the body element
+            webView.getEngine().executeScript(
+                "document.body.classList.toggle('dark-mode');"
+            );
+        });
+
+        HBox buttonBox = new HBox(10, toggleThemeButton, closeButton);
+        buttonBox.setAlignment(Pos.CENTER);
+
+        VBox helpLayout = new VBox(10, webView, buttonBox); // Add buttonBox to VBox
         helpLayout.setPrefSize(winW, winH);
         helpLayout.setSpacing(15);
         helpLayout.setStyle("-fx-padding: 20;");

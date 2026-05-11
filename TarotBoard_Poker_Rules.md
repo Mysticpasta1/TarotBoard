@@ -185,5 +185,5 @@ negative), the hand type, card values, suits, and wild cards.
 
 ---
 
-# **Fortune smiles upon the bold. ✨🃏🌠**
+# **Fortune smiles upon the bold. ✨✨✨**
 
