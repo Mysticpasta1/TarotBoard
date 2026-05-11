@@ -110,6 +110,10 @@ public class TarotBoard extends Application {
     // Declare startLayout as a class field
     private VBox startLayout;
 
+    // Constants for default deck position
+    private static final double DEFAULT_DECK_X = 50;
+    private static final double DEFAULT_DECK_Y = 50;
+
     @Override
     public void start(Stage primaryStage) {
         TarotBoard.primaryStage = primaryStage;
@@ -443,10 +447,11 @@ public class TarotBoard extends Application {
             }
             cards[i] = card; // Store Card object
 
-            cards[i].getCardPane().setTranslateX(50);
-            cards[i].getCardPane().setTranslateY(50);
-            UIUtils.makeDraggable(cards[i].getCardPane(), new Translate());
+            cards[i].getCardPane().setTranslateX(DEFAULT_DECK_X); // Initial position
+            cards[i].getCardPane().setTranslateY(DEFAULT_DECK_Y); // Initial position
+            UIUtils.makeDraggable(cards[i].getCardPane());
             UIUtils.makeFlippableAndRotatable(cards[i].getCardPane(), false);
+            this.makeDiscardable(cards[i].getCardPane(), gameRoot, discardZone); // Make cards discardable
             gameRoot.getChildren().add(cards[i].getCardPane());
         }
     }
@@ -469,6 +474,29 @@ public class TarotBoard extends Application {
             double sy = event.getSceneY();
             var bounds = discardZone.localToScene(discardZone.getBoundsInLocal());
             if (bounds.contains(sx, sy)) {
+                // Check if it's a Card
+                boolean isCard = false;
+                for (Card card : cards) {
+                    if (card != null && card.getCardPane() == pane) {
+                        // Reset card state
+                        pane.setTranslateX(DEFAULT_DECK_X);
+                        pane.setTranslateY(DEFAULT_DECK_Y);
+                        pane.setRotate(0); // Reset rotation
+                        // Flip card face down
+                        ImageView backView = (ImageView) pane.getChildren().get(0);
+                        ImageView frontView = (ImageView) pane.getChildren().get(1);
+                        Node textNode = pane.getChildren().get(2);
+                        backView.setVisible(true);
+                        frontView.setVisible(false);
+                        textNode.setVisible(false);
+                        pane.toBack();
+                        isCard = true;
+                        break;
+                    }
+                }
+                if (isCard) return; // If it was a card, we're done
+
+                // If not a card, proceed with existing logic for dice and chips
                 for (int i = 0; i < dice.size(); i++) {
                     if (dice.get(i).getPane() == pane) {
                         gameRoot.getChildren().remove(pane);
@@ -511,8 +539,8 @@ public class TarotBoard extends Application {
                 Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
 
                 // Reset position and rotation
-                cardPane.setTranslateX(50);
-                cardPane.setTranslateY(50);
+                cardPane.setTranslateX(DEFAULT_DECK_X); // Use constant
+                cardPane.setTranslateY(DEFAULT_DECK_Y); // Use constant
                 cardPane.getTransforms().removeAll(cardPane.getTransforms());
                 cardPane.setRotate(0);
 
@@ -536,7 +564,7 @@ public class TarotBoard extends Application {
                 }
                 cards[a].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
 
-                UIUtils.makeDraggable(cardPane, new Translate());
+                UIUtils.makeDraggable(cardPane);
                 UIUtils.makeFlippableAndRotatable(cardPane, false);
             }
         }
@@ -557,11 +585,13 @@ public class TarotBoard extends Application {
     private void spawnDie(Pane gameRoot, int sides, Color dieColor) {
         Die die = new Die(sides, dieColor);
         StackPane diePane = die.getPane();
-        UIUtils.makeDraggable(diePane, new Translate());
+        UIUtils.makeDraggable(diePane);
         this.makeDiscardable(diePane, gameRoot, discardZone);
 
-        diePane.setTranslateX(gameScene.getWidth() / 2);
-        diePane.setTranslateY(gameScene.getHeight() / 2);
+        int randomX = new Random().nextInt(-5, 5);
+        int randomY = new Random().nextInt(-5, 5);
+        diePane.setTranslateX((gameScene.getWidth() / 2) + randomX);
+        diePane.setTranslateY((gameScene.getHeight() / 2) + randomY);
         gameRoot.getChildren().add(diePane);
         dice.add(die);
     }
@@ -570,10 +600,12 @@ public class TarotBoard extends Application {
         Chip chip = new Chip(chipColor, bwFrontImage, bwBackImage);
         StackPane chipPane = chip.getChipPane();
 
-        chipPane.setTranslateX(gameScene.getWidth() / 2);
-        chipPane.setTranslateY(gameScene.getHeight() / 2);
+        int randomX = new Random().nextInt(-5, 5);
+        int randomY = new Random().nextInt(-5, 5);
+        chipPane.setTranslateX((gameScene.getWidth() / 2) + randomX);
+        chipPane.setTranslateY((gameScene.getHeight() / 2) + randomY);
 
-        UIUtils.makeDraggable(chipPane, new Translate());
+        UIUtils.makeDraggable(chipPane);
         this.makeDiscardable(chipPane, gameRoot, discardZone);
         UIUtils.makeFlippableAndRotatable(chipPane, true);
 
@@ -698,12 +730,13 @@ public class TarotBoard extends Application {
             StackPane pane = card.getCardPane(); // Get the pane from the Card object
             double tx = pane.getTranslateX();
             double ty = pane.getTranslateY();
-            for (var t : pane.getTransforms()) {
-                if (t instanceof Translate tr) {
-                    tx += tr.getX();
-                    ty += tr.getY();
-                }
-            }
+            // Removed iteration over transforms for translation, as translateX/Y are now directly used for dragging
+            // for (var t : pane.getTransforms()) {
+            //     if (t instanceof Translate tr) {
+            //         tx += tr.getX();
+            //         ty += tr.getY();
+            //     }
+            // }
 
             ImageView backView = (ImageView) pane.getChildren().get(0);
             ImageView frontView = (ImageView) pane.getChildren().get(1);
@@ -723,12 +756,13 @@ public class TarotBoard extends Application {
             StackPane diePane = die.getPane();
             double tx = diePane.getTranslateX();
             double ty = diePane.getTranslateY();
-            for (var t : diePane.getTransforms()) {
-                if (t instanceof Translate tr) {
-                    tx += tr.getX();
-                    ty += tr.getY();
-                }
-            }
+            // Removed iteration over transforms for translation
+            // for (var t : diePane.getTransforms()) {
+            //     if (t instanceof Translate tr) {
+            //         tx += tr.getX();
+            //         ty += tr.getY();
+            //     }
+            // }
             Color dieColor = die.getDieColor();
 
             dieStates.add(new SaveData.DieState(
@@ -751,12 +785,13 @@ public class TarotBoard extends Application {
             StackPane chipPane = chip.getChipPane();
             double tx = chipPane.getTranslateX();
             double ty = chipPane.getTranslateY();
-            for (var t : chipPane.getTransforms()) {
-                if (t instanceof Translate tr) {
-                    tx += tr.getX();
-                    ty += tr.getY();
-                }
-            }
+            // Removed iteration over transforms for translation
+            // for (var t : chipPane.getTransforms()) {
+            //     if (t instanceof Translate tr) {
+            //         tx += tr.getX();
+            //         ty += tr.getY();
+            //     }
+            // }
 
             ImageView frontView = (ImageView) chipPane.getChildren().get(0);
             ImageView backView = (ImageView) chipPane.getChildren().get(1);
@@ -844,8 +879,9 @@ public class TarotBoard extends Application {
             ImageView frontView = (ImageView) pane.getChildren().get(1);
             Text text = (Text) pane.getChildren().get(2);
 
-            pane.getTransforms().clear();
-            UIUtils.makeDraggable(pane, new Translate());
+            pane.getTransforms().clear(); // Clear any existing transforms
+            UIUtils.makeDraggable(pane);
+            this.makeDiscardable(pane, gameRoot, discardZone); // Make cards discardable
 
             pane.setTranslateX(cs.translateX());
             pane.setTranslateY(cs.translateY());
@@ -879,9 +915,9 @@ public class TarotBoard extends Application {
             StackPane diePane = die.getPane();
 
             diePane.translateXProperty().unbind();
-            diePane.getTransforms().clear();
-            UIUtils.makeDraggable(diePane, new Translate());
-            this.makeDiscardable(diePane, gameRoot, discardZone);
+            diePane.getTransforms().clear(); // Clear any existing transforms
+            UIUtils.makeDraggable(diePane);
+            this.makeDiscardable(diePane, gameRoot, discardZone); // Make dice discardable
 
             diePane.setTranslateX(ds.translateX());
             diePane.setTranslateY(ds.translateY());

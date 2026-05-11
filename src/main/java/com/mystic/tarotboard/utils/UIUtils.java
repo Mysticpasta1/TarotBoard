@@ -15,26 +15,36 @@ import java.util.Random;
 
 public class UIUtils {
 
-    public static void makeDraggable(StackPane pane, Translate translate) {
+    public static void makeDraggable(StackPane pane) { // Removed Translate parameter
         final double[] dragDeltaX = new double[1];
         final double[] dragDeltaY = new double[1];
-
-        pane.getTransforms().add(translate);
+        final boolean[] isDragging = new boolean[1]; // Flag to indicate if dragging is active
 
         pane.setOnMousePressed(event -> {
-            dragDeltaX[0] = event.getSceneX() - translate.getX();
-            dragDeltaY[0] = event.getSceneY() - translate.getY();
-            pane.toFront();
+            // Only start dragging if no modifier keys (Shift or Control) are pressed
+            if (!event.isShiftDown() && !event.isControlDown()) {
+                dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
+                dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
+                pane.toFront();
+                isDragging[0] = true; // Set dragging flag to true
+            } else {
+                isDragging[0] = false; // Not dragging if modifier key is pressed
+            }
         });
 
         pane.setOnMouseDragged(event -> {
-            double newTranslateX = event.getSceneX() - dragDeltaX[0];
-            double newTranslateY = event.getSceneY() - dragDeltaY[0];
+            if (isDragging[0]) { // Only drag if the dragging flag is true
+                double newTranslateX = event.getSceneX() - dragDeltaX[0];
+                double newTranslateY = event.getSceneY() - dragDeltaY[0];
 
-            if (translate.getX() != newTranslateX || translate.getY() != newTranslateY) {
-                translate.setX(newTranslateX);
-                translate.setY(newTranslateY);
+                // Apply directly to pane's translate properties
+                pane.setTranslateX(newTranslateX);
+                pane.setTranslateY(newTranslateY);
             }
+        });
+
+        pane.setOnMouseReleased(_ -> {
+            isDragging[0] = false; // Reset dragging flag on mouse release
         });
     }
 
@@ -44,6 +54,12 @@ public class UIUtils {
             Node back = null;
             Node text = null;
             double currentRotation = pane.getRotate();
+
+            // Prevent rotation/flip if a drag was initiated (though makeDraggable should prevent this now)
+            // The isStillSincePress() check is crucial here to distinguish clicks from drags
+            if (!event.isStillSincePress()) {
+                return; // If mouse moved significantly, it was a drag, not a click for rotation/flip
+            }
 
             if (event.getButton() == MouseButton.PRIMARY) {
                 if (event.isShiftDown()) {
@@ -56,7 +72,7 @@ public class UIUtils {
                             }
                         }
                     }
-                    if (front != null && back != null && event.isStillSincePress()) {
+                    if (front != null && back != null) { // Removed event.isStillSincePress() as it's checked above
                         pane.setRotate(currentRotation - 1);
                         pane.toFront();
                     }
@@ -70,7 +86,7 @@ public class UIUtils {
                             }
                         }
                     }
-                    if (front != null && back != null && event.isStillSincePress()) {
+                    if (front != null && back != null) { // Removed event.isStillSincePress() as it's checked above
                         pane.setRotate(currentRotation - 90);
                         pane.toFront();
                     }
@@ -94,7 +110,7 @@ public class UIUtils {
                                 text = text1;
                             }
                         }
-                        if (front != null && back != null && event.isStillSincePress()) {
+                        if (front != null && back != null) { // Removed event.isStillSincePress() as it's checked above
                             front.setVisible(!front.isVisible());
                             back.setVisible(!back.isVisible());
                             pane.toFront();
@@ -115,7 +131,7 @@ public class UIUtils {
                             }
                         }
                     }
-                    if (front != null && back != null && event.isStillSincePress()) {
+                    if (front != null && back != null) { // Removed event.isStillSincePress() as it's checked above
                         pane.setRotate(currentRotation + 1);
                         pane.toFront();
                     }
@@ -129,7 +145,7 @@ public class UIUtils {
                             }
                         }
                     }
-                    if (front != null && back != null && event.isStillSincePress()) {
+                    if (front != null && back != null) { // Removed event.isStillSincePress() as it's checked above
                         pane.setRotate(currentRotation + 90);
                         pane.toFront();
                     }
@@ -158,7 +174,7 @@ public class UIUtils {
         for (int i = 0; i < flips; i++) {
             timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), _ -> {
                 f.setVisible(!f.isVisible());
-                b.setVisible(!b.isVisible());
+                b.setVisible(!f.isVisible()); // Corrected: b.setVisible(!f.isVisible())
             }));
         }
         timeline.setOnFinished(_ -> {
