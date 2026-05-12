@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id "java"
     id "application"
@@ -71,6 +73,12 @@ jlinkZip {
 
 shadowJar {
     manifest.attributes("Main-Class": "com.mystic.tarotboard.TarotBoard")
+}
+
+tasks.register("headlessJar", ShadowJar) {
+    archiveClassifier.set("headless")
+    archiveVersion.set(project.version) // Ensure version is included in the filename
+    manifest.attributes("Main-Class": "com.mystic.tarotboard.network.server.HeadlessServer")
 }
 
 jar {

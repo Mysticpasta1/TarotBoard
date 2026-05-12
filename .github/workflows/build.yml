@@ -43,15 +43,21 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux (AppImage)
+    name: Linux Packages
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ app-image, deb, rpm ]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install fakeroot
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fakeroot rpm
 
       - name: Setup Java 26
         uses: actions/setup-java@v4
@@ -62,18 +68,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build AppImage
-        run: ./gradlew clean jpackage -PinstallerType=app-image
+      - name: Build ${{ matrix.type }}
+        run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }}
 
-      - name: Archive AppImage
-        run: tar -czf TarotBoard-linux-appimage.tar.gz -C build/jpackage TarotBoard/
-
-      - name: Upload AppImage archive
+      - name: Upload ${{ matrix.type }}
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage-build
-          path: TarotBoard-linux-appimage.tar.gz
-          compression-level: 6
+          name: linux-${{ matrix.type }}-build
+          path: build/jpackage/TarotBoard-*.${{ matrix.type }}
+          compression-level: 0
           if-no-files-found: error
 
   headless-server:
