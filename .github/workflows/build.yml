@@ -2,7 +2,7 @@ name: Build TarotBoard
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -10,92 +10,66 @@ jobs:
   windows:
     name: Windows (MSI + EXE)
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ msi, exe ]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup GraalVM 21
-        uses: graalvm/setup-graalvm@v1
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'graalvm'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          distribution: 'temurin'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build native app (Windows)
-        run: ./gradlew clean nativeBuild nativePackage -Ptarget=host
+      - name: Build ${{ matrix.type }}
+        run: ./gradlew.bat clean jpackage -PinstallerType=${{ matrix.type }}
+        shell: cmd
 
-      - name: Upload Windows artifacts
+      - name: Upload ${{ matrix.type }}
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: build/gluonfx/**
+          name: windows-${{ matrix.type }}-build
+          path: build/jpackage/TarotBoard-*.${{ matrix.type }}
+          compression-level: 0
+          if-no-files-found: error
+
   linux:
-    name: Linux (AppImage + DEB + RPM)
+    name: Linux (AppImage)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup GraalVM 21
-        uses: graalvm/setup-graalvm@v1
+      - name: Install fakeroot
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'graalvm'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fakeroot rpm libfuse2
+          distribution: 'temurin'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build native app (Linux)
-        run: ./gradlew clean nativeBuild nativePackage -Ptarget=host
+      - name: Build AppImage
+        run: ./gradlew clean jpackage -PinstallerType=app-image
 
-      - name: Upload Linux artifacts
+      - name: Archive AppImage
+        run: tar -czf TarotBoard-linux-appimage.tar.gz -C build/jpackage TarotBoard/
+
+      - name: Upload AppImage archive
         uses: actions/upload-artifact@v4
         with:
-          name: linux-build
-          path: build/gluonfx/**
-  android:
-    name: Android (APK)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup GraalVM 21
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '21'
-          distribution: 'graalvm'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK components
-        run: |
-          sdkmanager "platform-tools" \
-                     "platforms;android-35" \
-                     "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Build Android APK
-        run: ./gradlew clean nativeBuild nativePackage -Ptarget=android
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: build/gluonfx/**
+          name: linux-appimage-build
+          path: TarotBoard-linux-appimage.tar.gz
+          compression-level: 6
+          if-no-files-found: error
