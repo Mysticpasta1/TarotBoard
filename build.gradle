@@ -5,7 +5,7 @@ plugins {
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
     id "org.gradlex.extra-java-module-info" version "1.9"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" apply false
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28"
 }
 
 group = "com.mystic"
@@ -90,12 +90,8 @@ tasks.register('runServer', JavaExec) {
     mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
     classpath = sourceSets.main.runtimeClasspath
 }
-if (isAndroidBuild) {
-    apply plugin: 'com.gluonhq.gluonfx-gradle-plugin'
-
-    gluonfx {
-        target = "android"
-        graalvmHome = System.getenv("GRAALVM_HOME")
-    }
+gluonfx {
+    target = isAndroidBuild ? "android" : "host"
+    graalvmHome = System.getenv("GRAALVM_HOME")
 }
 
