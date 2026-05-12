@@ -90,7 +90,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build APK
-        run: ./gradlew nativePackage
+        run: ./gradlew nativePackage -PandroidBuild=true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
