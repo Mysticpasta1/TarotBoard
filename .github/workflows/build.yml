@@ -81,11 +81,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean Gluon cache
+        run: rm -rf build/gluonfx
+
       - name: Setup GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
-          distribution: 'graalvm'
+          distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: true
           components: 'native-image'
@@ -104,8 +107,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build APK
-        run: ./gradlew nativeBuild nativePackage -PandroidBuild=true --stacktrace
+      - name: Native Build
+        run: ./gradlew nativeBuild -PandroidBuild=true -PgluonfxSkipCache=true --stacktrace --info
+
+      - name: Package APK
+        run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
