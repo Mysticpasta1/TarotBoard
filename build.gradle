@@ -5,15 +5,12 @@ plugins {
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
     id "org.gradlex.extra-java-module-info" version "1.9"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.22"
 }
 
 group = "com.mystic"
 version = "3.0.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
@@ -90,14 +87,3 @@ tasks.register('runServer', JavaExec) {
     mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
     classpath = sourceSets.main.runtimeClasspath
 }
-gluonfx {
-    target = isAndroidBuild ? "android" : "host"
-    graalvmHome = System.getenv("GRAALVM_HOME")
-
-    compilerArgs = [
-            "-H:+UnlockExperimentalVMOptions",
-            "-H:+UseCAPCache",
-            "-H:CAPCacheDir=${project.projectDir}/caps"
-    ]
-}
-
