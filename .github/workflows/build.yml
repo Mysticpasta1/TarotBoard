@@ -107,8 +107,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Native Build
-        run: ./gradlew nativeBuild -PandroidBuild=true -PgluonfxSkipCache=true --stacktrace --info
+      - name: Native Build (no cache)
+        run: ./gradlew nativeBuild -PandroidBuild=true --no-build-cache --rerun-tasks --stacktrace
 
       - name: Package APK
         run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
