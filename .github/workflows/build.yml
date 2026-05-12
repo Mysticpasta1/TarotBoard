@@ -103,6 +103,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: true
 
+      - name: Set up Gluon GraalVM
+        uses: gluonhq/setup-gluon-graalvm@v1
+        with:
+          java-version: '21'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 

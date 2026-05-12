@@ -5,7 +5,7 @@ plugins {
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
     id "org.gradlex.extra-java-module-info" version "1.9"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28"
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.22"
 }
 
 group = "com.mystic"
@@ -93,5 +93,11 @@ tasks.register('runServer', JavaExec) {
 gluonfx {
     target = isAndroidBuild ? "android" : "host"
     graalvmHome = System.getenv("GRAALVM_HOME")
+
+    compilerArgs = [
+            "-H:+UnlockExperimentalVMOptions",
+            "-H:+UseCAPCache",
+            "-H:CAPCacheDir=${project.projectDir}/caps"
+    ]
 }
 
