@@ -47,8 +47,6 @@
     "helpBtnFg": "#e8e8e8",
     "settingsBtnBg": "#2d2d44",
     "settingsBtnFg": "#e8e8e8",
-    "resetBtnBg": "#c44",
-    "helpCssLight": "helpLight",
-    "helpCssDark": "helpDark"
+    "resetBtnBg": "#c44"
   }
 }

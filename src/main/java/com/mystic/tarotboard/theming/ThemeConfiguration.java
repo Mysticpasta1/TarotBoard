@@ -425,15 +425,6 @@ public class ThemeConfiguration implements Serializable {
          * Background color of the reset button
          */
         public String resetBtnBg = "#c44";
-
-        /**
-         * Light theme help CSS
-         */
-        public String helpCssLight = "";
-        /**
-         * Dark theme help CSS
-         */
-        public String helpCssDark = "";
     }
 
     /**

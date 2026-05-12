@@ -25,8 +25,7 @@ application {
         applicationDefaultJvmArgs = []
     } else {
         applicationDefaultJvmArgs = [
-            '--enable-native-access=javafx.graphics',
-            '--enable-native-access=javafx.web'
+            '--enable-native-access=javafx.graphics'
         ]
     }
 }
@@ -46,11 +45,7 @@ extraJavaModuleInfo {
 
 javafx {
     version = "21.0.1"
-    if (isAndroidBuild) {
-        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
-    } else {
-        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics", "javafx.swing", "javafx.web"]
-    }
+    modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
 }
 
 dependencies {
@@ -108,5 +103,13 @@ if (isAndroidBuild) {
     gluonfx {
         target = "android"
         graalvmHome = System.getenv("GRAALVM_HOME")
+    }
+
+    sourceSets {
+        main {
+            java {
+                exclude 'module-info.java'
+            }
+        }
     }
 }

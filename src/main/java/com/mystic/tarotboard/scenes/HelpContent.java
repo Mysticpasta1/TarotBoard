@@ -42,7 +42,7 @@ final class HelpContent {
 
             ## Overview
 
-            TarotBoard Poker is a mystical, cosmic twist on classic poker. \s
+            TarotBoard Poker is a mystical, cosmic twist on classic poker.
             Featuring:
 
             - **4255 unique cards**
@@ -73,21 +73,21 @@ final class HelpContent {
 
             ### Values
 
-            | Category | Values                                                                                                                                                                                                                                                                                                                                                                  | Value Notes                               | \s
-            |----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------| \s
-            | Negative | Devil, Shadow, Specter, Phantom, Wraith, Ghoul, Banshee, Reverent, Eidolon, Shade, Doppelganger, Hollow, Abyss, Chimera, Poltergeist, Wight, Apparition, Nightmare, Succubus, Incubus, Necromancer, Fury, Grim, Harbinger, Spectacle, Lich, Gorgon, Drake, Demon, Frost, Golem, Hydra, Inferno, Juggernaut, Kraken, Reaper, Leviathan, Manticore, Naga, Blight, Serpent | Negative numeric values (e.g., -1 to -40) |  \s
-            | Neutral  | Hold                                                                                                                                                                                                                                                                                                                                                                    | Neutral value 0                           | \s
+            | Category | Values                                                                                                                                                                                                                                                                                                                                                                  | Value Notes                               |
+            |----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+            | Negative | Devil, Shadow, Specter, Phantom, Wraith, Ghoul, Banshee, Reverent, Eidolon, Shade, Doppelganger, Hollow, Abyss, Chimera, Poltergeist, Wight, Apparition, Nightmare, Succubus, Incubus, Necromancer, Fury, Grim, Harbinger, Spectacle, Lich, Gorgon, Drake, Demon, Frost, Golem, Hydra, Inferno, Juggernaut, Kraken, Reaper, Leviathan, Manticore, Naga, Blight, Serpent | Negative numeric values (e.g., -1 to -40) |
+            | Neutral  | Hold                                                                                                                                                                                                                                                                                                                                                                    | Neutral value 0                           |
             | Positive | Ace, 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King, Nomad, Prince, Rune, Fable, Sorceress, Utopia, Wizard, Titan, Baron, Illusionist, Oracle, Magician, Luminary, Eclipse, Celestial, Duke, Genesis,Zephyr, Vesper, Umbra, Valkyrie, Warden, Zenith, Yggdrasil, Zodiac, Phoenix, Raven, Cipher, Angel                                                                   | Positive numeric values (1 to 40+)        |
 
             ## Court Sets & Colors
 
-            | Set Name          | Description                                        | Associated Color - Name (Hex) | \s
-            |-------------------|----------------------------------------------------|-------------------------------| \s
-            | **The Celestial** | Rulers of the cosmos — stars, suns, cosmic royalty | Royal Gold (#FFD700)          | \s
-            | **The Umbral**    | Shadow realm of secrets, spirits, occult power     | Fusion Orange (#FF8800)       | \s
-            | **The Infernal**  | Fiery destruction, sin, and wrath                  | Burning Crimson (#DC143C)     | \s
-            | **The Verdant**   | Life, nature, cycles, and rebirth                  | Forest Green (#228B22)        | \s
-            | **The Aetheric**  | Fate, time, magic weaving threads of existence     | Aether Blue (#1E90FF)         | \s
+            | Set Name          | Description                                        | Associated Color - Name (Hex) |
+            |-------------------|----------------------------------------------------|-------------------------------|
+            | **The Celestial** | Rulers of the cosmos — stars, suns, cosmic royalty | Royal Gold (#FFD700)          |
+            | **The Umbral**    | Shadow realm of secrets, spirits, occult power     | Fusion Orange (#FF8800)       |
+            | **The Infernal**  | Fiery destruction, sin, and wrath                  | Burning Crimson (#DC143C)     |
+            | **The Verdant**   | Life, nature, cycles, and rebirth                  | Forest Green (#228B22)        |
+            | **The Aetheric**  | Fate, time, magic weaving threads of existence     | Aether Blue (#1E90FF)         |
             | **The Expansion** | Void of forgotten realms, entropy, and echoes      | Vivid Orchid (#AD03FC)        |
 
             ---
@@ -96,37 +96,37 @@ final class HelpContent {
 
             ### Mythic Hands (Highest Tier)
 
-            | Rank | Name                | Description                                                                                        | Example / Flavor                                    | Beats                     | \s
-            |------|---------------------|----------------------------------------------------------------------------------------------------|-----------------------------------------------------|---------------------------| \s
+            | Rank | Name                | Description                                                                                        | Example / Flavor                                    | Beats                     |
+            |------|---------------------|----------------------------------------------------------------------------------------------------|-----------------------------------------------------|---------------------------|
             | 1    | **Galaxy Flush**    | Highest 5 consecutive values (e.g. Zenith, Yggdrasil, Zodiac, Phoenix, Angel) all in the same suit | Celestial royal straight flush                      | Realm Royal and Below     |
-            | 2    | **Realm Royal**     | Royal Flush within the same Court Set suits                                                        | Supreme domain flush                                | Crazy Straight and Below  | \s
-            | 3    | **Crazy Straight**  | Straight flush including the value using 1 or more Wilds                                           | Straight with Wilds                                 | Straight Flush and Below  | \s
-            | 4    | **Straight Flush**  | Five consecutive values in the same suit                                                           | Classic flush                                       | Five of a Kind and Below  | \s
-            | 5    | **Five of a Kind**  | Five cards of the same value, using Wilds                                                          | Five Reapers with or without a Joker as one of them | Hyper Flush and Below     | \s
-            | 6    | **Hyper Flush**     | Seven cards all in the same suit                                                                   | Flood of Waves                                      | Prismatic Flush and Below | \s
+            | 2    | **Realm Royal**     | Royal Flush within the same Court Set suits                                                        | Supreme domain flush                                | Crazy Straight and Below  |
+            | 3    | **Crazy Straight**  | Straight flush including the value using 1 or more Wilds                                           | Straight with Wilds                                 | Straight Flush and Below  |
+            | 4    | **Straight Flush**  | Five consecutive values in the same suit                                                           | Classic flush                                       | Five of a Kind and Below  |
+            | 5    | **Five of a Kind**  | Five cards of the same value, using Wilds                                                          | Five Reapers with or without a Joker as one of them | Hyper Flush and Below     |
+            | 6    | **Hyper Flush**     | Seven cards all in the same suit                                                                   | Flood of Waves                                      | Prismatic Flush and Below |
             | 7    | **Prismatic Flush** | Five cards of the same value, each from different suits                                            | Five Shadows from different Courts                  | Flush and Below           |
 
             ### Legendary Hands
 
-            | Rank | Name              | Description                                    | Beats                       | \s
-            |------|-------------------|------------------------------------------------|-----------------------------| \s
+            | Rank | Name              | Description                                    | Beats                       |
+            |------|-------------------|------------------------------------------------|-----------------------------|
             | 8    | Flush             | Five cards same suit                           | Four of a Kind and Below    |
-            | 9    | Four of a Kind    | Four cards of the same value                   | Full House and Below        | \s
+            | 9    | Four of a Kind    | Four cards of the same value                   | Full House and Below        |
             | 10   | Full House        | Three of a Kind + One Pair                     | Suit Chain and Below        |
             | 11   | Suit Chain        | Straight all from one Court Set                | Straight and Below          |
-            | 12   | Straight          | Five consecutive values                        | Arcane Straight and Below   | \s
-            | 13   | Arcane Straight   | Straight using one or more Wild cards          | Double Joker Bomb and Below | \s
+            | 12   | Straight          | Five consecutive values                        | Arcane Straight and Below   |
+            | 13   | Arcane Straight   | Straight using one or more Wild cards          | Double Joker Bomb and Below |
             | 14   | Double Joker Bomb | Two or more Wild cards in hand                 | Spectrum and Below          |
             | 15   | Spectrum          | Six Cards each one from a different suit group | Three of a Kind and Below   |
 
             ### Core Hands (Classic + Custom)
 
-            | Rank | Name            | Description                         | Beats                | \s
-            |------|-----------------|-------------------------------------|----------------------| \s
-            | 15   | Three of a Kind | Three cards of the same value       | Twin Realm and Below | \s
-            | 16   | Twin Realm      | Two pairs from different Court Sets | Two Pair and Below   | \s
+            | Rank | Name            | Description                         | Beats                |
+            |------|-----------------|-------------------------------------|----------------------|
+            | 15   | Three of a Kind | Three cards of the same value       | Twin Realm and Below |
+            | 16   | Twin Realm      | Two pairs from different Court Sets | Two Pair and Below   |
             | 17   | Two Pair        | Two pairs of same-value cards       | One Pair and Below   |
-            | 18   | One Pair        | Two cards of the same value         | High Cards           | \s
+            | 18   | One Pair        | Two cards of the same value         | High Cards           |
             | 19   | High Cards      | Highest single card wins            | —                    |
 
             ---
@@ -143,7 +143,7 @@ final class HelpContent {
             ## Tiebreakers & Special Rules
 
             - Higher values win ties (e.g., Angel beats Phoenix, which beats Raven).
-            - If values tie, suits from Court Sets break ties using a defined hierarchy \s
+            - If values tie, suits from Court Sets break ties using a defined hierarchy
               (e.g., Celestial > Umbral > Infernal > Verdant > Aetheric > Expansion).
             - Wild cards don't break ties but complete winning combos.
 

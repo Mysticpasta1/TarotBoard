@@ -112,10 +112,6 @@
     "_comment_settingsBtnFg": "Text color for settings window buttons (hex/rgba/named) [String]",
     "settingsBtnFg": "#e8e8e8",
     "_comment_resetBtnBg": "Background color of 'Reset to Defaults' buttons (hex/rgba/named) [String]",
-    "resetBtnBg": "#c44",
-    "_comment_helpCssLight": "Key into css.json for the light-theme help page stylesheet [String]",
-    "helpCssLight": "helpLight",
-    "_comment_helpCssDark": "Key into css.json for the dark-theme help page stylesheet [String]",
-    "helpCssDark": "helpDark"
+    "resetBtnBg": "#c44"
   }
 }

@@ -6,8 +6,6 @@ module com.mystic.tarotboard {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.graphics;
-    requires javafx.swing;
-    requires javafx.web;
     requires java.net.http;
 
     requires com.google.gson;
@@ -15,6 +13,8 @@ module com.mystic.tarotboard {
     requires flexmark;
     requires flexmark.util.data;
     requires flexmark.ext.tables;
+    requires flexmark.util.ast;
+    requires java.desktop;
 
     opens com.mystic.tarotboard to javafx.fxml, com.google.gson;
     opens com.mystic.tarotboard.theming to com.google.gson;
