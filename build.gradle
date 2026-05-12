@@ -45,7 +45,7 @@ extraJavaModuleInfo {
 }
 
 javafx {
-    version = "27-ea+15"
+    version = "21.0.1"
     if (isAndroidBuild) {
         modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
     } else {
