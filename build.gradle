@@ -100,6 +100,8 @@ if (isAndroidBuild) {
         appIdentifier = "com.mystic.tarotboard"
         graalvmHome = System.getenv("GRAALVM_HOME")
 
+        skipCache = true
+        
         attachConfig {
             version = "4.0.20"
             services "lifecycle"
