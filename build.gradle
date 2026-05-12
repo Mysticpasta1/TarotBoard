@@ -3,13 +3,15 @@ plugins {
     id "application"
     id "com.gradleup.shadow" version "9.4.1"
     id "org.beryx.jlink" version "3.1.5"
-    id "org.openjfx.javafxplugin" version "bf3c04dd64"
+    id "org.openjfx.javafxplugin" version "0.1.0"
     id "org.gradlex.extra-java-module-info" version "1.9"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.24" apply false
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" apply false
 }
 
 group = "com.mystic"
 version = "3.0.0"
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
 
@@ -47,7 +49,7 @@ javafx {
     if (isAndroidBuild) {
         modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
     } else {
-        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics", "javafx.swing", "javafx.web", "jdk.jsobject"]
+        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics", "javafx.swing", "javafx.web"]
     }
 }
 
@@ -57,10 +59,9 @@ dependencies {
 }
 
 if (isAndroidBuild) {
-    java.toolchain.languageVersion = JavaLanguageVersion.of(26)
     compileJava {
-        source = sourceSets.main.java.matching { exclude '**/module-info.java' } +
-                 fileTree('src/android/java') { include '**/module-info.java' }
+        source = sourceSets.main.java.matching { exclude '**/module-info.java'; exclude '**/HelpScene.java' } +
+                 fileTree('src/android/java')
     }
 }
 
@@ -113,8 +114,6 @@ if (isAndroidBuild) {
 
     gluonfx {
         target = "android"
-        mainClass = "com.mystic.tarotboard.TarotBoard"
-        androidSdk = System.getenv("ANDROID_HOME")
         graalvmHome = System.getenv("GRAALVM_HOME")
     }
 }

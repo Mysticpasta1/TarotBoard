@@ -8,7 +8,6 @@ module com.mystic.tarotboard {
     requires javafx.graphics;
     requires javafx.swing;
     requires javafx.web;
-    requires jdk.jsobject;
     requires java.net.http;
 
     requires com.google.gson;

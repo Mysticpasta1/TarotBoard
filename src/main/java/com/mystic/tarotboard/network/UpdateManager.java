@@ -144,8 +144,6 @@ public class UpdateManager {
      */
     public static void installUpdate(Path msiPath) throws IOException {
         String path = msiPath.toAbsolutePath().toString();
-        try (var process = new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start()) {
-            process.getOutputStream().close();
-        }
+        new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start();
     }
 }
