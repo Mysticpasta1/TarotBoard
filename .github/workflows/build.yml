@@ -93,9 +93,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Install native-image
-        run: gu install native-image
-
       - name: Build APK
         run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
 
