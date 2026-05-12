@@ -83,7 +83,7 @@ jobs:
       - name: Setup GraalVM
         uses: actions/setup-java@v4
         with:
-          java-version: '17' # GraalVM 17 is commonly used for GluonFX
+          java-version: '21'
           distribution: 'graalvm'
 
       - name: Setup Gradle
