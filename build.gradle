@@ -4,7 +4,7 @@ plugins {
     id "com.gradleup.shadow" version "8.3.0"
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" apply false
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28"
 }
 
 group = "com.mystic"
@@ -89,21 +89,18 @@ tasks.register('runServer', JavaExec) {
 }
 
 // --- ANDROID (GLUONFX) CONFIGURATION ---
-if (isAndroidBuild) {
-    apply plugin: 'com.gluonhq.gluonfx-gradle-plugin'
-    gluonfx {
-        target = "android"
-        appIdentifier = 'com.mystic.tarotboard'
+gluonfx {
+    target = "android"
+    appIdentifier = 'com.mystic.tarotboard'
 
-        attachConfig {
-            version = '4.0.20'
-            services 'lifecycle'
-        }
+    attachConfig {
+        version = '4.0.20'
+        services 'lifecycle'
+    }
 
-        release {
-            appLabel = 'TarotBoard'
-            versionCode = 1
-            versionName = '1.0'
-        }
+    release {
+        appLabel = 'TarotBoard'
+        versionCode = 1
+        versionName = '1.0'
     }
 }
