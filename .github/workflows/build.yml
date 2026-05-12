@@ -2,7 +2,7 @@ name: Build And Release Linux And Windows Builds
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
@@ -88,6 +88,27 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      - name: Verify Java and GraalVM setup
+        run: |
+          echo "JAVA_HOME: $JAVA_HOME"
+          java -version
+          echo "GRAALVM_HOME: $GRAALVM_HOME"
+          $GRAALVM_HOME/bin/java -version
+          echo GRAALVM_HOME
+          native-image --version
+
+      - name: Set GRAALVM_HOME
+        uses: actions/set-env@v4
+        with:
+          name: GRAALVM_HOME
+          value: $GRAALVM_HOME
+
+      - name: Set JAVA_HOME
+        uses: actions/set-env@v4
+        with:
+          name: JAVA_HOME
+          value: $JAVA_HOME
 
       - name: Build APK
         run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
