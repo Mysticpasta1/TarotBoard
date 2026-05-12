@@ -2,16 +2,16 @@ plugins {
     id "java"
     id "application"
     id "com.gradleup.shadow" version "8.3.0"
-    id "org.beryx.jlink" version "3.1.5"
+    id "org.beryx.jlink" version "3.1.5" apply false
     id "org.openjfx.javafxplugin" version "0.1.0"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28"
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" apply false
 }
 
 group = "com.mystic"
 version = "3.0.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
+def isAndroidBuild = project.hasProperty("androidBuild") && project.property("androidBuild").toBoolean()
 
 application {
     mainClass = "com.mystic.tarotboard.TarotBoard" //gluon see this
@@ -44,33 +44,36 @@ application {
     ]
 }
 
-def jpackageType = project.findProperty('installerType') ?: 'msi'
+if (!isAndroidBuild) {
+    apply plugin: "org.beryx.jlink"
+    def jpackageType = project.findProperty("installerType") ?: "msi"
 
-jlink {
-    imageZip = layout.buildDirectory.get().file("distributions/app-${javafx.platform.classifier}.zip").asFile
-    options = ["--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"]
-    launcher {
-        name = "TarotBoard"
-        mainClass = "com.mystic.tarotboard.TarotBoard"
-        noConsole = true
-    }
+    jlink {
+        imageZip = layout.buildDirectory.get().file("distributions/app-${javafx.platform.classifier}.zip").asFile
+        options = ["--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"]
+        launcher {
+            name = "TarotBoard"
+            mainClass = "com.mystic.tarotboard.TarotBoard"
+            noConsole = true
+        }
 
-    jpackage {
-        imageName = "TarotBoard"
-        skipInstaller = project.findProperty('skipInstaller')?.toBoolean() ?: (jpackageType == 'app-image')
-        installerType = jpackageType
-        if (project.hasProperty('installerOptions')) {
-            installerOptions = project.getProperty('installerOptions').split(',')
-        } else if (jpackageType == 'msi' || jpackageType == 'exe') {
-            installerOptions = ['--win-shortcut', '--win-menu', '--win-dir-chooser']
-        } else {
-            installerOptions = []
+        jpackage {
+            imageName = "TarotBoard"
+            skipInstaller = project.findProperty("skipInstaller")?.toBoolean() ?: (jpackageType == "app-image")
+            installerType = jpackageType
+            if (project.hasProperty("installerOptions")) {
+                installerOptions = project.getProperty("installerOptions").split(",")
+            } else if (jpackageType == "msi" || jpackageType == "exe") {
+                installerOptions = ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
+            } else {
+                installerOptions = []
+            }
         }
     }
-}
 
-jlinkZip {
-    group = "distribution"
+    jlinkZip {
+        group = "distribution"
+    }
 }
 
 shadowJar {
@@ -81,26 +84,29 @@ jar {
     manifest.attributes("Main-Class": "com.mystic.tarotboard.TarotBoard")
 }
 
-tasks.register('runServer', JavaExec) {
-    group = 'application'
-    description = 'Run the headless dedicated server'
-    mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
+tasks.register("runServer", JavaExec) {
+    group = "application"
+    description = "Run the headless dedicated server"
+    mainClass = "com.mystic.tarotboard.network.server.HeadlessServer"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 // --- ANDROID (GLUONFX) CONFIGURATION ---
-gluonfx {
-    target = "android"
-    appIdentifier = 'com.mystic.tarotboard'
+if (isAndroidBuild) {
+    apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
+    gluonfx {
+        target = "android"
+        appIdentifier = "com.mystic.tarotboard"
 
-    attachConfig {
-        version = '4.0.20'
-        services 'lifecycle'
-    }
+        attachConfig {
+            version = "4.0.20"
+            services "lifecycle"
+        }
 
-    release {
-        appLabel = 'TarotBoard'
-        versionCode = 1
-        versionName = '1.0'
+        release {
+            appLabel = "TarotBoard"
+            versionCode = 1
+            versionName = "1.0"
+        }
     }
 }
