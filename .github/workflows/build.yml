@@ -111,9 +111,6 @@ jobs:
             ~/.gradle/wrapper
           key: android-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      - name: Build with Gradle
-        run: ./gradlew nativeCompile --stacktrace --info
-
       - name: Build APK
         run: |
           ./gradlew nativeBuild -PandroidBuild=true --stacktrace
