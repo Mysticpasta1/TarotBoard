@@ -71,11 +71,56 @@ jobs:
       - name: Build ${{ matrix.type }}
         run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }}
 
-      - name: Upload ${{ matrix.type }}
+      - name: Archive Package
+        run: |
+          if [ "${{ matrix.type }}" = "app-image" ]; then
+            tar -czf TarotBoard-linux-${{ matrix.type }}.tar.gz -C build/jpackage TarotBoard/
+          else
+            tar -czf TarotBoard-linux-${{ matrix.type }}.tar.gz -C build/jpackage .
+          fi
+
+      - name: Upload Package
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.type }}-build
-          path: build/jpackage/TarotBoard-*.${{ matrix.type }}
+          path: TarotBoard-linux-${{ matrix.type }}.tar.gz
+          compression-level: 6
+          if-no-files-found: error
+
+  flatpak:
+    name: Flatpak Build
+    runs-on: ubuntu-latest
+    needs: [linux]
+    
+    steps:
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: linux-app-image-build
+          path: app-image-artifact
+
+      - name: Extract AppImage
+        run: tar -xzf app-image-artifact/TarotBoard-linux-app-image.tar.gz
+
+      - name: Create source tarball for Flatpak
+        run: tar -czf source.tar.gz TarotBoard
+
+      - name: Install Flatpak dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder
+
+      - name: Build Flatpak
+        run: flatpak-builder build-dir .github/flatpak/com.mystic.tarotboard.json --force-clean --user --install-deps-from=flathub --repo=repo
+
+      - name: Create Flatpak bundle
+        run: flatpak build-bundle repo TarotBoard.flatpak com.mystic.tarotboard
+
+      - name: Upload Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-build
+          path: TarotBoard.flatpak
           compression-level: 0
           if-no-files-found: error
 
@@ -110,7 +155,7 @@ jobs:
   release:
     name: Create GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux, headless-server]
+    needs: [windows, linux, flatpak, headless-server]
     runs-on: ubuntu-latest
     permissions:
       contents: write

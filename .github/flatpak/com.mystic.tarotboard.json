@@ -1,0 +1,26 @@
+{
+    "app-id": "com.mystic.tarotboard",
+    "runtime": "org.freedesktop.Platform",
+    "runtime-version": "23.08",
+    "sdk": "org.freedesktop.Sdk",
+    "command": "TarotBoard",
+    "finish-args": [
+        "--socket=x11",
+        "--share=ipc"
+    ],
+    "modules": [
+        {
+            "name": "tarotboard",
+            "buildsystem": "simple",
+            "build-commands": [
+                "cp -R . /app/"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "path": "source.tar.gz"
+                }
+            ]
+        }
+    ]
+}
