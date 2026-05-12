@@ -75,7 +75,7 @@ public class Cards {
             }
         });
 
-        cardPane.setOnMouseExited(_ -> cardTooltip.hide());
+        cardPane.setOnMouseExited(event -> cardTooltip.hide());
     }
 
     /**

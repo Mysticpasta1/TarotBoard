@@ -61,11 +61,11 @@ public class HelpScene {
 
         Button backButton = new Button("Back");
         backButton.setStyle(Styles.helpBtn());
-        backButton.setOnAction(_ -> stage.setScene(previousScene));
+        backButton.setOnAction(event -> stage.setScene(previousScene));
 
         Button toggleThemeButton = new Button("Toggle Theme");
         toggleThemeButton.setStyle(Styles.helpBtn());
-        toggleThemeButton.setOnAction(_ -> {
+        toggleThemeButton.setOnAction(event -> {
             isDarkMode[0] = !isDarkMode[0];
             String nextCss = useThemeCss
                     ? (isDarkMode[0] ? cssDark : cssLight)

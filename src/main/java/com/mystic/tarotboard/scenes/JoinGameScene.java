@@ -49,7 +49,7 @@ public class JoinGameScene {
         joinPortField.setMaxWidth(100);
         Button joinGameButton = new Button("Join Game");
         joinGameButton.setStyle(Styles.mpBtn());
-        joinGameButton.setOnAction(_ -> tarotBoard.joinGame());
+        joinGameButton.setOnAction(event -> tarotBoard.joinGame());
 
         operatorPasswordField = new PasswordField();
         operatorPasswordField.setPromptText("Operator password");
@@ -57,7 +57,7 @@ public class JoinGameScene {
         operatorPasswordField.setMaxWidth(200);
         Button requestOperatorButton = new Button("Request Operator Access");
         requestOperatorButton.setStyle(Styles.mpBtn());
-        requestOperatorButton.setOnAction(_ -> tarotBoard.requestOperatorAccess());
+        requestOperatorButton.setOnAction(event -> tarotBoard.requestOperatorAccess());
         operatorStatusLabel = new Label("");
         operatorStatusLabel.setStyle(Styles.mpSmallLabel());
 
@@ -65,7 +65,7 @@ public class JoinGameScene {
         cursorStatusLabel.setStyle(Styles.mpSmallLabel());
         Button chooseCursorBtn = new Button("Choose Cursor Image");
         chooseCursorBtn.setStyle(Styles.menuSmallBtn());
-        chooseCursorBtn.setOnAction(_ -> tarotBoard.chooseCursorImage());
+        chooseCursorBtn.setOnAction(event -> tarotBoard.chooseCursorImage());
 
         networkStatusLabel = new Label("Offline");
         networkStatusLabel.setStyle(Styles.mpLabel());
@@ -109,7 +109,7 @@ public class JoinGameScene {
 
         Button backToStartBtn = new Button("Back to Menu");
         backToStartBtn.setStyle(Styles.mpBtn());
-        backToStartBtn.setOnAction(_ -> tarotBoard.switchToStart());
+        backToStartBtn.setOnAction(event -> tarotBoard.switchToStart());
 
         layout.getChildren().addAll(title, nameRow, joinRow, opRow, cursorRow, networkStatusLabel, backToStartBtn);
 
@@ -132,8 +132,8 @@ public class JoinGameScene {
             scale = Math.clamp(scale, 0.3, 3.0);
             mpContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
         };
-        scene.widthProperty().addListener((_, _, _) -> scaleContent.run());
-        scene.heightProperty().addListener((_, _, _) -> scaleContent.run());
+        scene.widthProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
+        scene.heightProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
     }
 
     /**

@@ -242,25 +242,25 @@ public class GameServer {
                     broadcast(listMsg, -1);
                     if (onMessage != null) onMessage.accept(listMsg);
                 }
-                case Msg.PlayerLeave _ -> disconnect();
+                case Msg.PlayerLeave ignored -> disconnect();
                 case Msg.CursorMove c ->
                         broadcast(NetworkMessage.of(new Msg.CursorMove(playerId, c.x(), c.y())), playerId);
                 case Msg.CursorImage c ->
                         broadcast(NetworkMessage.of(new Msg.CursorImage(playerId, c.imageData())), playerId);
-                case Msg.SendState _ -> {
+                case Msg.SendState ignored -> {
                     if (onMessage != null) {
                         onMessage.accept(NetworkMessage.of(new Msg.SendState(playerId)));
                     }
                     return;
                 }
-                case Msg.CardNamesSync _ -> {
+                case Msg.CardNamesSync ignored -> {
                     broadcast(msg, playerId);
                     if (onMessage != null) {
                         onMessage.accept(msg);
                     }
                     return;
                 }
-                case Msg.RequestOperator _ -> {
+                case Msg.RequestOperator ignored -> {
                     if (onMessage != null) {
                         onMessage.accept(msg);
                     }

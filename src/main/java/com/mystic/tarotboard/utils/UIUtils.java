@@ -104,7 +104,7 @@ public class UIUtils {
             }
         });
 
-        pane.setOnMouseReleased(_ -> {
+        pane.setOnMouseReleased(event -> {
             if (isDragging[0] && wasDragged[0] && onDragEnd != null) {
                 onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
             }
@@ -379,12 +379,12 @@ public class UIUtils {
         int flips = 5;
         Timeline timeline = new Timeline();
         for (int i = 0; i < flips; i++) {
-            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), _ -> {
+            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), event -> {
                 f.setVisible(!f.isVisible());
                 b.setVisible(!f.isVisible());
             }));
         }
-        timeline.setOnFinished(_ -> {
+        timeline.setOnFinished(event -> {
             boolean showFront = new Random().nextBoolean();
             f.setVisible(showFront);
             b.setVisible(!showFront);
