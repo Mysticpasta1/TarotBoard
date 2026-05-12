@@ -3,10 +3,7 @@ name: Build And Release
 on:
   push:
     branches: [ master ]
-    tags:
-      - 'v*'
   pull_request:
-  workflow_dispatch:
 
 jobs:
   windows:
@@ -158,18 +155,36 @@ jobs:
 
   release:
     name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/master'
     needs: [ windows, linux, flatpak, headless-server ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
           merge-multiple: true
+
+      - name: Get version and construct tag
+        id: get_version
+        run: |
+          VERSION=$(grep '^version = ' build.gradle | cut -d'"' -f2)
+          TAG="v${VERSION}-${{ github.run_number }}"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "Generated tag: ${TAG}"
+
+      - name: Create and Push Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag "${{ env.TAG }}"
+          git push origin "${{ env.TAG }}"
 
       - name: List downloaded files
         run: find artifacts -type f
@@ -177,7 +192,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: "${{ env.TAG }}"
           files: artifacts/**/*
-          body: "New release of TarotBoard."
+          body: "Automated release for build ${{ github.run_number }}."
           draft: false
           prerelease: false
