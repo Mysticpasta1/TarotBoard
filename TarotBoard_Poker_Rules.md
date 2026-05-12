@@ -18,7 +18,6 @@
             Cards / Chips:
               Drag ......................... Move
               Double-click (left) ......... Flip
-              Hover + F ................... Multi-flip (chips only)
               Shift+Click (left) .......... Rotate -1°
               Ctrl+Click (left) ........... Rotate -90°
               Shift+Click (right) ......... Rotate +1°
@@ -30,7 +29,9 @@
               Drag ........................ Move
             
             General:
-              Drag onto ✖ zone ......... Delete item
+              Tab ......................... Show player list (multiplayer)
+              F ........................... Multi-flip chips while hovering
+              Drag onto ✖ zone .......... Delete item
 
 ## Overview
 

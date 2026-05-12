@@ -1,0 +1,30 @@
+{
+  "_about": "Theme registry. Add your theme entry here to make it selectable in-app.",
+  "_note": "Keys starting with '_' are documentation and safely ignored by Gson.",
+  "themes": [
+    {
+      "_comment_themeName": "Display name shown in the theme selector dropdown [String]",
+      "themeName": "ExampleTheme",
+
+      "_comment_cardFrontPath": "Path to card front image, relative to basePath [String]",
+      "cardFrontPath": "example_card_front.png",
+      "_comment_cardBackPath": "Path to card back image, relative to basePath [String]",
+      "cardBackPath": "example_card_back.png",
+      "_comment_chipFrontPath": "Path to chip front image, relative to basePath [String]",
+      "chipFrontPath": "example_front_poker_chips.png",
+      "_comment_chipBackPath": "Path to chip back image, relative to basePath [String]",
+      "chipBackPath": "example_back_poker_chips.png",
+      "_comment_backgroundPath": "Path to table background image, relative to basePath [String]",
+      "backgroundPath": "example_background_image.png",
+
+      "_comment_suitStyleKey": "Key into suits.json for suit group colors [String]",
+      "suitStyleKey": "example",
+      "_comment_basePath": "Base resource path for resolving relative image paths. For external themes, set to the theme directory [String]",
+      "basePath": "./Example/",
+      "_comment_guiKey": "Key into gui.json for all UI font/color settings [String]",
+      "guiKey": "example",
+      "_comment_cursorKey": "Key into cursor.json for remote cursor settings [String]",
+      "cursorKey": "example"
+    }
+  ]
+}

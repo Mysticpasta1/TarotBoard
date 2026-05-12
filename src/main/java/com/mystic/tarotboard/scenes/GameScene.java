@@ -1,0 +1,494 @@
+package com.mystic.tarotboard.scenes;
+
+import com.mystic.tarotboard.TarotBoard;
+import com.mystic.tarotboard.items.Chips;
+import com.mystic.tarotboard.network.NetworkMessage;
+import com.mystic.tarotboard.network.NetworkMessage.Msg;
+import com.mystic.tarotboard.theming.ThemeConfiguration;
+import com.mystic.tarotboard.theming.ThemeManager;
+import com.mystic.tarotboard.theming.configs.KeyBindConfig;
+import com.mystic.tarotboard.utils.Styles;
+import com.mystic.tarotboard.utils.UIUtils;
+import javafx.collections.FXCollections;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+import javafx.scene.transform.Scale;
+import javafx.stage.Stage;
+import javafx.util.StringConverter;
+
+import java.util.*;
+
+/**
+ * Scene containing the game board, control panel, discard zone, cursor overlay,
+ * player list overlay, and all mouse/keyboard event handlers.
+ */
+public class GameScene {
+    private final TarotBoard tarotBoard;
+    private final Scene scene;
+    private final Pane gameBg;
+    private final Pane gameContent;
+    private final StackPane discardZone;
+    private final Pane cursorOverlay;
+    private final Pane playerListOverlay;
+    private final double[] mouseX = new double[1];
+    private final double[] mouseY = new double[1];
+    private final Label networkStatusInGame;
+    private final Button disconnectButton;
+    private final PasswordField opPwInGame;
+    private final Button requestOpInGame;
+
+    /**
+     * Constructs the game scene and wires all UI controls and event handlers.
+     *
+     * @param tarotBoard   the main application instance
+     * @param primaryStage the primary stage for scene transitions
+     * @param baseWidth    reference width for proportional scaling
+     * @param baseHeight   reference height for proportional scaling
+     */
+    public GameScene(TarotBoard tarotBoard, Stage primaryStage, double baseWidth, double baseHeight) {
+        this.tarotBoard = tarotBoard;
+
+        Pane gameRoot = new Pane();
+        gameBg = new Pane();
+        gameBg.prefWidthProperty().bind(gameRoot.widthProperty());
+        gameBg.prefHeightProperty().bind(gameRoot.heightProperty());
+
+        gameContent = new Pane();
+        gameContent.setPrefSize(baseWidth, baseHeight);
+        gameContent.layoutXProperty().bind(gameRoot.widthProperty().subtract(baseWidth).divide(2));
+        gameContent.layoutYProperty().bind(gameRoot.heightProperty().subtract(baseHeight).divide(2));
+
+        gameRoot.getChildren().addAll(gameBg, gameContent);
+
+        scene = new Scene(gameRoot);
+        addColorPickerCss(scene);
+
+        Runnable scaleGameContent = () -> {
+            double w = scene.getWidth();
+            double h = scene.getHeight();
+            if (w <= 0 || h <= 0) return;
+            double scale = Math.min(w / baseWidth, h / baseHeight);
+            scale = Math.clamp(scale, 0.3, 3.0);
+            gameContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
+        };
+        scene.widthProperty().addListener((_, _, _) -> scaleGameContent.run());
+        scene.heightProperty().addListener((_, _, _) -> scaleGameContent.run());
+
+        VBox controlPanelRight = new VBox(10);
+        controlPanelRight.setAlignment(Pos.TOP_RIGHT);
+        controlPanelRight.setStyle(Styles.panelBg());
+        controlPanelRight.setPrefWidth(200);
+        controlPanelRight.setMaxWidth(200);
+
+        ColorPicker colorPicker = new ColorPicker(tarotBoard.getCurrentColor());
+        colorPicker.setOnAction(_ -> tarotBoard.setCurrentColor(colorPicker.getValue()));
+        colorPicker.setMaxWidth(Double.MAX_VALUE);
+        colorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 11pt;");
+
+        Button spawnChipButton = new Button("Spawn Chip");
+        spawnChipButton.setStyle(Styles.panelBtn());
+        spawnChipButton.setMaxWidth(Double.MAX_VALUE);
+        spawnChipButton.setOnAction(_ -> tarotBoard.spawnChip(colorPicker.getValue()));
+
+        TextField diceSidesInput = new TextField("20");
+        diceSidesInput.setPrefWidth(60);
+        diceSidesInput.setAlignment(Pos.CENTER);
+        diceSidesInput.setStyle(Styles.panelBtn());
+        diceSidesInput.textProperty().addListener((_, _, n) -> {
+            if (!n.matches("\\d*")) {
+                diceSidesInput.setText(n.replaceAll("\\D", ""));
+                return;
+            }
+            if (n.length() > 4) {
+                diceSidesInput.setText(n.substring(0, 4));
+                return;
+            }
+            if (!n.isEmpty() && Integer.parseInt(n) > 9999) {
+                diceSidesInput.setText("9999");
+            }
+        });
+
+        Button spawnDieButton = new Button("Spawn Dice");
+        spawnDieButton.setStyle(Styles.panelBtn());
+        spawnDieButton.setMaxWidth(Double.MAX_VALUE);
+        spawnDieButton.setOnAction(_ -> {
+            try {
+                int sides = Integer.parseInt(diceSidesInput.getText());
+                if (sides > 0) {
+                    tarotBoard.spawnDie(sides, colorPicker.getValue());
+                } else {
+                    System.err.println("Number of sides for die must be positive.");
+                }
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid number of sides for die: " + diceSidesInput.getText());
+            }
+        });
+
+        HBox diceInputGroup = new HBox(5, diceSidesInput, spawnDieButton);
+        diceInputGroup.setAlignment(Pos.CENTER_LEFT);
+        diceInputGroup.setMaxWidth(Double.MAX_VALUE);
+
+        Button resetDiceButton = new Button("Reset Dice");
+        resetDiceButton.setStyle(Styles.panelBtn());
+        resetDiceButton.setMaxWidth(Double.MAX_VALUE);
+        resetDiceButton.setOnAction(_ -> tarotBoard.resetDice());
+
+        ComboBox<ThemeConfiguration> themeSelector = new ComboBox<>(FXCollections.observableArrayList(ThemeManager.getThemes()));
+        themeSelector.setValue(tarotBoard.getCurrentCardTheme());
+        themeSelector.setMaxWidth(Double.MAX_VALUE);
+        themeSelector.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ThemeConfiguration theme) {
+                return theme != null ? theme.getThemeName() : "";
+            }
+
+            @Override
+            public ThemeConfiguration fromString(String string) {
+                return ThemeManager.getThemeByName(string);
+            }
+        });
+        themeSelector.setOnAction(_ -> tarotBoard.applyCurrentTheme(themeSelector.getValue()));
+
+        Button resetChips = new Button("Reset Chips");
+        resetChips.setStyle(Styles.panelBtn());
+        resetChips.setMaxWidth(Double.MAX_VALUE);
+        resetChips.setOnAction(_ -> tarotBoard.resetChips());
+
+        Button reshuffleCards = new Button("Reshuffle Cards");
+        reshuffleCards.setStyle(Styles.panelBtn());
+        reshuffleCards.setMaxWidth(Double.MAX_VALUE);
+        reshuffleCards.setOnAction(_ -> tarotBoard.reshuffleCards());
+
+        Button newGameButton = new Button("New Game");
+        newGameButton.setStyle(Styles.panelBtn());
+        newGameButton.setMaxWidth(Double.MAX_VALUE);
+        newGameButton.setOnAction(_ -> tarotBoard.newGame());
+
+        Button helpButton2 = new Button("Help");
+        helpButton2.setStyle(Styles.panelBtn());
+        helpButton2.setMaxWidth(Double.MAX_VALUE);
+        helpButton2.setOnAction(_ -> HelpScene.show(primaryStage));
+
+        Button backButton3 = new Button("Back to Start");
+        backButton3.setStyle(Styles.panelBtn());
+        backButton3.setMaxWidth(Double.MAX_VALUE);
+        backButton3.setOnAction(_ -> {
+            tarotBoard.leaveGame();
+            tarotBoard.switchToStart();
+        });
+
+        disconnectButton = new Button("Disconnect");
+        disconnectButton.setStyle(Styles.panelBtn());
+        disconnectButton.setMaxWidth(Double.MAX_VALUE);
+        disconnectButton.setOnAction(_ -> {
+            tarotBoard.leaveGame();
+            tarotBoard.switchToStart();
+        });
+        disconnectButton.setVisible(false);
+
+        networkStatusInGame = new Label("");
+        networkStatusInGame.setStyle(Styles.panelLabel());
+        networkStatusInGame.setMaxWidth(Double.MAX_VALUE);
+        networkStatusInGame.setWrapText(true);
+
+        opPwInGame = new PasswordField();
+        opPwInGame.setPromptText("Op password");
+        opPwInGame.setStyle(Styles.panelSmall());
+        opPwInGame.setMaxWidth(Double.MAX_VALUE);
+        opPwInGame.setVisible(false);
+        requestOpInGame = new Button("Request Operator");
+        requestOpInGame.setStyle(Styles.panelSmall());
+        requestOpInGame.setMaxWidth(Double.MAX_VALUE);
+        requestOpInGame.setVisible(false);
+        requestOpInGame.setOnAction(_ -> {
+            String pw = opPwInGame.getText();
+            if (!pw.isEmpty() && tarotBoard.isClientConnected()) {
+                tarotBoard.sendNetworkMessage(NetworkMessage.of(new Msg.RequestOperator(tarotBoard.getMyPlayerId(), pw)));
+                opPwInGame.clear();
+            }
+        });
+
+        Button chooseCursorInGame = new Button("Cursor Image");
+        chooseCursorInGame.setStyle(Styles.panelSmall());
+        chooseCursorInGame.setMaxWidth(Double.MAX_VALUE);
+        chooseCursorInGame.setOnAction(_ -> tarotBoard.chooseCursorImage());
+
+        Button settingsInGameBtn = new Button("Settings");
+        settingsInGameBtn.setStyle(Styles.panelBtn());
+        settingsInGameBtn.setMaxWidth(Double.MAX_VALUE);
+        settingsInGameBtn.setOnAction(_ -> SettingsScene.show(primaryStage));
+
+        controlPanelRight.getChildren().addAll(
+                colorPicker,
+                chooseCursorInGame,
+                spawnChipButton,
+                diceInputGroup,
+                resetDiceButton,
+                resetChips,
+                reshuffleCards,
+                newGameButton,
+                networkStatusInGame,
+                opPwInGame,
+                requestOpInGame,
+                disconnectButton,
+                settingsInGameBtn,
+                helpButton2,
+                backButton3,
+                themeSelector
+        );
+
+        controlPanelRight.layoutXProperty().bind(scene.widthProperty().subtract(controlPanelRight.widthProperty()).subtract(10));
+        controlPanelRight.setLayoutY(10);
+        gameRoot.getChildren().add(controlPanelRight);
+
+        discardZone = new StackPane();
+        discardZone.setStyle(Styles.discardZone());
+        discardZone.setPrefSize(90, 90);
+        Text trashText = new Text("✖");
+        trashText.setFont(Font.font(36));
+        trashText.setFill(Color.web("#cc0000"));
+        discardZone.getChildren().add(trashText);
+        discardZone.setLayoutX(10);
+        discardZone.layoutYProperty().bind(scene.heightProperty().subtract(100));
+        gameRoot.getChildren().add(discardZone);
+
+        cursorOverlay = new Pane();
+        cursorOverlay.setMouseTransparent(true);
+        gameRoot.getChildren().add(cursorOverlay);
+
+        StackPane overlayRoot = new StackPane();
+        overlayRoot.setMouseTransparent(true);
+        overlayRoot.setVisible(false);
+        overlayRoot.prefWidthProperty().bind(scene.widthProperty());
+        overlayRoot.prefHeightProperty().bind(scene.heightProperty());
+        overlayRoot.setStyle(Styles.overlayBg());
+        VBox overlayContent = new VBox(10);
+        overlayContent.setAlignment(Pos.TOP_CENTER);
+        overlayContent.setStyle(Styles.overlayContent());
+        overlayContent.setMaxWidth(480);
+        overlayContent.setMaxHeight(600);
+        VBox overlayPlayersBox = new VBox(6);
+        overlayPlayersBox.setAlignment(Pos.CENTER_LEFT);
+        overlayContent.getChildren().addAll(overlayPlayersBox);
+        overlayRoot.getChildren().add(overlayContent);
+        gameRoot.getChildren().add(overlayRoot);
+        playerListOverlay = overlayRoot;
+
+        var keybinds = KeyBindConfig.getInstance();
+        scene.setOnMouseMoved(event -> {
+            mouseX[0] = event.getSceneX();
+            mouseY[0] = event.getSceneY();
+            if (tarotBoard.isMultiplayer()) {
+                tarotBoard.sendNetworkMessage(NetworkMessage.of(new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+            }
+        });
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            var code = event.getCode();
+            if (code == keybinds.togglePlayerList()) {
+                if (tarotBoard.isMultiplayer()) {
+                    rebuildPlayerListOverlay();
+                    playerListOverlay.setVisible(true);
+                }
+                event.consume();
+                return;
+            }
+            if (code == keybinds.multiFlip()) {
+                for (Chips chip : tarotBoard.getChips()) {
+                    StackPane pane = chip.getChipPane();
+                    var pt = pane.sceneToLocal(mouseX[0], mouseY[0]);
+                    if (pane.contains(pt)) {
+                        UIUtils.multiFlip(pane);
+                        break;
+                    }
+                }
+                event.consume();
+                return;
+            }
+            StackPane piece = tarotBoard.findPieceAtMouse(mouseX[0], mouseY[0]);
+            if (piece != null) {
+                UIUtils.handlePieceKeyPress(piece, code);
+                int speed = keybinds.moveSpeed();
+                int dx = 0, dy = 0;
+                if (code == keybinds.moveUp()) dy = -speed;
+                else if (code == keybinds.moveDown()) dy = speed;
+                else if (code == keybinds.moveLeft()) dx = -speed;
+                else if (code == keybinds.moveRight()) dx = speed;
+                if (dx != 0 || dy != 0) {
+                    piece.setTranslateX(piece.getTranslateX() + dx);
+                    piece.setTranslateY(piece.getTranslateY() + dy);
+                }
+            }
+        });
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> {
+            if (event.getCode() == keybinds.togglePlayerList()) {
+                playerListOverlay.setVisible(false);
+                event.consume();
+            }
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+            bringCursorOverlayToFront();
+            for (StackPane pane : tarotBoard.getPieceMap().values()) {
+                var pt = pane.sceneToLocal(mouseX[0], mouseY[0]);
+                if (pane.contains(pt)) {
+                    UIUtils.handlePieceClick(pane, event);
+                    break;
+                }
+            }
+        });
+    }
+
+    /**
+     * Returns the JavaFX {@link Scene} object.
+     *
+     * @return the scene
+     */
+    public Scene getScene() {
+        return scene;
+    }
+
+    /**
+     * Returns the background pane for the game board.
+     *
+     * @return the game background pane
+     */
+    public Pane getGameBg() {
+        return gameBg;
+    }
+
+    /**
+     * Returns the content pane where game pieces (cards, chips, dice) are placed.
+     *
+     * @return the game content pane
+     */
+    public Pane getGameContent() {
+        return gameContent;
+    }
+
+    /**
+     * Returns the discard zone stack pane.
+     *
+     * @return the discard zone pane
+     */
+    public StackPane getDiscardZone() {
+        return discardZone;
+    }
+
+    /**
+     * Returns the overlay pane for remote cursor indicators.
+     *
+     * @return the cursor overlay pane
+     */
+    public Pane getCursorOverlay() {
+        return cursorOverlay;
+    }
+
+    /**
+     * Returns the label used for in-game network status messages.
+     *
+     * @return the network status label
+     */
+    public Label getNetworkStatusInGame() {
+        return networkStatusInGame;
+    }
+
+    /**
+     * Shows or hides multiplayer-specific controls (operator password,
+     * request operator button, and disconnect button).
+     *
+     * @param visible true to show multiplayer controls, false to hide
+     */
+    public void setMultiplayerControlsVisible(boolean visible) {
+        opPwInGame.setVisible(visible);
+        requestOpInGame.setVisible(visible);
+        disconnectButton.setVisible(visible);
+    }
+
+    /**
+     * Brings the cursor overlay and player list overlay to the front of the scene
+     * so they remain visible above game content and UI panels.
+     */
+    public void bringCursorOverlayToFront() {
+        if (cursorOverlay != null && cursorOverlay.getParent() != null) {
+            cursorOverlay.toFront();
+        }
+        if (playerListOverlay != null && playerListOverlay.getParent() != null) {
+            playerListOverlay.toFront();
+        }
+    }
+
+    /**
+     * Rebuilds the player list overlay content from the current network player list.
+     * The local player is sorted first, followed by others by ID.
+     */
+    public void rebuildPlayerListOverlay() {
+        if (!(playerListOverlay instanceof StackPane overlay)) return;
+        if (overlay.getChildren().isEmpty()) return;
+        VBox content = (VBox) overlay.getChildren().getFirst();
+        VBox playersBox = (VBox) content.getChildren().getFirst();
+        playersBox.getChildren().clear();
+
+        List<com.mystic.tarotboard.network.NetworkMessage.PlayerInfo> allPlayers = new ArrayList<>(tarotBoard.getPlayerList());
+        if (tarotBoard.isHost() && tarotBoard.getGameServer() != null) {
+            for (var pi : tarotBoard.getGameServer().getPlayers()) {
+                boolean found = false;
+                for (var existing : allPlayers) {
+                    if (existing.id() == pi.id()) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) allPlayers.add(pi);
+            }
+        }
+
+        allPlayers.sort((a, b) -> {
+            if (a.id() == tarotBoard.getMyPlayerId()) return -1;
+            if (b.id() == tarotBoard.getMyPlayerId()) return 1;
+            return Integer.compare(a.id(), b.id());
+        });
+
+        for (var pi : allPlayers) {
+            boolean isMe = pi.id() == tarotBoard.getMyPlayerId();
+            playersBox.getChildren().add(createPlayerRow(pi.name(), Color.color(pi.r(), pi.g(), pi.b()), isMe));
+        }
+        overlay.toFront();
+    }
+
+    private void addColorPickerCss(Scene s) {
+        var url = getClass().getResource("/com/mystic/tarotboard/assets/colorpicker.css");
+        if (url != null) {
+            s.getStylesheets().add(url.toExternalForm());
+        }
+    }
+
+    private HBox createPlayerRow(String name, Color color, boolean isMe) {
+        Circle dot = new Circle(7);
+        dot.setFill(color);
+        dot.setStroke(Color.WHITE);
+        dot.setStrokeWidth(1.5);
+
+        Label nameLabel = new Label(name);
+        nameLabel.setStyle(Styles.playerName(isMe));
+
+        StringBuilder tagText = new StringBuilder();
+        if (isMe) tagText.append("[You]");
+        if (tarotBoard.isHost() && isMe) tagText.append(" [Host]");
+        if (tarotBoard.isOperator() && isMe) tagText.append(" [Op]");
+        if (!isMe && tarotBoard.isHost()) tagText.append(" [Guest]");
+
+        Label tagLabel = new Label(tagText.toString());
+        tagLabel.setStyle(Styles.playerTag(isMe));
+
+        HBox row = new HBox(12, dot, nameLabel, tagLabel);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+}

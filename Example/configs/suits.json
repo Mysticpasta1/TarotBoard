@@ -1,0 +1,38 @@
+{
+  "_about": "Suit color definitions keyed by name. Reference one via themes.json 'suitStyleKey'.",
+  "_note": "Keys starting with '_' are documentation and safely ignored by Gson. The 'groupName' field is also silently ignored during deserialization — only 'colorHex' is used by the SuitStyle record.",
+  "example": [
+    {
+      "_comment_groupName": "Name of the court set (informational, not parsed) [String]",
+      "groupName": "CELESTIAL_COURT",
+      "_comment_colorHex": "Display color for cards in this suit group (hex) [String]",
+      "colorHex": "#FFD700"
+    },
+    {
+      "groupName": "UMBRAL_DOMINION",
+      "colorHex": "#FF8800"
+    },
+    {
+      "groupName": "INFERNAL_PACT",
+      "colorHex": "#DC143C"
+    },
+    {
+      "groupName": "VERDANT_CYCLE",
+      "colorHex": "#228B22"
+    },
+    {
+      "groupName": "AETHERIC_LOOM",
+      "colorHex": "#1E90FF"
+    },
+    {
+      "groupName": "DARK_EXPANSE",
+      "colorHex": "#AD03FC"
+    },
+    {
+      "_comment_groupName": "Wild card suit group (last entry is fallback for all unlisted suits)",
+      "groupName": "WILDS",
+      "_comment_colorHex": "Display color for wild card labels and fallback suit color (hex/rgba/named) [String]",
+      "colorHex": "white"
+    }
+  ]
+}

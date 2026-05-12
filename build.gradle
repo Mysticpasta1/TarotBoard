@@ -5,12 +5,13 @@ plugins {
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "bf3c04dd64"
     id "org.gradlex.extra-java-module-info" version "1.9"
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.24" apply false
 }
 
-group "com.mystic"
-version "3.0.0"
+group = "com.mystic"
+version = "3.0.0"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(26)
+def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
@@ -18,10 +19,14 @@ tasks.withType(JavaCompile).configureEach {
 
 application {
     mainClass = "com.mystic.tarotboard.TarotBoard"
-    applicationDefaultJvmArgs = [
-        '--enable-native-access=javafx.graphics',
-        '--enable-native-access=javafx.web'
-    ]
+    if (isAndroidBuild) {
+        applicationDefaultJvmArgs = []
+    } else {
+        applicationDefaultJvmArgs = [
+            '--enable-native-access=javafx.graphics',
+            '--enable-native-access=javafx.web'
+        ]
+    }
 }
 
 repositories {
@@ -29,41 +34,58 @@ repositories {
 }
 
 extraJavaModuleInfo {
-    failOnMissingModuleInfo = false // Let non-critical transitives stay on classpath
+    failOnMissingModuleInfo = false
 
-    // Core and Utils (for Parser, HtmlRenderer, and MutableDataSet)
     automaticModule("flexmark-0.64.8.jar", "flexmark")
     automaticModule("flexmark-util-data-0.64.8.jar", "flexmark.util.data")
-
-    // Extension (for TablesExtension)
     automaticModule("flexmark-ext-tables-0.64.8.jar", "flexmark.ext.tables")
     automaticModule("flexmark-util-ast-0.64.8.jar", "flexmark.util.ast")
 }
 
 javafx {
     version = "27-ea+15"
-    modules = ["javafx.controls", "javafx.fxml", "javafx.graphics", "javafx.swing", "javafx.web", "jdk.jsobject"]
+    if (isAndroidBuild) {
+        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
+    } else {
+        modules = ["javafx.controls", "javafx.fxml", "javafx.graphics", "javafx.swing", "javafx.web", "jdk.jsobject"]
+    }
 }
 
 dependencies {
     implementation "com.vladsch.flexmark:flexmark-all:0.64.8"
-    implementation "com.google.code.gson:gson:2.10.1" // Added Gson dependency
+    implementation "com.google.code.gson:gson:2.10.1"
 }
+
+if (isAndroidBuild) {
+    java.toolchain.languageVersion = JavaLanguageVersion.of(26)
+    compileJava {
+        source = sourceSets.main.java.matching { exclude '**/module-info.java' } +
+                 fileTree('src/android/java') { include '**/module-info.java' }
+    }
+}
+
+def jpackageType = project.findProperty('installerType') ?: 'msi'
 
 jlink {
     imageZip = layout.buildDirectory.get().file("distributions/app-${javafx.platform.classifier}.zip").asFile
     options = ["--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"]
     launcher {
         name = "TarotBoard"
-        mainClass = "com.mystic.tarotboard.Launcher"
+        mainClass = "com.mystic.tarotboard.TarotBoard"
         noConsole = true
     }
 
     jpackage {
         imageName = "TarotBoard"
-        skipInstaller = false
-        installerType = "msi"
-        installerOptions = ['--win-shortcut', '--win-menu', '--win-dir-chooser']
+        skipInstaller = project.findProperty('skipInstaller')?.toBoolean() ?: (jpackageType == 'app-image')
+        installerType = jpackageType
+        if (project.hasProperty('installerOptions')) {
+            installerOptions = project.getProperty('installerOptions').split(',')
+        } else if (jpackageType == 'msi' || jpackageType == 'exe') {
+            installerOptions = ['--win-shortcut', '--win-menu', '--win-dir-chooser']
+        } else {
+            installerOptions = []
+        }
     }
 }
 
@@ -72,9 +94,27 @@ jlinkZip {
 }
 
 shadowJar {
-    manifest.attributes("Main-Class": "com.mystic.tarotboard.Launcher")
+    manifest.attributes("Main-Class": "com.mystic.tarotboard.TarotBoard")
 }
 
 jar {
-    manifest.attributes("Main-Class": "com.mystic.tarotboard.Launcher")
+    manifest.attributes("Main-Class": "com.mystic.tarotboard.TarotBoard")
+}
+
+tasks.register('runServer', JavaExec) {
+    group = 'application'
+    description = 'Run the headless dedicated server'
+    mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+if (isAndroidBuild) {
+    apply plugin: 'com.gluonhq.gluonfx-gradle-plugin'
+
+    gluonfx {
+        target = "android"
+        mainClass = "com.mystic.tarotboard.TarotBoard"
+        androidSdk = System.getenv("ANDROID_HOME")
+        graalvmHome = System.getenv("GRAALVM_HOME")
+    }
 }

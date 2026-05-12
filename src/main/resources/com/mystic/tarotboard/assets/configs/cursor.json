@@ -1,0 +1,11 @@
+{
+  "default": {
+    "cursorSize": 64,
+    "dotRadius": 8,
+    "dotStrokeWidth": 1.5,
+    "dotStrokeColor": "white",
+    "labelFontSize": 10,
+    "labelColor": "white",
+    "cursorImagePath": ""
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "themeName": "Default",
+    "cardFrontPath": "card_front.png",
+    "cardBackPath": "card_back.png",
+    "chipFrontPath": "front_poker_chips.png",
+    "chipBackPath": "back_poker_chips.png",
+    "backgroundPath": "background_image.png",
+    "suitStyleKey": "default",
+    "basePath": "./com/mystic/tarotboard/assets/",
+    "guiKey": "default",
+    "cursorKey": "default"
+  }
+]

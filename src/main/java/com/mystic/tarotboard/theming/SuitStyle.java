@@ -1,32 +1,21 @@
 package com.mystic.tarotboard.theming;
 
+import java.io.Serial;
 import java.io.Serializable;
 
-public class SuitStyle implements Serializable {
-    private String groupName;
-    private String colorHex;
+/**
+ * An immutable record associating a suit with its display color hex value.
+ */
+public record SuitStyle(String colorHex) implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
 
-    // Default constructor for serialization
-    public SuitStyle() {}
-
-    public SuitStyle(String groupName, String colorHex) {
-        this.groupName = groupName;
-        this.colorHex = colorHex;
-    }
-
-    public String getGroupName() {
-        return groupName;
-    }
-
+    /**
+     * Returns the hex color string for this suit style.
+     *
+     * @return the color hex string (e.g. "#FFD700")
+     */
     public String getColorHex() {
         return colorHex;
-    }
-
-    public void setGroupName(String groupName) {
-        this.groupName = groupName;
-    }
-
-    public void setColorHex(String colorHex) {
-        this.colorHex = colorHex;
     }
 }

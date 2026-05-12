@@ -1,0 +1,20 @@
+{
+  "_about": "Remote cursor appearance entries keyed by name. Reference one via themes.json 'cursorKey'.",
+  "_note": "Keys starting with '_' are documentation and safely ignored by Gson.",
+  "example": {
+    "_comment_cursorSize": "Render size of the cursor image overlay (px) [double]",
+    "cursorSize": 64.0,
+    "_comment_dotRadius": "Radius of the player indicator dot (px) [double]",
+    "dotRadius": 8.0,
+    "_comment_dotStrokeWidth": "Width of the dot's outline stroke (px) [double]",
+    "dotStrokeWidth": 1.5,
+    "_comment_dotStrokeColor": "Color of the dot's outline (hex/rgba/named) [String]",
+    "dotStrokeColor": "white",
+    "_comment_labelFontSize": "Font size of the player name label (pt) [int]",
+    "labelFontSize": 10,
+    "_comment_labelColor": "Color of the player name label (hex/rgba/named) [String]",
+    "labelColor": "white",
+    "_comment_cursorImagePath": "Optional path to a custom cursor overlay image. Empty = default dot only [String]",
+    "cursorImagePath": ""
+  }
+}
