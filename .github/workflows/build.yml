@@ -26,7 +26,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build native app (Windows)
-        run: ./gradlew nativeBuild nativePackage -Ptarget=host
+        run: ./gradlew clean nativeBuild nativePackage -Ptarget=host
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -57,7 +57,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build native app (Linux)
-        run: ./gradlew nativeBuild nativePackage -Ptarget=host
+        run: ./gradlew clean nativeBuild nativePackage -Ptarget=host
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -92,7 +92,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build Android APK
-        run: ./gradlew nativeBuild nativePackage -Ptarget=android
+        run: ./gradlew clean nativeBuild nativePackage -Ptarget=android
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
