@@ -80,17 +80,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 21
+      - name: Setup GraalVM
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: '17' # GraalVM 17 is commonly used for GluonFX
+          distribution: 'graalvm'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build APK
-        run: ./gradlew clean gluonfx:nativeBuild gluonfx:nativePackage
+        run: ./gradlew gluonfx/nativeBuild gluonfx/nativePackage
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
