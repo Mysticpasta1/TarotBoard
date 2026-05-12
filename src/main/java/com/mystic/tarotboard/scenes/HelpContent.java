@@ -3,12 +3,27 @@ package com.mystic.tarotboard.scenes;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+/**
+ * A utility class for building the rich text and table-based content
+ * displayed in the help and rules section of the application.
+ */
 public final class HelpContent {
+    /**
+     * Private constructor to prevent instantiation of this utility class.
+     */
     private HelpContent() {
     }
 
+    /**
+     * Populates the given VBox container with all the formatted help content,
+     * including headers, text blocks, and tables.
+     *
+     * @param container The VBox to which the help content will be added.
+     */
     public static void buildContent(VBox container) {
         container.getChildren().addAll(
             h1("TarotBoard Poker — Complete Hand Ranking Guide"),
@@ -126,6 +141,11 @@ public final class HelpContent {
         );
     }
 
+    /**
+     * Creates a styled Label for a main heading (H1).
+     * @param t The text content of the heading.
+     * @return A new Label configured as an H1 heading.
+     */
     private static Label h1(String t) {
         Label l = new Label(t);
         l.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
@@ -133,6 +153,11 @@ public final class HelpContent {
         return l;
     }
 
+    /**
+     * Creates a styled Label for a subheading (H2).
+     * @param t The text content of the subheading.
+     * @return A new Label configured as an H2 subheading.
+     */
     private static Label h2(String t) {
         Label l = new Label(t);
         l.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;");
@@ -140,6 +165,11 @@ public final class HelpContent {
         return l;
     }
 
+    /**
+     * Creates a styled Label for a minor heading (H3).
+     * @param t The text content of the minor heading.
+     * @return A new Label configured as an H3 minor heading.
+     */
     private static Label h3(String t) {
         Label l = new Label(t);
         l.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: lightgray;");
@@ -147,6 +177,11 @@ public final class HelpContent {
         return l;
     }
 
+    /**
+     * Creates a styled Label for standard body text.
+     * @param t The text content.
+     * @return A new Label configured for body text.
+     */
     private static Label text(String t) {
         Label l = new Label(t);
         l.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
@@ -154,35 +189,64 @@ public final class HelpContent {
         return l;
     }
 
+    /**
+     * Creates a styled Label to act as a visual separator.
+     * @return A new Label configured as a separator.
+     */
     private static Label separator() {
         Label l = new Label("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         l.setStyle("-fx-text-fill: gray;");
         return l;
     }
 
+    /**
+     * Creates and configures a new GridPane for displaying tabular data.
+     * The grid is styled with a background and configured to create visible grid lines
+     * by using the background color to fill the gaps between cells.
+     *
+     * @return A new, styled GridPane instance.
+     */
     private static GridPane createTable() {
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
-        grid.setStyle("-fx-background-color: #222222; -fx-border-color: #444444; -fx-border-width: 1; -fx-border-radius: 5; -fx-background-radius: 5;");
+        grid.setHgap(1);
+        grid.setVgap(1);
+        grid.setMaxWidth(Region.USE_PREF_SIZE);
+        grid.setStyle("-fx-background-color: #888888; -fx-padding: 1;");
         return grid;
     }
 
+    /**
+     * Adds a new row of data to the specified GridPane. Each cell is a StackPane
+     * containing a Label, allowing for background colors that create a grid effect.
+     *
+     * @param grid    The GridPane to which the row will be added.
+     * @param row     The row index.
+     * @param isHeader True if the row is a header, which applies a different style.
+     * @param columns The string content for each column in the row.
+     */
     private static void addRow(GridPane grid, int row, boolean isHeader, String... columns) {
         for (int i = 0; i < columns.length; i++) {
             Label l = new Label(columns[i]);
             l.setWrapText(true);
-            l.setMaxWidth(300);
+            l.setPadding(new Insets(5, 10, 5, 10));
+            l.setMaxWidth(400);
+
+            StackPane cell = new StackPane(l);
+            cell.setStyle("-fx-background-color: #222222;");
+
             if (isHeader) {
                 l.setStyle("-fx-font-weight: bold; -fx-text-fill: #FFCC00; -fx-font-size: 14px;");
             } else {
                 l.setStyle("-fx-text-fill: white; -fx-font-size: 13px;");
             }
-            grid.add(l, i, row);
+            grid.add(cell, i, row);
         }
     }
 
+    /**
+     * Builds and returns a GridPane displaying information about Wild Cards.
+     * @return A GridPane containing the Wild Cards table.
+     */
     private static GridPane buildWildCardsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Wild Card Names", "Color (HEX)", "Color (Name)");
@@ -190,6 +254,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane displaying the different card suits grouped by Court Set.
+     * @return A GridPane containing the suits table.
+     */
     private static GridPane buildSuitsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Court Set Name", "Suits", "Color (HEX)", "Color (Name)");
@@ -202,6 +270,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane detailing the card values and their categories.
+     * @return A GridPane containing the card values table.
+     */
     private static GridPane buildValuesTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Category", "Values", "Value Notes");
@@ -211,6 +283,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane describing the different Court Sets.
+     * @return A GridPane containing the Court Sets table.
+     */
     private static GridPane buildCourtSetsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Set Name", "Description", "Associated Color - Name (Hex)");
@@ -223,6 +299,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane for the Mythic tier of hand rankings.
+     * @return A GridPane containing the Mythic Hands table.
+     */
     private static GridPane buildMythicHandsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Rank", "Name", "Description", "Example / Flavor", "Beats");
@@ -236,6 +316,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane for the Legendary tier of hand rankings.
+     * @return A GridPane containing the Legendary Hands table.
+     */
     private static GridPane buildLegendaryHandsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Rank", "Name", "Description", "Beats");
@@ -250,6 +334,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane for the Core tier of hand rankings.
+     * @return A GridPane containing the Core Hands table.
+     */
     private static GridPane buildCoreHandsTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Rank", "Name", "Description", "Beats");
@@ -261,6 +349,10 @@ public final class HelpContent {
         return g;
     }
 
+    /**
+     * Builds and returns a GridPane detailing the scoring for each hand type.
+     * @return A GridPane containing the scoring table.
+     */
     private static GridPane buildScoringTable() {
         GridPane g = createTable();
         addRow(g, 0, true, "Hand Name", "Positive", "Neutral", "Negative", "Notes");
