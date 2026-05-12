@@ -106,7 +106,7 @@ jobs:
         run: tar -xzf app-image-artifact/TarotBoard-linux-app-image.tar.gz
 
       - name: Create source tarball for Flatpak
-        run: tar -czf source.tar.gz TarotBoard
+        run: tar -czf .github/flatpak/source.tar.gz TarotBoard
 
       - name: Install Flatpak dependencies
         run: |
