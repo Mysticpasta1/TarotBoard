@@ -89,18 +89,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Verify Java and GraalVM setup
-        run: |
-          echo "JAVA_HOME: $JAVA_HOME"
-          java -version
-          echo "GRAALVM_HOME: $GRAALVM_HOME"
-          $GRAALVM_HOME/bin/java -version
-          echo GRAALVM_HOME
-          native-image --version
-
       - name: Build APK
-        env:
-          GRAALVM_HOME: $GRAALVM_HOME
         run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
 
       - name: Upload APK
