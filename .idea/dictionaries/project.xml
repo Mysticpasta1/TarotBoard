@@ -4,9 +4,16 @@
       <w>Grims</w>
       <w>beryx</w>
       <w>darkcyan</w>
+      <w>fakeroot</w>
+      <w>gluonfxbuild</w>
       <w>gradleup</w>
+      <w>jpackage</w>
+      <w>jvmargs</w>
       <w>lich</w>
+      <w>panelbg</w>
+      <w>sdkmanager</w>
       <w>tarotboard</w>
+      <w>temurin</w>
     </words>
   </dictionary>
 </component>

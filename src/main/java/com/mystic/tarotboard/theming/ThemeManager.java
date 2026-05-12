@@ -4,25 +4,41 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
+import com.mystic.tarotboard.utils.PlatformPaths;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
+/**
+ * Manages loading, registration, and access of themes, CSS, GUI configs, cursor configs,
+ * and suit styles from both application resources and external user-defined files.
+ */
 public class ThemeManager {
+    private ThemeManager() {
+    }
 
     private static final List<ThemeConfiguration> themes = new ArrayList<>();
-    private static final Path USER_THEMES_DIR = Paths.get(System.getProperty("user.home"), ".tarotboard", "themes");
-    private static final String RESOURCE_THEMES_PATH = "/com/mystic/tarotboard/assets/themes.json";
+    private static ThemeConfiguration activeTheme;
+    private static final String RESOURCE_THEMES_PATH = "/com/mystic/tarotboard/assets/configs/themes.json";
+    private static final String RESOURCE_CSS_PATH = "/com/mystic/tarotboard/assets/configs/css.json";
+    private static final String RESOURCE_GUI_PATH = "/com/mystic/tarotboard/assets/configs/gui.json";
+    private static final String RESOURCE_CURSOR_PATH = "/com/mystic/tarotboard/assets/configs/cursor.json";
+    private static final String RESOURCE_SUITS_PATH = "/com/mystic/tarotboard/assets/configs/suits.json";
     private static final String DEFAULT_THEME_NAME = "Default";
+    private static final Map<String, List<String>> cssRegistry = new HashMap<>();
+    private static final Map<String, ThemeConfiguration.GuiConfig> guiRegistry = new HashMap<>();
+    private static final Map<String, ThemeConfiguration.CursorConfig> cursorRegistry = new HashMap<>();
+    private static final Map<String, List<SuitStyle>> suitRegistry = new HashMap<>();
 
     private static final List<String> CELESTIAL_COURT = List.of("Stars", "Suns", "Crowns", "Quasars", "Crescents", "Sigils", "Comets", "Glyphs");
     private static final List<String> UMBRAL_DOMINION = List.of("Veils", "Runes", "Hearts", "Spirals", "Eyes", "Omens", "Diamonds", "Orbs");
@@ -32,10 +48,118 @@ public class ThemeManager {
     private static final List<String> DARK_EXPANSE = List.of("Echoes", "Rifts", "Ashes", "Nulls", "Hallows", "Fluxes", "Ethers", "Grims");
 
     static {
-        // Load themes from application resources first
+        loadCssRegistry();
+        loadGuiRegistry();
+        loadCursorRegistry();
+        loadSuitRegistry();
         loadResourceThemes();
-        // Then load external themes, which can override or add to the resource themes
         loadExternalThemes();
+    }
+
+    private static void loadCssRegistry() {
+        Gson gson = new Gson();
+        try (InputStream is = ThemeManager.class.getResourceAsStream(RESOURCE_CSS_PATH)) {
+            if (is != null) {
+                Type mapType = new TypeToken<Map<String, List<String>>>() {
+                }.getType();
+                Map<String, List<String>> loaded = gson.fromJson(new InputStreamReader(is), mapType);
+                if (loaded != null) {
+                    cssRegistry.putAll(loaded);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading CSS registry: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the CSS string for the given key from the registry.
+     *
+     * @param key the CSS registry key
+     * @return the joined CSS string, or empty if not found
+     */
+    public static String getCss(String key) {
+        List<String> lines = cssRegistry.get(key);
+        return lines != null ? String.join("\n", lines) : "";
+    }
+
+    private static void loadGuiRegistry() {
+        Gson gson = new Gson();
+        try (InputStream is = ThemeManager.class.getResourceAsStream(RESOURCE_GUI_PATH)) {
+            if (is != null) {
+                Type mapType = new TypeToken<Map<String, ThemeConfiguration.GuiConfig>>() {
+                }.getType();
+                Map<String, ThemeConfiguration.GuiConfig> loaded = gson.fromJson(new InputStreamReader(is), mapType);
+                if (loaded != null) {
+                    guiRegistry.putAll(loaded);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading GUI registry: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the GUI configuration for the given key from the registry.
+     *
+     * @param key the GUI config registry key
+     * @return the GuiConfig, or null if not found
+     */
+    public static ThemeConfiguration.GuiConfig getGuiConfig(String key) {
+        return guiRegistry.get(key);
+    }
+
+    private static void loadCursorRegistry() {
+        Gson gson = new Gson();
+        try (InputStream is = ThemeManager.class.getResourceAsStream(RESOURCE_CURSOR_PATH)) {
+            if (is != null) {
+                Type mapType = new TypeToken<Map<String, ThemeConfiguration.CursorConfig>>() {
+                }.getType();
+                Map<String, ThemeConfiguration.CursorConfig> loaded = gson.fromJson(new InputStreamReader(is), mapType);
+                if (loaded != null) {
+                    cursorRegistry.putAll(loaded);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading cursor registry: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the cursor configuration for the given key from the registry.
+     *
+     * @param key the cursor config registry key
+     * @return the CursorConfig, or null if not found
+     */
+    public static ThemeConfiguration.CursorConfig getCursorConfig(String key) {
+        return cursorRegistry.get(key);
+    }
+
+    private static void loadSuitRegistry() {
+        Gson gson = new Gson();
+        try (InputStream is = ThemeManager.class.getResourceAsStream(RESOURCE_SUITS_PATH)) {
+            if (is != null) {
+                Type mapType = new TypeToken<Map<String, List<SuitStyle>>>() {
+                }.getType();
+                Map<String, List<SuitStyle>> loaded = gson.fromJson(new InputStreamReader(is), mapType);
+                if (loaded != null) {
+                    suitRegistry.putAll(loaded);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading suit registry: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the suit styles for the given key from the registry.
+     *
+     * @param key the suit style registry key
+     * @return list of SuitStyle, or empty list if not found
+     */
+    public static List<SuitStyle> getSuitStyles(String key) {
+        List<SuitStyle> styles = suitRegistry.get(key);
+        return styles != null ? styles : new ArrayList<>();
     }
 
     private static void loadResourceThemes() {
@@ -46,14 +170,16 @@ public class ThemeManager {
                 }.getType();
                 List<ThemeConfiguration> loadedResourceThemes = gson.fromJson(new InputStreamReader(is), listType);
                 if (loadedResourceThemes != null && !loadedResourceThemes.isEmpty()) {
-                    // For resource themes, basePath is null
-                    loadedResourceThemes.forEach(theme -> theme.setBasePath(null));
+                    loadedResourceThemes.forEach(theme -> {
+                        theme.setSuitStyleKey(theme.getSuitStyleKey());
+                        theme.setGuiKey(theme.getGuiKey());
+                        theme.setCursorKey(theme.getCursorKey());
+                    });
                     themes.addAll(loadedResourceThemes);
                     System.out.println("Successfully loaded themes from resource: " + RESOURCE_THEMES_PATH);
                 }
             } else {
                 System.err.println("Resource theme JSON file not found: " + RESOURCE_THEMES_PATH + ". No default themes loaded from resources.");
-                // If resource themes.json is not found, ensure a basic default is still present
                 if (themes.isEmpty()) {
                     addHardcodedDefaultTheme();
                 }
@@ -68,23 +194,23 @@ public class ThemeManager {
 
     private static void addHardcodedDefaultTheme() {
         List<SuitStyle> defaultSuitStyles = new ArrayList<>();
-        defaultSuitStyles.add(new SuitStyle("CELESTIAL_COURT", "#FFD700"));
-        defaultSuitStyles.add(new SuitStyle("UMBRAL_DOMINION", "#FF8800"));
-        defaultSuitStyles.add(new SuitStyle("INFERNAL_PACT", "#DC143C"));
-        defaultSuitStyles.add(new SuitStyle("VERDANT_CYCLE", "#228B22"));
-        defaultSuitStyles.add(new SuitStyle("AETHERIC_LOOM", "#1E90FF"));
-        defaultSuitStyles.add(new SuitStyle("DARK_EXPANSE", "#AD03FC"));
-        defaultSuitStyles.add(new SuitStyle("WILDS", "#E5E7EB"));
+        defaultSuitStyles.add(new SuitStyle("#FFD700"));
+        defaultSuitStyles.add(new SuitStyle("#FF8800"));
+        defaultSuitStyles.add(new SuitStyle("#DC143C"));
+        defaultSuitStyles.add(new SuitStyle("#228B22"));
+        defaultSuitStyles.add(new SuitStyle("#1E90FF"));
+        defaultSuitStyles.add(new SuitStyle("#AD03FC"));
+        defaultSuitStyles.add(new SuitStyle("white"));
 
         ThemeConfiguration defaultTheme = new ThemeConfiguration(
                 DEFAULT_THEME_NAME,
-                "/com/mystic/tarotboard/assets/card_front.png",
-                "/com/mystic/tarotboard/assets/card_back.png",
-                "/com/mystic/tarotboard/assets/front_poker_chips.png",
-                "/com/mystic/tarotboard/assets/back_poker_chips.png",
-                "/com/mystic/tarotboard/assets/background_image.png",
+                "card_front.png",
+                "card_back.png",
+                "front_poker_chips.png",
+                "back_poker_chips.png",
+                "background_image.png",
                 defaultSuitStyles,
-                null // basePath is null for hardcoded resource themes
+                "./com/mystic/tarotboard/assets/"
         );
         themes.add(defaultTheme);
     }
@@ -93,42 +219,55 @@ public class ThemeManager {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         Type listType = new TypeToken<ArrayList<ThemeConfiguration>>() {
         }.getType();
+        Path themesDir = PlatformPaths.getThemesDir();
 
         try {
-            Files.createDirectories(USER_THEMES_DIR);
+            Files.createDirectories(themesDir);
 
-            try (Stream<Path> paths = Files.list(USER_THEMES_DIR)) {
+            try (Stream<Path> paths = Files.list(themesDir)) {
                 paths.filter(Files::isDirectory)
                         .forEach(dir -> {
                             try (Stream<Path> subPaths = Files.list(dir)) {
-                                subPaths.filter(Files::isRegularFile)
-                                        .filter(path -> path.toString().endsWith(".json"))
-                                        .forEach(jsonFile -> {
-                                            try (Reader reader = Files.newBufferedReader(jsonFile)) {
-                                                List<ThemeConfiguration> loadedExternalThemes = gson.fromJson(reader, listType);
-                                                if (loadedExternalThemes != null) {
-                                                    String basePath = jsonFile.getParent().toString(); // Get the directory of the JSON file
-                                                    for (ThemeConfiguration externalTheme : loadedExternalThemes) {
-                                                        externalTheme.setBasePath(basePath); // Set the base path for relative image resolution
-                                                        // Check if a theme with the same name already exists (from resources)
-                                                        boolean replaced = false;
-                                                        for (int i = 0; i < themes.size(); i++) {
-                                                            if (themes.get(i).getThemeName().equalsIgnoreCase(externalTheme.getThemeName())) {
-                                                                themes.set(i, externalTheme); // Replace existing theme
-                                                                replaced = true;
-                                                                break;
-                                                            }
-                                                        }
-                                                        if (!replaced) {
-                                                            themes.add(externalTheme); // Add new external theme
-                                                        }
-                                                    }
-                                                    System.out.println("Successfully loaded themes from external file: " + jsonFile.getFileName());
+                                subPaths.filter(Files::isDirectory)
+                                        .forEach(subDir -> {
+                                            try (Stream<Path> jsonPaths = Files.list(subDir)) {
+                                                if (subDir.getFileName().endsWith("/configs")) {
+                                                    jsonPaths.filter(path -> path.toString().endsWith(".json"))
+                                                            .forEach(jsonFile -> {
+                                                                try (Reader reader = Files.newBufferedReader(jsonFile)) {
+                                                                    List<ThemeConfiguration> loadedExternalThemes = gson.fromJson(reader, listType);
+                                                                    if (loadedExternalThemes != null) {
+                                                                        String basePath = jsonFile.getParent().toString();
+                                                                        for (ThemeConfiguration externalTheme : loadedExternalThemes) {
+                                                                            externalTheme.setBasePath(basePath);
+                                                                            externalTheme.setSuitStyleKey(externalTheme.getSuitStyleKey());
+                                                                            externalTheme.setGuiKey(externalTheme.getGuiKey());
+                                                                            externalTheme.setCursorKey(externalTheme.getCursorKey());
+                                                                            boolean replaced = false;
+                                                                            for (int i = 0; i < themes.size(); i++) {
+                                                                                if (themes.get(i).getThemeName().equalsIgnoreCase(externalTheme.getThemeName())) {
+                                                                                    themes.set(i, externalTheme);
+                                                                                    replaced = true;
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                            if (!replaced) {
+                                                                                themes.add(externalTheme);
+                                                                            }
+                                                                        }
+                                                                        System.out.println("Successfully loaded themes from external file: " + jsonFile.getFileName());
+                                                                    }
+                                                                } catch (JsonSyntaxException e) {
+                                                                    System.err.println("Error parsing JSON from " + jsonFile.getFileName() + ": " + e.getMessage());
+                                                                } catch (IOException e) {
+                                                                    System.err.println("Error reading file " + jsonFile.getFileName() + ": " + e.getMessage());
+                                                                }
+                                                            });
+                                                } else {
+                                                    System.err.println("Jsons must be in a configs directory: " + subDir.getFileName());
                                                 }
-                                            } catch (JsonSyntaxException e) {
-                                                System.err.println("Error parsing JSON from " + jsonFile.getFileName() + ": " + e.getMessage());
                                             } catch (IOException e) {
-                                                System.err.println("Error reading file " + jsonFile.getFileName() + ": " + e.getMessage());
+                                                System.err.println("Error accessing directory " + subDir.getFileName() + ": " + e.getMessage());
                                             }
                                         });
                             } catch (IOException e) {
@@ -137,14 +276,25 @@ public class ThemeManager {
                         });
             }
         } catch (IOException e) {
-            System.err.println("Error accessing user themes directory " + USER_THEMES_DIR + ": " + e.getMessage());
+            System.err.println("Error accessing user themes directory " + themesDir + ": " + e.getMessage());
         }
     }
 
+    /**
+     * Returns a defensive copy of all loaded themes.
+     *
+     * @return list of all theme configurations
+     */
     public static List<ThemeConfiguration> getThemes() {
-        return new ArrayList<>(themes); // Return a copy to prevent external modification
+        return new ArrayList<>(themes);
     }
 
+    /**
+     * Finds a theme by name (case-insensitive). Falls back to the first available theme if not found.
+     *
+     * @param name the theme name to search for
+     * @return the matching ThemeConfiguration, or the first available theme as fallback
+     */
     public static ThemeConfiguration getThemeByName(String name) {
         for (ThemeConfiguration theme : themes) {
             if (theme.getThemeName().equalsIgnoreCase(name)) {
@@ -152,13 +302,19 @@ public class ThemeManager {
             }
         }
         System.err.println("Theme '" + name + "' not found. Falling back to default theme.");
-        // Ensure there's always at least one theme, even if loading failed
         if (themes.isEmpty()) {
-            addHardcodedDefaultTheme(); // Fallback to hardcoded if everything else failed
+            addHardcodedDefaultTheme();
         }
-        return themes.getFirst(); // Fallback to the first available theme (should be default)
+        return themes.getFirst();
     }
 
+    /**
+     * Returns the hex color for a given suit name by looking up its associated suit style index.
+     *
+     * @param suit       the suit name
+     * @param suitStyles the ordered list of suit styles to index into
+     * @return the hex color string for the suit
+     */
     public static String getSuitColor(String suit, List<SuitStyle> suitStyles) {
         if (CELESTIAL_COURT.contains(suit)) {
             return suitStyles.getFirst().getColorHex();
@@ -174,6 +330,27 @@ public class ThemeManager {
             return suitStyles.get(5).getColorHex();
         }
 
-        return suitStyles.getLast().getColorHex(); // Default Ghost White
+        return suitStyles.getLast().getColorHex();
+    }
+
+    /**
+     * Returns the currently active theme, defaulting to "Default" if none is set.
+     *
+     * @return the active ThemeConfiguration
+     */
+    public static ThemeConfiguration getActiveTheme() {
+        if (activeTheme == null) {
+            activeTheme = getThemeByName("Default");
+        }
+        return activeTheme;
+    }
+
+    /**
+     * Sets the active theme.
+     *
+     * @param theme the theme to activate
+     */
+    public static void setActiveTheme(ThemeConfiguration theme) {
+        activeTheme = theme;
     }
 }

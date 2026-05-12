@@ -1,42 +1,63 @@
 package com.mystic.tarotboard;
 
-import com.mystic.tarotboard.gameitems.Card;
-import com.mystic.tarotboard.gameitems.Chip;
-import com.mystic.tarotboard.gameitems.Die;
+import com.mystic.tarotboard.items.Cards;
+import com.mystic.tarotboard.items.Chips;
+import com.mystic.tarotboard.items.Dice;
+import com.mystic.tarotboard.network.NetworkMessage;
+import com.mystic.tarotboard.network.NetworkMessage.Msg;
+import com.mystic.tarotboard.network.UpdateManager;
+import com.mystic.tarotboard.network.client.GameClient;
+import com.mystic.tarotboard.network.server.GameServer;
+import com.mystic.tarotboard.scenes.GameScene;
+import com.mystic.tarotboard.scenes.HostGameScene;
+import com.mystic.tarotboard.scenes.JoinGameScene;
+import com.mystic.tarotboard.scenes.MultiplayerScene;
+import com.mystic.tarotboard.scenes.StartScene;
+import com.mystic.tarotboard.theming.RemoteCursor;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.utils.CardDataHelper;
+import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.SaveData;
+import com.mystic.tarotboard.utils.Styles;
 import com.mystic.tarotboard.utils.UIUtils;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
+import javafx.scene.ImageCursor;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ColorPicker;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
-import javafx.scene.transform.Translate;
+import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
-import javafx.util.StringConverter;
 
+import java.io.ByteArrayInputStream;
 import java.io.*;
 import java.nio.file.*;
-import java.util.List;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Main application class for TarotBoard.
+ * Manages the primary game lifecycle including UI setup, card/chip/dice
+ * management, multiplayer networking, theme management, and save/load.
+ */
 public class TarotBoard extends Application {
+    /**
+     * Constructs a new TarotBoard instance.
+     */
+    public TarotBoard() {
+    }
 
     private static final List<String> wilds = List.of(
             "Joker", "Soul", "Light", "Dark", "Judgement", "Chorus", "Life", "Death", "Wrath",
@@ -59,6 +80,10 @@ public class TarotBoard extends Application {
             "Rifts", "Ashes", "Nulls", "Hallows", "Fluxes", "Ethers", "Grims"
     );
 
+    /**
+     * All possible card values in the deck, including numbered ranks,
+     * face cards, and supernatural entity names.
+     */
     public static final List<String> values = List.of(
             "Fugitive", "Devil", "Shadow", "Specter", "Phantom", "Void", "Wraith",
             "Ghoul", "Banshee", "Reverent", "Eidolon", "Shade",
@@ -85,233 +110,201 @@ public class TarotBoard extends Application {
     private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
     private static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
-    private static final String SAVE_FILE = System.getProperty("user.home") + File.separator + ".tarotboard" + File.separator + "save.dat";
     private static Stage primaryStage;
-    private Scene startScene;
-    private static Scene gameScene;
-    private final List<Chip> chips = new ArrayList<>();
-    private StackPane discardZone;
+    private GameScene gameScene;
+    private StartScene startScene;
+    private MultiplayerScene multiplayerScene;
+    private HostGameScene hostGameScene;
+    private JoinGameScene joinGameScene;
+    private final List<Chips> chips = new ArrayList<>();
     private Image bwFrontImage;
     private Image bwBackImage;
-    private Card[] cards; // Changed from StackPane[] cardPanes
-    private final List<Die> dice = new ArrayList<>();
+    private Cards[] cards;
+    private final List<Dice> dice = new ArrayList<>();
     private static boolean reshuffled = false;
     private static final ObservableList<String> cardNames = FXCollections.observableArrayList();
-    private Color currentColor = Color.WHITE; // New field for selected color
-    private ThemeConfiguration currentCardTheme = ThemeManager.getThemeByName("Default"); // Use ThemeConfiguration
+    private Color currentColor = Color.WHITE;
+    private ThemeConfiguration currentCardTheme = initDefaultTheme();
 
-    // Custom image paths
+    private static ThemeConfiguration initDefaultTheme() {
+        var t = ThemeManager.getThemeByName("Default");
+        ThemeManager.setActiveTheme(t);
+        return t;
+    }
+
     private String customCardFrontPath = null;
     private String customCardBackPath = null;
     private String customChipFrontPath = null;
     private String customChipBackPath = null;
     private String customBackgroundPath = null;
 
-    // Declare startLayout as a class field
-    private VBox startLayout;
-
-    // Constants for default deck position
     private static final double DEFAULT_DECK_X = 50;
     private static final double DEFAULT_DECK_Y = 50;
 
+    private GameServer gameServer;
+    private GameClient gameClient;
+    private boolean isMultiplayer;
+    private int myPlayerId;
+    private boolean isHost;
+    private boolean isOperator;
+    private byte[] myCursorImage;
+    private final Map<Integer, RemoteCursor> remoteCursors = new HashMap<>();
+    private final Map<String, StackPane> pieceMap = new HashMap<>();
+    private final List<NetworkMessage.PlayerInfo> playerList = new ArrayList<>();
+    private final Map<String, Long> lastPieceMoveTime = new HashMap<>();
+
+    private final Set<Integer> operators = new HashSet<>();
+    private String hostOperatorPassword = "admin";
+
+    /**
+     * Returns the game scene instance.
+     *
+     * @return the game scene
+     */
+    public GameScene getGameScene() {
+        return gameScene;
+    }
+
+    /**
+     * Returns the current player color used for new chips.
+     *
+     * @return the current color
+     */
+    public Color getCurrentColor() {
+        return currentColor;
+    }
+
+    /**
+     * Sets the current player color for new chips.
+     *
+     * @param c the new color
+     */
+    public void setCurrentColor(Color c) {
+        currentColor = c;
+    }
+
+    /**
+     * Returns the currently active card theme configuration.
+     *
+     * @return the current card theme
+     */
+    public ThemeConfiguration getCurrentCardTheme() {
+        return currentCardTheme;
+    }
+
+    /**
+     * Returns the list of chip items on the board.
+     *
+     * @return the chips list
+     */
+    public List<Chips> getChips() {
+        return chips;
+    }
+
+    /**
+     * Returns the map of piece IDs to their visual panes.
+     *
+     * @return the piece map
+     */
+    public Map<String, StackPane> getPieceMap() {
+        return pieceMap;
+    }
+
+    /**
+     * Returns the local player's network ID.
+     *
+     * @return the player ID
+     */
+    public int getMyPlayerId() {
+        return myPlayerId;
+    }
+
+    /**
+     * Returns whether this session is a multiplayer game.
+     *
+     * @return true if multiplayer
+     */
+    public boolean isMultiplayer() {
+        return isMultiplayer;
+    }
+
+    /**
+     * Returns whether this peer is the host of the multiplayer session.
+     *
+     * @return true if this peer is the host
+     */
+    public boolean isHost() {
+        return isHost;
+    }
+
+    /**
+     * Returns whether this peer has operator privileges.
+     *
+     * @return true if this peer is an operator
+     */
+    public boolean isOperator() {
+        return isOperator;
+    }
+
+    /**
+     * Returns whether the game client is currently connected to a server.
+     *
+     * @return true if connected
+     */
+    public boolean isClientConnected() {
+        return gameClient != null && gameClient.isConnected();
+    }
+
+    /**
+     * Returns the game server instance, or null if not hosting.
+     *
+     * @return the game server, or null
+     */
+    public GameServer getGameServer() {
+        return gameServer;
+    }
+
+    /**
+     * Returns the current list of connected players.
+     *
+     * @return the player list
+     */
+    public List<NetworkMessage.PlayerInfo> getPlayerList() {
+        return playerList;
+    }
+
+    /**
+     * Initializes and displays the primary stage with all game scenes,
+     * including the main menu, multiplayer setup, and the game board.
+     *
+     * @param primaryStage the primary stage for this JavaFX application
+     */
     @Override
     public void start(Stage primaryStage) {
         TarotBoard.primaryStage = primaryStage;
         Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
-        Pane gameRoot = new Pane();
-        gameScene = new Scene(gameRoot, screenBounds.getWidth(), screenBounds.getHeight());
+        double baseWidth = screenBounds.getWidth();
+        double baseHeight = screenBounds.getHeight();
 
-        // Load background image
-        updateBackground(gameRoot);
+        gameScene = new GameScene(this, primaryStage, baseWidth, baseHeight);
+        startScene = new StartScene(this, primaryStage, baseWidth, baseHeight);
+        multiplayerScene = new MultiplayerScene(this, baseWidth, baseHeight);
+        hostGameScene = new HostGameScene(this, baseWidth, baseHeight);
+        joinGameScene = new JoinGameScene(this, baseWidth, baseHeight);
+
+        updateBackground(gameScene.getGameBg());
+        updateStartSceneBackground();
 
         CardDataHelper.addCardNames(cardNames, wilds, suits, values);
         CardDataHelper.generateShuffledCardNames(cardNames);
-        cards = new Card[NUM_CARDS]; // Initialize cards array
+        cards = new Cards[NUM_CARDS];
 
-        loadAndCreateCards(gameRoot);
+        loadAndCreateCards();
 
-        // Load chip images
         bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
-        // Create buttons that will be moved to the control panel
-        Button resetChips = getResetChipsButton(gameRoot);
-        Button reshuffleCards = new Button("Reshuffle Cards");
-        reshuffleCards.setOnAction(_ -> getReshuffleCardsButton());
-        Button newGameButton = new Button("New Game");
-        newGameButton.setOnAction(_ -> newGame(gameRoot));
-        Button helpButton2 = createHelpButton();
-        Button backButton3 = new Button("Back to Start");
-        backButton3.setOnAction(_ -> switchToStart());
-
-
-        // Buttons for the start scene
-        Button newGameBtn = new Button("New Game");
-        newGameBtn.setStyle("-fx-font-size: 20pt;");
-        newGameBtn.setOnAction(_ -> {
-            newGame(gameRoot);
-            primaryStage.setScene(gameScene);
-            primaryStage.setTitle("Game Scene");
-        });
-
-        Button continueButton = new Button("Continue");
-        continueButton.setStyle("-fx-font-size: 20pt;");
-        continueButton.setDisable(!new File(SAVE_FILE).exists());
-        continueButton.setOnAction(_ -> continueGame());
-
-        Button helpButton = createHelpButton();
-        helpButton.setStyle("-fx-font-size: 20pt;");
-
-
-        Button quitButton = new Button("Quit");
-        quitButton.setStyle("-fx-font-size: 20pt;");
-        quitButton.setOnAction(_ -> primaryStage.close());
-
-        startLayout = new VBox(10); // Initialize the class field
-        startLayout.setAlignment(Pos.CENTER);
-        // Add buttons to startLayout BEFORE creating the scene
-        startLayout.getChildren().addAll(newGameBtn, continueButton, helpButton, quitButton);
-        startScene = new Scene(startLayout, screenBounds.getWidth(), screenBounds.getHeight());
-
-        // Set background for startLayout
-        updateStartSceneBackground();
-
-        VBox controlPanelRight = new VBox(10);
-        controlPanelRight.setAlignment(Pos.TOP_RIGHT);
-        controlPanelRight.setStyle("-fx-background-color: rgba(0,0,0,0.4); -fx-padding: 10; -fx-background-radius: 8;");
-        controlPanelRight.setPrefWidth(200);
-        controlPanelRight.setMaxWidth(200);
-
-        ColorPicker colorPicker = new ColorPicker(currentColor);
-        colorPicker.setOnAction(_ -> currentColor = colorPicker.getValue());
-        colorPicker.setMaxWidth(Double.MAX_VALUE);
-
-        Button spawnChipButton = new Button("Spawn Chip");
-        spawnChipButton.setStyle("-fx-font-size: 11pt;");
-        spawnChipButton.setMaxWidth(Double.MAX_VALUE);
-        spawnChipButton.setOnAction(_ -> spawnChip(gameRoot, currentColor));
-
-        TextField diceSidesInput = new TextField("20");
-        diceSidesInput.setPrefWidth(60);
-        diceSidesInput.setAlignment(Pos.CENTER);
-        diceSidesInput.setStyle("-fx-font-size: 11pt;");
-
-        Button spawnDieButton = new Button("Spawn Dice");
-        spawnDieButton.setStyle("-fx-font-size: 11pt;");
-        spawnDieButton.setMaxWidth(Double.MAX_VALUE);
-        spawnDieButton.setOnAction(_ -> {
-            try {
-                int sides = Integer.parseInt(diceSidesInput.getText());
-                if (sides > 0) {
-                    spawnDie(gameRoot, sides, currentColor);
-                } else {
-                    System.err.println("Number of sides for die must be positive.");
-                }
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid number of sides for die: " + diceSidesInput.getText());
-            }
-        });
-
-        HBox diceInputGroup = new HBox(5, diceSidesInput, spawnDieButton);
-
-        diceInputGroup.setAlignment(Pos.CENTER_LEFT);
-        diceInputGroup.setMaxWidth(Double.MAX_VALUE);
-
-        Button resetDiceButton = new Button("Reset Dice");
-        resetDiceButton.setStyle("-fx-font-size: 11pt;");
-        resetDiceButton.setMaxWidth(Double.MAX_VALUE);
-        resetDiceButton.setOnAction(_ -> {
-            for (Die die : dice) {
-                gameRoot.getChildren().remove(die.getPane());
-            }
-            dice.clear();
-        });
-
-        // Card Theme Selector
-        ComboBox<ThemeConfiguration> themeSelector = new ComboBox<>(FXCollections.observableArrayList(ThemeManager.getThemes()));
-        themeSelector.setValue(currentCardTheme);
-        themeSelector.setMaxWidth(Double.MAX_VALUE);
-        themeSelector.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(ThemeConfiguration theme) {
-                return theme != null ? theme.getThemeName() : "";
-            }
-
-            @Override
-            public ThemeConfiguration fromString(String string) {
-                return ThemeManager.getThemeByName(string);
-            }
-        });
-        themeSelector.setOnAction(_ -> {
-            currentCardTheme = themeSelector.getValue();
-            // Reset custom card paths when a theme is selected
-            customCardFrontPath = null;
-            customCardBackPath = null;
-            customChipFrontPath = null; // Clear custom chip paths too
-            customChipBackPath = null;  // Clear custom chip paths too
-            customBackgroundPath = null; // Clear custom background path too
-            applyCurrentTheme(gameRoot); // Call new method to apply theme without new game
-        });
-
-        resetChips.setStyle("-fx-font-size: 11pt;");
-        resetChips.setMaxWidth(Double.MAX_VALUE);
-        reshuffleCards.setStyle("-fx-font-size: 11pt;");
-        reshuffleCards.setMaxWidth(Double.MAX_VALUE);
-        newGameButton.setStyle("-fx-font-size: 11pt;");
-        newGameButton.setMaxWidth(Double.MAX_VALUE);
-        helpButton2.setStyle("-fx-font-size: 11pt;");
-        helpButton2.setMaxWidth(Double.MAX_VALUE);
-        backButton3.setStyle("-fx-font-size: 11pt;");
-        backButton3.setMaxWidth(Double.MAX_VALUE);
-
-
-        controlPanelRight.getChildren().addAll(
-                colorPicker,
-                spawnChipButton,
-                diceInputGroup,
-                resetDiceButton,
-                resetChips,
-                reshuffleCards,
-                newGameButton,
-                helpButton2,
-                backButton3,
-                themeSelector
-        );
-
-        controlPanelRight.layoutXProperty().bind(gameScene.widthProperty().subtract(controlPanelRight.widthProperty()).subtract(10));
-        controlPanelRight.setLayoutY(10);
-        gameRoot.getChildren().add(controlPanelRight);
-
-        discardZone = new StackPane();
-        discardZone.setStyle("-fx-background-color: rgba(200,0,0,0.25); -fx-border-color: #cc0000; -fx-border-width: 2; -fx-background-radius: 10; -fx-border-radius: 10;");
-        discardZone.setPrefSize(90, 90);
-        Text trashText = new Text("✖");
-        trashText.setFont(javafx.scene.text.Font.font(36));
-        trashText.setFill(Color.web("#cc0000"));
-        discardZone.getChildren().add(trashText);
-        discardZone.setLayoutX(10);
-        discardZone.layoutYProperty().bind(gameScene.heightProperty().subtract(100));
-        gameRoot.getChildren().add(discardZone);
-
-        double[] mouseX = new double[1];
-        double[] mouseY = new double[1];
-        gameScene.setOnMouseMoved(event -> {
-            mouseX[0] = event.getSceneX();
-            mouseY[0] = event.getSceneY();
-        });
-        gameScene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() != javafx.scene.input.KeyCode.F) return;
-            for (Chip chip : chips) {
-                StackPane pane = chip.getChipPane();
-                var pt = pane.sceneToLocal(mouseX[0], mouseY[0]);
-                if (pane.contains(pt)) {
-                    UIUtils.multiFlip(pane);
-                    break;
-                }
-            }
-        });
-
-        primaryStage.setScene(startScene);
+        primaryStage.setScene(startScene.getScene());
         primaryStage.setX(screenBounds.getMinX());
         primaryStage.setY(screenBounds.getMinY());
         primaryStage.setWidth(screenBounds.getWidth());
@@ -319,11 +312,733 @@ public class TarotBoard extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Finds a game piece pane at the given scene coordinates.
+     *
+     * @param mouseX the scene X coordinate
+     * @param mouseY the scene Y coordinate
+     * @return the piece pane at the coordinates, or null if none found
+     */
+    public StackPane findPieceAtMouse(double mouseX, double mouseY) {
+        for (StackPane pane : pieceMap.values()) {
+            var pt = pane.sceneToLocal(mouseX, mouseY);
+            if (pane.contains(pt)) return pane;
+        }
+        return null;
+    }
+
+    /**
+     * Starts a new multiplayer game server on the configured port and switches to the game scene.
+     */
+    public void hostGame() {
+        if (gameServer != null) leaveGame();
+        String name = hostGameScene.getPlayerNameField().getText().trim();
+        if (name.isEmpty()) name = "Host";
+        int port;
+        try {
+            port = Integer.parseInt(hostGameScene.getHostPortField().getText().trim());
+        } catch (NumberFormatException e) {
+            hostGameScene.getNetworkStatusLabel().setText("Invalid port");
+            return;
+        }
+        try {
+            Color c = hostGameScene.getPlayerColorPicker().getValue();
+            gameServer = new GameServer(port, name, c.getRed(), c.getGreen(), c.getBlue());
+            myPlayerId = gameServer.getHostPlayerId();
+            isHost = true;
+            isMultiplayer = true;
+            operators.clear();
+            operators.add(myPlayerId);
+            hostOperatorPassword = hostGameScene.getHostOpPasswordField().getText();
+            playerList.clear();
+            playerList.addAll(gameServer.getPlayers());
+
+            gameServer.setOnMessage(msg -> Platform.runLater(() -> handleNetworkMessage(msg)));
+            gameServer.start();
+
+            hostGameScene.getNetworkStatusLabel().setText("Hosting on port " + port + " (ID: " + myPlayerId + ")");
+            hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusOk());
+            gameScene.getNetworkStatusInGame().setText("Hosting on port " + port);
+            gameScene.getNetworkStatusInGame().setStyle(Styles.panelLabel());
+            gameScene.setMultiplayerControlsVisible(true);
+
+            primaryStage.setScene(gameScene.getScene());
+            primaryStage.setTitle("Game Scene - Hosting on port " + port);
+        } catch (IOException e) {
+            hostGameScene.getNetworkStatusLabel().setText("Failed to host: " + e.getMessage());
+            hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
+            isMultiplayer = false;
+            isHost = false;
+        }
+    }
+
+    public void joinGame() {
+        if (gameClient != null && gameClient.isConnected()) leaveGame();
+        String name = joinGameScene.getPlayerNameField().getText().trim();
+        if (name.isEmpty()) name = "Player";
+        String ip = joinGameScene.getJoinIpField().getText().trim();
+        int port;
+        try {
+            port = Integer.parseInt(joinGameScene.getJoinPortField().getText().trim());
+        } catch (NumberFormatException e) {
+            joinGameScene.getNetworkStatusLabel().setText("Invalid port");
+            return;
+        }
+        try {
+            gameClient = new GameClient(ip, port);
+            isHost = false;
+            isMultiplayer = true;
+
+            gameClient.setOnMessage(msg -> Platform.runLater(() -> handleNetworkMessage(msg)));
+            gameClient.start();
+
+            Color pc = joinGameScene.getPlayerColorPicker().getValue();
+            gameClient.send(NetworkMessage.of(new Msg.PlayerJoin(name, pc.getRed(), pc.getGreen(), pc.getBlue())));
+
+            gameClient.send(NetworkMessage.of(new Msg.SendState(myPlayerId)));
+
+            joinGameScene.getNetworkStatusLabel().setText("Connected to " + ip + ":" + port);
+            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusOk());
+            gameScene.getNetworkStatusInGame().setText("Connected to " + ip + ":" + port);
+            gameScene.getNetworkStatusInGame().setStyle(Styles.panelLabel());
+            gameScene.setMultiplayerControlsVisible(true);
+
+            primaryStage.setScene(gameScene.getScene());
+            primaryStage.setTitle("Game Scene - Connected to " + ip + ":" + port);
+        } catch (IOException e) {
+            joinGameScene.getNetworkStatusLabel().setText("Failed to connect: " + e.getMessage());
+            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
+            isMultiplayer = false;
+        }
+    }
+
+    /**
+     * Disconnects from any active multiplayer session and cleans up remote cursors and player state.
+     */
+    public void leaveGame() {
+        if (gameClient != null) {
+            gameClient.disconnect();
+            gameClient = null;
+        }
+        if (gameServer != null) {
+            gameServer.stop();
+            gameServer = null;
+        }
+        isMultiplayer = false;
+        isHost = false;
+        isOperator = false;
+        myPlayerId = -1;
+        operators.clear();
+        for (var cursor : remoteCursors.values()) {
+            cursor.removeFrom(gameScene.getCursorOverlay());
+        }
+        remoteCursors.clear();
+        playerList.clear();
+        if (hostGameScene != null) {
+            hostGameScene.getNetworkStatusLabel().setText("Offline");
+            hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpLabel());
+        }
+        if (joinGameScene != null) {
+            joinGameScene.getNetworkStatusLabel().setText("Offline");
+            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpLabel());
+            joinGameScene.getOperatorStatusLabel().setText("");
+        }
+        if (gameScene != null) {
+            gameScene.getNetworkStatusInGame().setText("");
+            gameScene.setMultiplayerControlsVisible(false);
+        }
+        if (primaryStage != null) {
+            primaryStage.setTitle("TarotBoard");
+        }
+    }
+
+    /**
+     * Sends an operator access request to the host using the password entered in the multiplayer UI.
+     */
+    public void requestOperatorAccess() {
+        String password = joinGameScene.getOperatorPasswordField().getText();
+        if (password.isEmpty()) {
+            joinGameScene.getOperatorStatusLabel().setText("Enter a password");
+            joinGameScene.getOperatorStatusLabel().setStyle("-fx-font-size: 12pt; -fx-text-fill: #c44;");
+            return;
+        }
+        if (gameClient != null && gameClient.isConnected()) {
+            gameClient.send(NetworkMessage.of(new Msg.RequestOperator(myPlayerId, password)));
+            joinGameScene.getOperatorStatusLabel().setText("Requesting operator access...");
+            joinGameScene.getOperatorStatusLabel().setStyle("-fx-font-size: 12pt; -fx-text-fill: #FFA500;");
+        } else {
+            joinGameScene.getOperatorStatusLabel().setText("Not connected to a server");
+            joinGameScene.getOperatorStatusLabel().setStyle("-fx-font-size: 12pt; -fx-text-fill: #c44;");
+        }
+    }
+
+    /**
+     * Opens a file chooser to select a custom cursor image and sends it to connected peers.
+     */
+    public void chooseCursorImage() {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Choose Cursor Image");
+        fc.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif"),
+                new FileChooser.ExtensionFilter("All Files", "*.*"));
+        java.io.File file = fc.showOpenDialog(primaryStage);
+        if (file == null) return;
+        try {
+            myCursorImage = java.nio.file.Files.readAllBytes(file.toPath());
+            if (hostGameScene != null && hostGameScene.getCursorStatusLabel() != null) {
+                hostGameScene.getCursorStatusLabel().setText(file.getName());
+                hostGameScene.getCursorStatusLabel().setStyle(Styles.mpSmallLabel());
+            }
+            if (joinGameScene != null && joinGameScene.getCursorStatusLabel() != null) {
+                joinGameScene.getCursorStatusLabel().setText(file.getName());
+                joinGameScene.getCursorStatusLabel().setStyle(Styles.mpSmallLabel());
+            }
+            if (gameScene != null) {
+                Image cursorImg = new Image(new ByteArrayInputStream(myCursorImage));
+                if (!cursorImg.isError()) {
+                    gameScene.getScene().setCursor(new ImageCursor(cursorImg, cursorImg.getWidth() / 2, cursorImg.getHeight() / 2));
+                }
+            }
+            if (isMultiplayer) {
+                sendNetworkMessage(NetworkMessage.of(new Msg.CursorImage(myPlayerId, myCursorImage)));
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load cursor image: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a network message to the connected client or broadcasts to all peers if hosting.
+     *
+     * @param msg the message to send
+     */
+    public void sendNetworkMessage(NetworkMessage msg) {
+        if (gameClient != null && gameClient.isConnected()) {
+            gameClient.send(msg);
+        }
+        if (gameServer != null && isHost) {
+            gameServer.broadcast(msg, myPlayerId);
+        }
+    }
+
+    private void handleNetworkMessage(NetworkMessage msg) {
+        switch (msg.data()) {
+            case Msg.YourId y -> myPlayerId = y.playerId();
+            case Msg.OperatorStatus o -> handleOperatorStatus(o);
+            case Msg.PlayerList p -> handlePlayerList(p);
+            case Msg.PlayerLeave l -> handlePlayerLeave(l);
+            case Msg.CardNamesSync c -> handleCardNamesSync(c);
+            case Msg.CursorMove c -> handleCursorMove(c);
+            case Msg.CursorImage c -> handleCursorImage(c);
+            case Msg.PieceMove m -> handlePieceMove(m);
+            case Msg.PieceRotate m -> handlePieceRotate(m);
+            case Msg.PieceFlip m -> handlePieceFlip(m);
+            case Msg.PieceToFront m -> handlePieceToFront(m);
+            case Msg.SpawnChip m -> handleSpawnChip(m);
+            case Msg.SpawnDie m -> handleSpawnDie(m);
+            case Msg.DeletePiece m -> handleDeletePiece(m);
+            case Msg.DieRoll m -> handleDieRoll(m);
+            case Msg.RequestOperator m -> handleRequestOperator(m);
+            case Msg.ReshuffleCards m -> handleReshuffleCards(m);
+            case Msg.ResetDice m -> handleResetDice(m);
+            case Msg.ResetChips m -> handleResetChips(m);
+            case Msg.NewGame m -> handleNewGame(m);
+            case Msg.SendState m -> handleSendState(m);
+            case Msg.StateSync s -> handleStateSync(s);
+            default -> {
+            }
+        }
+    }
+
+    private void handleRequestOperator(Msg.RequestOperator m) {
+        boolean granted = !hostOperatorPassword.isEmpty() && hostOperatorPassword.equals(m.password());
+        if (granted) {
+            operators.add(m.playerId());
+            System.out.println("[TarotBoard] Player " + m.playerId() + " is now an operator");
+        } else {
+            System.out.println("[TarotBoard] Operator request denied for player " + m.playerId());
+        }
+        if (gameServer != null) {
+            gameServer.sendTo(m.playerId(),
+                    NetworkMessage.of(new Msg.OperatorStatus(m.playerId(), granted)));
+        }
+    }
+
+    private boolean isOperator(int playerId) {
+        if (operators.contains(playerId)) return false;
+        System.out.println("[TarotBoard] Denied non-operator action from player " + playerId);
+        return true;
+    }
+
+    private void handlePlayerList(Msg.PlayerList p) {
+        playerList.clear();
+        playerList.addAll(p.players());
+        Set<Integer> activeIds = new HashSet<>();
+        for (var pi : p.players()) {
+            activeIds.add(pi.id());
+            if (pi.id() == myPlayerId) continue;
+            if (!remoteCursors.containsKey(pi.id())) {
+                RemoteCursor rc = new RemoteCursor(pi.name(),
+                        Color.color(pi.r(), pi.g(), pi.b()));
+                rc.addTo(gameScene.getCursorOverlay());
+                remoteCursors.put(pi.id(), rc);
+            }
+        }
+        var iter = remoteCursors.entrySet().iterator();
+        while (iter.hasNext()) {
+            var entry = iter.next();
+            if (!activeIds.contains(entry.getKey())) {
+                entry.getValue().removeFrom(gameScene.getCursorOverlay());
+                iter.remove();
+            }
+        }
+        if (myCursorImage != null && isMultiplayer) {
+            sendNetworkMessage(NetworkMessage.of(new Msg.CursorImage(myPlayerId, myCursorImage)));
+        }
+    }
+
+    private void handlePlayerLeave(Msg.PlayerLeave l) {
+        var cursor = remoteCursors.remove(l.playerId());
+        if (cursor != null) cursor.removeFrom(gameScene.getCursorOverlay());
+    }
+
+    private void handleOperatorStatus(Msg.OperatorStatus o) {
+        isOperator = o.isOperator();
+        if (joinGameScene != null) {
+            if (isOperator) {
+                joinGameScene.getOperatorStatusLabel().setText("Operator ✓");
+                joinGameScene.getOperatorStatusLabel().setStyle(Styles.mpSmallLabel());
+            } else {
+                joinGameScene.getOperatorStatusLabel().setText("Access denied");
+                joinGameScene.getOperatorStatusLabel().setStyle("-fx-font-size: 12pt; -fx-text-fill: #c44;");
+            }
+        }
+        if (gameScene != null) {
+            Label inGame = gameScene.getNetworkStatusInGame();
+            String current = inGame.getText();
+            if (isOperator) {
+                if (!current.contains(" [Operator]")) {
+                    inGame.setText(current + " [Operator]");
+                }
+            } else {
+                inGame.setText(current.replace(" [Operator]", ""));
+            }
+            inGame.setStyle(Styles.panelLabel());
+        }
+    }
+
+    private void handleCursorMove(Msg.CursorMove m) {
+        if (m.playerId() == myPlayerId) return;
+        var cursor = remoteCursors.get(m.playerId());
+        if (cursor != null) {
+            cursor.setPosition(m.x(), m.y());
+        }
+    }
+
+    private void handleCursorImage(Msg.CursorImage m) {
+        if (m.playerId() == myPlayerId) return;
+        var cursor = remoteCursors.get(m.playerId());
+        if (cursor != null) {
+            cursor.setImage(m.imageData());
+        }
+    }
+
+    private void handlePieceMove(Msg.PieceMove m) {
+        if (m.playerId() == myPlayerId) return;
+        var pane = pieceMap.get(m.pieceId());
+        if (pane != null) {
+            pane.setTranslateX(m.x());
+            pane.setTranslateY(m.y());
+            pane.toFront();
+        }
+    }
+
+    private void handlePieceRotate(Msg.PieceRotate m) {
+        if (m.playerId() == myPlayerId) return;
+        var pane = pieceMap.get(m.pieceId());
+        if (pane != null) {
+            pane.setRotate(m.rotation());
+            pane.toFront();
+        }
+    }
+
+    private void handlePieceFlip(Msg.PieceFlip m) {
+        if (m.playerId() == myPlayerId) return;
+        var pane = pieceMap.get(m.pieceId());
+        if (pane != null && pane.getChildren().size() >= 3) {
+            Node f = pane.getChildren().get(1);
+            Node b = pane.getChildren().get(0);
+            f.setVisible(m.frontVisible());
+            b.setVisible(m.backVisible());
+            if (pane.getChildren().size() > 2) {
+                Node t = pane.getChildren().get(2);
+                t.setVisible(m.textVisible());
+            }
+            pane.toFront();
+        }
+    }
+
+    private void handlePieceToFront(Msg.PieceToFront m) {
+        if (m.playerId() == myPlayerId) return;
+        var pane = pieceMap.get(m.pieceId());
+        if (pane != null) pane.toFront();
+    }
+
+    private void handleSpawnChip(Msg.SpawnChip m) {
+        if (m.playerId() == myPlayerId) return;
+        Color color = Color.color(m.red(), m.green(), m.blue(), m.opacity());
+        Chips chip = new Chips(color, bwFrontImage, bwBackImage, m.pieceId());
+        StackPane chipPane = chip.getChipPane();
+        chipPane.setTranslateX(m.x());
+        chipPane.setTranslateY(m.y());
+        setupPieceInteractions(chipPane, chip.getPieceId(), true);
+        chip.getChipPane().getChildren().get(0).setVisible(true);
+        chip.getChipPane().getChildren().get(1).setVisible(false);
+        chips.add(chip);
+        gameScene.getGameContent().getChildren().add(chipPane);
+        pieceMap.put(chip.getPieceId(), chipPane);
+        gameScene.bringCursorOverlayToFront();
+    }
+
+    private void handleSpawnDie(Msg.SpawnDie m) {
+        if (m.playerId() == myPlayerId) return;
+        Color color = Color.color(m.red(), m.green(), m.blue(), m.opacity());
+        Dice die = new Dice(m.sides(), color, m.pieceId());
+        die.setCurrentValue((int) m.value());
+        StackPane diePane = die.getPane();
+        diePane.setTranslateX(m.x());
+        diePane.setTranslateY(m.y());
+        setupPieceInteractions(diePane, die.getPieceId(), false);
+        dice.add(die);
+        gameScene.getGameContent().getChildren().add(diePane);
+        pieceMap.put(die.getPieceId(), diePane);
+        gameScene.bringCursorOverlayToFront();
+    }
+
+    private void handleDeletePiece(Msg.DeletePiece m) {
+        if (m.playerId() == myPlayerId) return;
+        var pane = pieceMap.remove(m.pieceId());
+        if (pane == null) return;
+        gameScene.getGameContent().getChildren().remove(pane);
+        chips.removeIf(c -> c.getPieceId().equals(m.pieceId()));
+        dice.removeIf(d -> d.getPieceId().equals(m.pieceId()));
+    }
+
+    private void handleDieRoll(Msg.DieRoll m) {
+        if (m.playerId() == myPlayerId) return;
+        for (Dice die : dice) {
+            if (die.getPieceId().equals(m.pieceId())) {
+                die.setCurrentValue(m.value());
+                break;
+            }
+        }
+    }
+
+    private void handleReshuffleCards(Msg.ReshuffleCards m) {
+        if (m.playerId() == myPlayerId) return;
+        if (isOperator(m.playerId())) return;
+        for (int a = 0; a < NUM_CARDS; a++) {
+            if (cards[a] != null) {
+                StackPane cardPane = cards[a].getCardPane();
+                cardPane.setTranslateX(DEFAULT_DECK_X);
+                cardPane.setTranslateY(DEFAULT_DECK_Y);
+                cardPane.setRotate(0);
+                ImageView backView = (ImageView) cardPane.getChildren().get(0);
+                ImageView frontView = (ImageView) cardPane.getChildren().get(1);
+                Node textNode = cardPane.getChildren().get(2);
+                backView.setVisible(true);
+                frontView.setVisible(false);
+                textNode.setVisible(false);
+            }
+        }
+    }
+
+    private void handleResetDice(Msg.ResetDice m) {
+        if (m.playerId() == myPlayerId) return;
+        if (isOperator(m.playerId())) return;
+        for (Dice die : dice) {
+            gameScene.getGameContent().getChildren().remove(die.getPane());
+            pieceMap.remove(die.getPieceId());
+        }
+        dice.clear();
+    }
+
+    private void handleResetChips(Msg.ResetChips m) {
+        if (m.playerId() == myPlayerId) return;
+        if (isOperator(m.playerId())) return;
+        for (Chips chip : chips) {
+            gameScene.getGameContent().getChildren().remove(chip.getChipPane());
+            pieceMap.remove(chip.getPieceId());
+        }
+        chips.clear();
+    }
+
+    private void handleNewGame(Msg.NewGame m) {
+        if (m.playerId() == myPlayerId) return;
+        if (isOperator(m.playerId())) return;
+        if (isHost) {
+            newGame();
+        } else {
+            for (Chips chip : chips) {
+                gameScene.getGameContent().getChildren().remove(chip.getChipPane());
+                pieceMap.remove(chip.getPieceId());
+            }
+            chips.clear();
+            for (Dice die : dice) {
+                gameScene.getGameContent().getChildren().remove(die.getPane());
+                pieceMap.remove(die.getPieceId());
+            }
+            dice.clear();
+            pieceMap.clear();
+            for (int a = 0; a < NUM_CARDS; a++) {
+                if (cards[a] != null) {
+                    StackPane pane = cards[a].getCardPane();
+                    pane.setTranslateX(DEFAULT_DECK_X);
+                    pane.setTranslateY(DEFAULT_DECK_Y);
+                    pane.setRotate(0);
+                    pane.getChildren().get(0).setVisible(true);
+                    pane.getChildren().get(1).setVisible(false);
+                    if (pane.getChildren().size() > 2)
+                        pane.getChildren().get(2).setVisible(false);
+                }
+            }
+        }
+    }
+
+    private void handleCardNamesSync(Msg.CardNamesSync m) {
+        var names = m.cardNames();
+        if (names.size() == cardNames.size()) {
+            cardNames.setAll(names);
+            for (int i = 0; i < NUM_CARDS; i++) {
+                if (cards[i] != null) {
+                    String logicalName = cardNames.get(i);
+                    Text text = cards[i].getCardName();
+                    Matcher matcher = CARD_PATTERN.matcher(logicalName);
+                    if (matcher.matches() && !wilds.contains(logicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        text.setText(Cards.getStyle(logicalName, value, suit, currentCardTheme).getText());
+                        text.setStyle(Cards.getStyle(logicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text wildText = CardDataHelper.getWildCardName(new Text(logicalName + "\n \n" + "(Wild)"));
+                        text.setText(wildText.getText());
+                        text.setStyle(wildText.getStyle());
+                    }
+                    cards[i].refreshTooltipContent(logicalName, wilds);
+                }
+            }
+        }
+    }
+
+    private void handleSendState(Msg.SendState m) {
+        if (!isHost) return;
+        gameServer.sendTo(m.playerId(), NetworkMessage.of(new Msg.CardNamesSync(new ArrayList<>(cardNames))));
+        int nCards = cards.length;
+        int[] cardIds = new int[nCards];
+        double[] cardX = new double[nCards];
+        double[] cardY = new double[nCards];
+        double[] cardRot = new double[nCards];
+        boolean[] cardBackVis = new boolean[nCards];
+        boolean[] cardFrontVis = new boolean[nCards];
+        boolean[] cardTextVis = new boolean[nCards];
+
+        for (int i = 0; i < nCards; i++) {
+            if (cards[i] == null) continue;
+            var pane = cards[i].getCardPane();
+            cardIds[i] = i;
+            cardX[i] = pane.getTranslateX();
+            cardY[i] = pane.getTranslateY();
+            cardRot[i] = pane.getRotate();
+            cardBackVis[i] = pane.getChildren().get(0).isVisible();
+            cardFrontVis[i] = pane.getChildren().get(1).isVisible();
+            cardTextVis[i] = pane.getChildren().size() > 2 && pane.getChildren().get(2).isVisible();
+        }
+
+        int nChips = chips.size();
+        String[] chipIds = new String[nChips];
+        double[] chipX = new double[nChips];
+        double[] chipY = new double[nChips];
+        double[] chipRot = new double[nChips];
+        boolean[] chipFrontVis = new boolean[nChips];
+        boolean[] chipBackVis = new boolean[nChips];
+        double[] chipR = new double[nChips];
+        double[] chipG = new double[nChips];
+        double[] chipB = new double[nChips];
+        double[] chipO = new double[nChips];
+
+        for (int i = 0; i < nChips; i++) {
+            var chip = chips.get(i);
+            var pane = chip.getChipPane();
+            chipIds[i] = chip.getPieceId();
+            chipX[i] = pane.getTranslateX();
+            chipY[i] = pane.getTranslateY();
+            chipRot[i] = pane.getRotate();
+            chipFrontVis[i] = pane.getChildren().get(0).isVisible();
+            chipBackVis[i] = pane.getChildren().get(1).isVisible();
+            var c = chip.getColor();
+            chipR[i] = c.getRed();
+            chipG[i] = c.getGreen();
+            chipB[i] = c.getBlue();
+            chipO[i] = c.getOpacity();
+        }
+
+        int nDice = dice.size();
+        String[] dieIds = new String[nDice];
+        double[] dieX = new double[nDice];
+        double[] dieY = new double[nDice];
+        double[] dieRot = new double[nDice];
+        int[] dieSides = new int[nDice];
+        int[] dieVals = new int[nDice];
+        double[] dieR = new double[nDice];
+        double[] dieG = new double[nDice];
+        double[] dieB = new double[nDice];
+        double[] dieO = new double[nDice];
+
+        for (int i = 0; i < nDice; i++) {
+            var die = dice.get(i);
+            var pane = die.getPane();
+            dieIds[i] = die.getPieceId();
+            dieX[i] = pane.getTranslateX();
+            dieY[i] = pane.getTranslateY();
+            dieRot[i] = pane.getRotate();
+            dieSides[i] = die.getSides();
+            dieVals[i] = die.getCurrentValue();
+            var c = die.getDieColor();
+            dieR[i] = c.getRed();
+            dieG[i] = c.getGreen();
+            dieB[i] = c.getBlue();
+            dieO[i] = c.getOpacity();
+        }
+
+        var sync = new Msg.StateSync(cardIds, cardX, cardY, cardRot, cardBackVis, cardFrontVis, cardTextVis,
+                chipIds, chipX, chipY, chipRot, chipFrontVis, chipBackVis,
+                chipR, chipG, chipB, chipO,
+                dieIds, dieX, dieY, dieRot, dieSides, dieVals,
+                dieR, dieG, dieB, dieO);
+
+        if (gameServer != null) {
+            gameServer.sendTo(m.playerId(), NetworkMessage.of(sync));
+        }
+    }
+
+    private void handleStateSync(Msg.StateSync s) {
+        for (Chips chip : chips) {
+            gameScene.getGameContent().getChildren().remove(chip.getChipPane());
+            pieceMap.remove(chip.getPieceId());
+        }
+        chips.clear();
+        for (Dice die : dice) {
+            gameScene.getGameContent().getChildren().remove(die.getPane());
+            pieceMap.remove(die.getPieceId());
+        }
+        dice.clear();
+
+        for (int i = 0; i < s.cardIds().length && i < cards.length; i++) {
+            if (cards[i] == null) continue;
+            var pane = cards[i].getCardPane();
+            pane.setTranslateX(s.cardX()[i]);
+            pane.setTranslateY(s.cardY()[i]);
+            pane.setRotate(s.cardRot()[i]);
+            if (pane.getChildren().size() >= 2) {
+                pane.getChildren().get(0).setVisible(s.cardBackVis()[i]);
+                pane.getChildren().get(1).setVisible(s.cardFrontVis()[i]);
+            }
+            if (pane.getChildren().size() > 2) {
+                pane.getChildren().get(2).setVisible(s.cardTextVis()[i]);
+            }
+        }
+
+        for (int i = 0; i < s.chipIds().length; i++) {
+            Color color = Color.color(s.chipR()[i], s.chipG()[i], s.chipB()[i], s.chipO()[i]);
+            Chips chip = new Chips(color, bwFrontImage, bwBackImage, s.chipIds()[i]);
+            StackPane chipPane = chip.getChipPane();
+            chipPane.setTranslateX(s.chipX()[i]);
+            chipPane.setTranslateY(s.chipY()[i]);
+            chipPane.setRotate(s.chipRot()[i]);
+            chipPane.getChildren().get(0).setVisible(s.chipFrontVis()[i]);
+            chipPane.getChildren().get(1).setVisible(s.chipBackVis()[i]);
+            setupPieceInteractions(chipPane, chip.getPieceId(), true);
+            chips.add(chip);
+            gameScene.getGameContent().getChildren().add(chipPane);
+            pieceMap.put(chip.getPieceId(), chipPane);
+        }
+
+        for (int i = 0; i < s.dieIds().length; i++) {
+            Color color = Color.color(s.dieR()[i], s.dieG()[i], s.dieB()[i], s.dieO()[i]);
+            Dice die = new Dice(s.dieSides()[i], color, s.dieIds()[i]);
+            die.setCurrentValue(s.dieVals()[i]);
+            StackPane diePane = die.getPane();
+            diePane.setTranslateX(s.dieX()[i]);
+            diePane.setTranslateY(s.dieY()[i]);
+            diePane.setRotate(s.dieRot()[i]);
+            setupPieceInteractions(diePane, die.getPieceId(), false);
+            dice.add(die);
+            gameScene.getGameContent().getChildren().add(diePane);
+            pieceMap.put(die.getPieceId(), diePane);
+        }
+
+        gameScene.bringCursorOverlayToFront();
+    }
+
+    private void setupPieceInteractions(StackPane pane, String pieceId, boolean isChipOrCard) {
+        UIUtils.makeDraggable(pane,
+                (x, y) -> sendPieceMove(pieceId, x, y),
+                (x, y) -> sendPieceMoveThrottled(pieceId, x, y)
+        );
+        if (isChipOrCard) {
+            boolean isCard = pieceId.startsWith("card:");
+            UIUtils.makeFlippableAndRotatable(pane, !isCard,
+                    (type, val) -> {
+                        if ("rotate".equals(type)) sendPieceRotate(pieceId, val);
+                        else if ("flip".equals(type)) {
+                            int frontIdx = isCard ? 1 : 0;
+                            int backIdx = isCard ? 0 : 1;
+                            sendPieceFlip(pieceId,
+                                    pane.getChildren().get(frontIdx).isVisible(),
+                                    pane.getChildren().get(backIdx).isVisible(),
+                                    pane.getChildren().size() > 2 && pane.getChildren().get(2).isVisible());
+                        }
+                    },
+                    () -> sendPieceToFront(pieceId)
+            );
+        }
+        this.makeDiscardable(pane, gameScene.getDiscardZone(), pieceId);
+    }
+
+    private void sendPieceMove(String pieceId, double x, double y) {
+        if (!isMultiplayer) return;
+        sendNetworkMessage(NetworkMessage.of(new Msg.PieceMove(myPlayerId, pieceId, x, y)));
+    }
+
+    private void sendPieceMoveThrottled(String pieceId, double x, double y) {
+        if (!isMultiplayer) return;
+        long now = System.currentTimeMillis();
+        Long last = lastPieceMoveTime.get(pieceId);
+        if (last == null || now - last > 50) {
+            lastPieceMoveTime.put(pieceId, now);
+            sendNetworkMessage(NetworkMessage.of(new Msg.PieceMove(myPlayerId, pieceId, x, y)));
+        }
+    }
+
+    private void sendPieceRotate(String pieceId, double rotation) {
+        if (!isMultiplayer) return;
+        sendNetworkMessage(NetworkMessage.of(new Msg.PieceRotate(myPlayerId, pieceId, rotation)));
+    }
+
+    private void sendPieceFlip(String pieceId, boolean frontVis, boolean backVis, boolean textVis) {
+        if (!isMultiplayer) return;
+        sendNetworkMessage(NetworkMessage.of(new Msg.PieceFlip(myPlayerId, pieceId, frontVis, backVis, textVis)));
+    }
+
+    private void sendPieceToFront(String pieceId) {
+        if (!isMultiplayer) return;
+        sendNetworkMessage(NetworkMessage.of(new Msg.PieceToFront(myPlayerId, pieceId)));
+    }
+
     private Image loadImage(String customPath, String themeDefinedPath, ThemeConfiguration theme) {
         Image originalImage = null;
         String finalPath;
 
-        // Try to load from customPath first (always treated as a file path)
         if (customPath != null && !customPath.trim().isEmpty()) {
             finalPath = customPath;
             try {
@@ -338,10 +1053,8 @@ public class TarotBoard extends Application {
             }
         }
 
-        // Fallback to themeDefinedPath if customPath failed or was not provided
         if (originalImage == null && themeDefinedPath != null && !themeDefinedPath.trim().isEmpty()) {
             if (themeDefinedPath.startsWith("/")) {
-                // Treat as an internal resource path
                 finalPath = themeDefinedPath;
                 try {
                     InputStream is = getClass().getResourceAsStream(finalPath);
@@ -354,64 +1067,91 @@ public class TarotBoard extends Application {
                     System.err.println("ERROR: Failed to load theme-defined image from resource: " + finalPath + ". Error: " + e.getMessage());
                 }
             } else {
-                // Treat as an external file system path, potentially relative to basePath
-                if (theme.getBasePath() != null) {
-                    finalPath = Paths.get(theme.getBasePath(), themeDefinedPath).toString();
-                } else {
-                    finalPath = themeDefinedPath; // Assume it's an absolute path or relative to current working directory
-                }
-
-                try {
-                    File file = new File(finalPath);
-                    if (file.exists()) {
-                        originalImage = new Image(file.toURI().toString());
-                    } else {
-                        System.err.println("ERROR: Theme-defined file not found: " + finalPath);
+                String bp = theme.getBasePath();
+                if (bp != null && bp.startsWith("./")) {
+                    finalPath = "/" + bp.substring(2) + themeDefinedPath;
+                    try {
+                        InputStream is = getClass().getResourceAsStream(finalPath);
+                        if (is != null) {
+                            originalImage = new Image(is);
+                        } else {
+                            System.err.println("ERROR: Theme-defined resource not found: " + finalPath);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("ERROR: Failed to load theme-defined image from resource: " + finalPath + ". Error: " + e.getMessage());
                     }
-                } catch (Exception e) {
-                    System.err.println("ERROR: Failed to load theme-defined image from file system: " + finalPath + ". Error: " + e.getMessage());
+                } else {
+                    if (bp != null) {
+                        finalPath = Paths.get(bp, themeDefinedPath).toString();
+                    } else {
+                        finalPath = themeDefinedPath;
+                    }
+
+                    try {
+                        File file = new File(finalPath);
+                        if (file.exists()) {
+                            originalImage = new Image(file.toURI().toString());
+                        } else {
+                            System.err.println("ERROR: Theme-defined file not found: " + finalPath);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("ERROR: Failed to load theme-defined image from file system: " + finalPath + ". Error: " + e.getMessage());
+                    }
                 }
             }
         }
 
         if (originalImage == null) {
             System.err.println("ERROR: No image could be loaded. Custom path: " + customPath + ", Theme-defined path: " + themeDefinedPath);
-            return null; // Return null if no image could be loaded
+            return null;
         }
 
         return originalImage;
     }
 
-    private void updateBackground(Pane gameRoot) {
+    private void updateBackground(Pane bg) {
         Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath(), currentCardTheme);
         if (backgroundImage != null) {
-            BackgroundSize backgroundSize = new BackgroundSize(gameScene.getWidth(), gameScene.getHeight(), false, false, true, false);
-            gameRoot.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+            bg.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.CENTER, new BackgroundSize(1.0, 1.0, true, true, false, false))));
         } else {
             System.err.println("WARNING: Background image could not be loaded. Using default/no background.");
-            gameRoot.setBackground(Background.EMPTY); // Or set a solid color background
+            bg.setBackground(Background.EMPTY);
         }
     }
 
     private void updateStartSceneBackground() {
-        if (startLayout != null && startScene != null) {
+        setLayoutBackground(startScene.getStartBg(), startScene.getScene());
+    }
+
+    private void updateMultiplayerSceneBackground() {
+        setLayoutBackground(multiplayerScene.getMpBg(), multiplayerScene.getScene());
+    }
+
+    private void updateHostGameSceneBackground() {
+        setLayoutBackground(hostGameScene.getMpBg(), hostGameScene.getScene());
+    }
+
+    private void updateJoinGameSceneBackground() {
+        setLayoutBackground(joinGameScene.getMpBg(), joinGameScene.getScene());
+    }
+
+    private void setLayoutBackground(Pane layout, Scene scene) {
+        if (layout != null && scene != null) {
             Image backgroundImage = loadImage(customBackgroundPath, currentCardTheme.getBackgroundPath(), currentCardTheme);
             if (backgroundImage != null) {
-                BackgroundSize backgroundSize = new BackgroundSize(startScene.getWidth(), startScene.getHeight(), false, false, true, false);
-                startLayout.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.CENTER, backgroundSize)));
+                layout.setBackground(new Background(new BackgroundImage(backgroundImage, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.CENTER, new BackgroundSize(1.0, 1.0, true, true, false, false))));
             } else {
-                System.err.println("WARNING: Start scene background image could not be loaded. Using default/no background.");
-                startLayout.setBackground(Background.EMPTY); // Or set a solid color background
+                System.err.println("WARNING: Scene background image could not be loaded.");
+                layout.setBackground(Background.EMPTY);
             }
         }
     }
 
-    private void loadAndCreateCards(Pane gameRoot) {
-        // Clear existing cards from gameRoot if any
+    private void loadAndCreateCards() {
         if (cards != null) {
-            for (Card card : cards) {
+            for (Cards card : cards) {
                 if (card != null) {
-                    gameRoot.getChildren().remove(card.getCardPane());
+                    gameScene.getGameContent().getChildren().remove(card.getCardPane());
                 }
             }
         }
@@ -419,10 +1159,8 @@ public class TarotBoard extends Application {
         Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
         Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
 
-        // Handle case where images might not load
         if (cardFrontImage == null || cardBackImage == null) {
             System.err.println("ERROR: Card images could not be loaded. Cannot create cards.");
-            // Potentially display an error to the user or use placeholder images
             return;
         }
 
@@ -430,59 +1168,72 @@ public class TarotBoard extends Application {
         System.out.println(suits.size() + " Suits, " + values.size() + " Values per suit, and " + wilds.size() + " Wilds");
 
         for (int i = 0; i < NUM_CARDS; i++) {
-            Card card;
+            Cards card;
             String cardLogicalName = cardNames.get(i);
 
             Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
             if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                card = new Card(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
-                card = new Card(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds); // Pass empty strings for value/suit for wild cards
+                card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
                 Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
-                // Manually set text and style for wild cards as Card constructor doesn't handle it directly
                 ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
                 card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
-            cards[i] = card; // Store Card object
+            String pieceId = "card:" + i;
+            cards[i] = card;
 
-            cards[i].getCardPane().setTranslateX(DEFAULT_DECK_X); // Initial position
-            cards[i].getCardPane().setTranslateY(DEFAULT_DECK_Y); // Initial position
-            UIUtils.makeDraggable(cards[i].getCardPane());
-            UIUtils.makeFlippableAndRotatable(cards[i].getCardPane(), false);
-            this.makeDiscardable(cards[i].getCardPane(), gameRoot, discardZone); // Make cards discardable
-            gameRoot.getChildren().add(cards[i].getCardPane());
+            cards[i].getCardPane().setTranslateX(DEFAULT_DECK_X);
+            cards[i].getCardPane().setTranslateY(DEFAULT_DECK_Y);
+            setupPieceInteractions(cards[i].getCardPane(), pieceId, true);
+            gameScene.getGameContent().getChildren().add(cards[i].getCardPane());
+            pieceMap.put(pieceId, cards[i].getCardPane());
         }
     }
 
-    private Button getResetChipsButton(Pane gameRoot) {
-        Button resetChips = new Button("Reset Chips");
-        resetChips.setOnAction(_ -> {
-            for (Chip chip : chips) {
-                gameRoot.getChildren().remove(chip.getChipPane());
-            }
-            chips.clear();
-        });
-
-        return resetChips;
+    /**
+     * Removes all chips from the board and notifies connected peers.
+     */
+    public void resetChips() {
+        for (Chips chip : chips) {
+            gameScene.getGameContent().getChildren().remove(chip.getChipPane());
+            pieceMap.remove(chip.getPieceId());
+        }
+        chips.clear();
+        sendNetworkMessage(NetworkMessage.of(new Msg.ResetChips(myPlayerId)));
     }
 
-    private void makeDiscardable(Pane pane, Pane gameRoot, StackPane discardZone) {
+    /**
+     * Removes all dice from the board and notifies connected peers.
+     */
+    public void resetDice() {
+        for (Dice die : dice) {
+            gameScene.getGameContent().getChildren().remove(die.getPane());
+            pieceMap.remove(die.getPieceId());
+        }
+        dice.clear();
+        sendNetworkMessage(NetworkMessage.of(new Msg.ResetDice(myPlayerId)));
+    }
+
+    private void makeDiscardable(Pane pane, StackPane discardZone, String pieceId) {
         pane.setOnMouseReleased(event -> {
             double sx = event.getSceneX();
             double sy = event.getSceneY();
             var bounds = discardZone.localToScene(discardZone.getBoundsInLocal());
+
+            if (isMultiplayer && pieceId != null) {
+                sendPieceMove(pieceId, pane.getTranslateX(), pane.getTranslateY());
+            }
+
             if (bounds.contains(sx, sy)) {
-                // Check if it's a Card
                 boolean isCard = false;
-                for (Card card : cards) {
+                for (Cards card : cards) {
                     if (card != null && card.getCardPane() == pane) {
-                        // Reset card state
                         pane.setTranslateX(DEFAULT_DECK_X);
                         pane.setTranslateY(DEFAULT_DECK_Y);
-                        pane.setRotate(0); // Reset rotation
-                        // Flip card face down
+                        pane.setRotate(0);
                         ImageView backView = (ImageView) pane.getChildren().get(0);
                         ImageView frontView = (ImageView) pane.getChildren().get(1);
                         Node textNode = pane.getChildren().get(2);
@@ -491,15 +1242,21 @@ public class TarotBoard extends Application {
                         textNode.setVisible(false);
                         pane.toBack();
                         isCard = true;
+                        if (isMultiplayer && pieceId != null) {
+                            sendNetworkMessage(NetworkMessage.of(new Msg.PieceMove(myPlayerId, pieceId, DEFAULT_DECK_X, DEFAULT_DECK_Y)));
+                            sendPieceFlip(pieceId, false, true, false);
+                            sendPieceRotate(pieceId, 0);
+                        }
                         break;
                     }
                 }
-                if (isCard) return; // If it was a card, we're done
+                if (isCard) return;
 
-                // If not a card, proceed with existing logic for dice and chips
                 for (int i = 0; i < dice.size(); i++) {
                     if (dice.get(i).getPane() == pane) {
-                        gameRoot.getChildren().remove(pane);
+                        gameScene.getGameContent().getChildren().remove(pane);
+                        pieceMap.remove(dice.get(i).getPieceId());
+                        sendNetworkMessage(NetworkMessage.of(new Msg.DeletePiece(myPlayerId, dice.get(i).getPieceId())));
                         dice.remove(i);
                         return;
                     }
@@ -513,230 +1270,346 @@ public class TarotBoard extends Application {
                     }
                 }
                 if (idx >= 0) {
-                    gameRoot.getChildren().remove(pane);
+                    gameScene.getGameContent().getChildren().remove(pane);
+                    pieceMap.remove(chips.get(idx).getPieceId());
+                    sendNetworkMessage(NetworkMessage.of(new Msg.DeletePiece(myPlayerId, chips.get(idx).getPieceId())));
                     chips.remove(idx);
                 }
             }
         });
     }
 
-    private Button createHelpButton() {
-        Button helpButton = new Button("Help");
-        helpButton.setOnAction(_ -> HelpWindow.show(primaryStage));
-        return helpButton;
-    }
+    /**
+     * Reshuffles all card names back into the deck and resets card positions.
+     * Only the host or a single-player session may perform the reshuffle.
+     */
+    public void reshuffleCards() {
+        if (isHost || !isMultiplayer) {
+            CardDataHelper.generateShuffledCardNames(cardNames);
+            reshuffled = true;
 
-    private void getReshuffleCardsButton() {
-        CardDataHelper.generateShuffledCardNames(cardNames);
-        reshuffled = true;
+            for (int a = 0; a < NUM_CARDS; a++) {
+                if (cards[a] != null) {
+                    StackPane cardPane = cards[a].getCardPane();
+                    Text cardNameText = cards[a].getCardName();
+                    String cardLogicalName = cardNames.get(a);
+                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
 
-        // Re-apply styles and tooltips for the new card order to existing cards
-        for (int a = 0; a < NUM_CARDS; a++) {
-            if (cards[a] != null) { // Ensure the card object exists
-                StackPane cardPane = cards[a].getCardPane();
-                Text cardNameText = cards[a].getCardName(); // Get the Text object from the existing Card
-                String cardLogicalName = cardNames.get(a);
-                Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+                    cardPane.setTranslateX(DEFAULT_DECK_X);
+                    cardPane.setTranslateY(DEFAULT_DECK_Y);
+                    cardPane.getTransforms().removeAll(cardPane.getTransforms());
+                    cardPane.setRotate(0);
 
-                // Reset position and rotation
-                cardPane.setTranslateX(DEFAULT_DECK_X); // Use constant
-                cardPane.setTranslateY(DEFAULT_DECK_Y); // Use constant
-                cardPane.getTransforms().removeAll(cardPane.getTransforms());
-                cardPane.setRotate(0);
+                    ImageView backView = (ImageView) cardPane.getChildren().get(0);
+                    ImageView frontView = (ImageView) cardPane.getChildren().get(1);
+                    Node textNode = cardPane.getChildren().get(2);
+                    backView.setVisible(true);
+                    frontView.setVisible(false);
+                    textNode.setVisible(false);
 
-                // Reset flip state (face down)
-                ImageView backView = (ImageView) cardPane.getChildren().get(0);
-                ImageView frontView = (ImageView) cardPane.getChildren().get(1);
-                Node textNode = cardPane.getChildren().get(2);
-                backView.setVisible(true);
-                frontView.setVisible(false);
-                textNode.setVisible(false);
+                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text text = new Text(cardLogicalName);
+                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
+                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
+                    }
+                    cards[a].refreshTooltipContent(cardLogicalName, wilds);
 
-                if (matcher.matches() && !wilds.contains(cardLogicalName)) {
-                    String value = matcher.group("value");
-                    String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
-                    cardNameText.setStyle(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
-                } else {
-                    Text text = new Text(cardLogicalName);
-                    cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
-                    cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
+                    String pieceId = "card:" + a;
+                    setupPieceInteractions(cards[a].getCardPane(), pieceId, true);
                 }
-                cards[a].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
-
-                UIUtils.makeDraggable(cardPane);
-                UIUtils.makeFlippableAndRotatable(cardPane, false);
             }
+            reshuffled = false;
+            sendNetworkMessage(NetworkMessage.of(new Msg.ReshuffleCards(myPlayerId)));
+            sendNetworkMessage(NetworkMessage.of(new Msg.CardNamesSync(new ArrayList<>(cardNames))));
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.ReshuffleCards(myPlayerId)));
         }
-        reshuffled = false;
     }
 
-    private void continueGame() {
-        loadGame();
-        primaryStage.setScene(gameScene);
-        primaryStage.setTitle("Game Scene");
+    /**
+     * Loads a saved game from disk and restores the board state or re-enters multiplayer setup.
+     */
+    public void continueGame() {
+        String saveFile = PlatformPaths.getSaveFilePath();
+        File file = new File(saveFile);
+        if (!file.exists()) return;
+
+        SaveData save;
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(saveFile))) {
+            save = (SaveData) ois.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error loading save: " + e.getMessage());
+            return;
+        }
+
+        if (save.isMultiplayer()) {
+            hostGameScene.getHostPortField().setText(String.valueOf(save.serverPort()));
+            if (save.serverIp() != null && !save.serverIp().isEmpty()) {
+                joinGameScene.getJoinIpField().setText(save.serverIp());
+                joinGameScene.getJoinPortField().setText(String.valueOf(save.serverPort()));
+                joinGameScene.getNetworkStatusLabel().setText("Saved multiplayer session - re-join");
+                joinGameScene.getNetworkStatusLabel().setStyle("-fx-font-size: 14pt; -fx-text-fill: #FFA500;");
+                switchToJoinGame();
+            } else {
+                hostGameScene.getNetworkStatusLabel().setText("Saved multiplayer session - re-host");
+                hostGameScene.getNetworkStatusLabel().setStyle("-fx-font-size: 14pt; -fx-text-fill: #FFA500;");
+                switchToHostGame();
+            }
+        } else {
+            loadGame(save);
+            primaryStage.setScene(gameScene.getScene());
+            primaryStage.setTitle("Game Scene");
+        }
     }
 
-    private void switchToStart() {
-        primaryStage.setScene(startScene);
-        primaryStage.setTitle("Start Scene");
+    /**
+     * Switches the scene to the multiplayer setup screen.
+     */
+    public void switchToMultiplayer() {
+        updateMultiplayerSceneBackground();
+        primaryStage.setScene(multiplayerScene.getScene());
+        primaryStage.setTitle("Multiplayer");
     }
 
-    private void spawnDie(Pane gameRoot, int sides, Color dieColor) {
-        Die die = new Die(sides, dieColor);
+    public void switchToHostGame() {
+        updateHostGameSceneBackground();
+        primaryStage.setScene(hostGameScene.getScene());
+        primaryStage.setTitle("Host Game");
+    }
+
+    public void switchToJoinGame() {
+        updateJoinGameSceneBackground();
+        primaryStage.setScene(joinGameScene.getScene());
+        primaryStage.setTitle("Join Game");
+    }
+
+    public void switchToStart() {
+        if (hostGameScene != null) {
+            hostGameScene.getNetworkStatusLabel().setText("Offline");
+            hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpLabel());
+        }
+        if (joinGameScene != null) {
+            joinGameScene.getNetworkStatusLabel().setText("Offline");
+            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpLabel());
+        }
+        primaryStage.setScene(startScene.getScene());
+        primaryStage.setTitle("TarotBoard");
+    }
+
+    /**
+     * Spawns a new die with the given number of sides and color at the center of the board.
+     *
+     * @param sides    the number of die faces
+     * @param dieColor the color of the die
+     */
+    public void spawnDie(int sides, Color dieColor) {
+        Dice die = new Dice(sides, dieColor);
         StackPane diePane = die.getPane();
-        UIUtils.makeDraggable(diePane);
-        this.makeDiscardable(diePane, gameRoot, discardZone);
+        setupPieceInteractions(diePane, die.getPieceId(), false);
 
         int randomX = new Random().nextInt(-5, 5);
         int randomY = new Random().nextInt(-5, 5);
-        diePane.setTranslateX((gameScene.getWidth() / 2) + randomX);
-        diePane.setTranslateY((gameScene.getHeight() / 2) + randomY);
-        gameRoot.getChildren().add(diePane);
+        diePane.setTranslateX((gameScene.getScene().getWidth() / 2) + randomX);
+        diePane.setTranslateY((gameScene.getScene().getHeight() / 2) + randomY);
+        gameScene.getGameContent().getChildren().add(diePane);
         dice.add(die);
+        pieceMap.put(die.getPieceId(), diePane);
+        gameScene.bringCursorOverlayToFront();
+
+        sendNetworkMessage(NetworkMessage.of(new Msg.SpawnDie(myPlayerId, die.getPieceId(),
+                diePane.getTranslateX(), diePane.getTranslateY(),
+                sides, die.getCurrentValue(),
+                dieColor.getRed(), dieColor.getGreen(), dieColor.getBlue(), dieColor.getOpacity())));
     }
 
-    private void spawnChip(Pane gameRoot, Color chipColor) {
-        Chip chip = new Chip(chipColor, bwFrontImage, bwBackImage);
+    /**
+     * Spawns a new chip with the given color at a random offset near the center of the board.
+     *
+     * @param chipColor the color of the chip
+     */
+    public void spawnChip(Color chipColor) {
+        Chips chip = new Chips(chipColor, bwFrontImage, bwBackImage);
         StackPane chipPane = chip.getChipPane();
 
         int randomX = new Random().nextInt(-5, 5);
         int randomY = new Random().nextInt(-5, 5);
-        chipPane.setTranslateX((gameScene.getWidth() / 2) + randomX);
-        chipPane.setTranslateY((gameScene.getHeight() / 2) + randomY);
+        chipPane.setTranslateX((gameScene.getScene().getWidth() / 2) + randomX);
+        chipPane.setTranslateY((gameScene.getScene().getHeight() / 2) + randomY);
 
-        UIUtils.makeDraggable(chipPane);
-        this.makeDiscardable(chipPane, gameRoot, discardZone);
-        UIUtils.makeFlippableAndRotatable(chipPane, true);
+        setupPieceInteractions(chipPane, chip.getPieceId(), true);
 
         chips.add(chip);
-        gameRoot.getChildren().add(chipPane);
+        gameScene.getGameContent().getChildren().add(chipPane);
+        pieceMap.put(chip.getPieceId(), chipPane);
+        gameScene.bringCursorOverlayToFront();
+
+        sendNetworkMessage(NetworkMessage.of(new Msg.SpawnChip(myPlayerId, chip.getPieceId(),
+                chipPane.getTranslateX(), chipPane.getTranslateY(),
+                chipColor.getRed(), chipColor.getGreen(), chipColor.getBlue(), chipColor.getOpacity())));
     }
 
-    private void newGame(Pane gameRoot) {
-        // Clear existing cards from gameRoot
-        if (cards != null) {
-            for (Card card : cards) {
-                if (card != null) {
-                    gameRoot.getChildren().remove(card.getCardPane());
+    /**
+     * Clears all pieces from the board, generates a fresh deck of cards, and applies
+     * the current theme. Only the host or a single-player session may start a new game.
+     */
+    public void newGame() {
+        if (isHost || !isMultiplayer) {
+            if (cards != null) {
+                for (Cards card : cards) {
+                    if (card != null) {
+                        gameScene.getGameContent().getChildren().remove(card.getCardPane());
+                    }
                 }
             }
-        }
-        // Clear existing chips from gameRoot
-        for (Chip chip : chips) {
-            gameRoot.getChildren().remove(chip.getChipPane());
-        }
-        chips.clear();
-
-        // Clear existing dice from gameRoot
-        for (Die die : dice) {
-            gameRoot.getChildren().remove(die.getPane());
-        }
-        dice.clear();
-
-        // Re-initialize cards array
-        cards = new Card[NUM_CARDS];
-        loadAndCreateCards(gameRoot); // Load cards with the current theme
-
-        CardDataHelper.generateShuffledCardNames(cardNames);
-        reshuffled = true;
-
-        // Re-apply styles and tooltips for the new card order
-        for (int a = 0; a < NUM_CARDS; a++) {
-            if (cards[a] != null) { // Ensure the card object exists
-                Text cardNameText = cards[a].getCardName();
-                String cardLogicalName = cardNames.get(a);
-                Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
-                if (matcher.matches() && !wilds.contains(cardLogicalName)) {
-                    String value = matcher.group("value");
-                    String suit = matcher.group("suit");
-                    cardNameText.setText(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
-                    cardNameText.setStyle(Card.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
-                } else {
-                    Text text = new Text(cardLogicalName);
-                    cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
-                    cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
-                }
-                cards[a].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
+            for (Chips chip : chips) {
+                gameScene.getGameContent().getChildren().remove(chip.getChipPane());
             }
+            chips.clear();
+
+            for (Dice die : dice) {
+                gameScene.getGameContent().getChildren().remove(die.getPane());
+            }
+            dice.clear();
+            pieceMap.clear();
+
+            cards = new Cards[NUM_CARDS];
+            loadAndCreateCards();
+
+            CardDataHelper.generateShuffledCardNames(cardNames);
+            reshuffled = true;
+
+            for (int a = 0; a < NUM_CARDS; a++) {
+                if (cards[a] != null) {
+                    Text cardNameText = cards[a].getCardName();
+                    String cardLogicalName = cardNames.get(a);
+                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text text = new Text(cardLogicalName);
+                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
+                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
+                    }
+                    cards[a].refreshTooltipContent(cardLogicalName, wilds);
+                }
+            }
+            reshuffled = false;
+            applyCurrentTheme();
+            sendNetworkMessage(NetworkMessage.of(new Msg.NewGame(myPlayerId)));
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.NewGame(myPlayerId)));
         }
-        reshuffled = false;
-        applyCurrentTheme(gameRoot); // Apply theme after new game setup
     }
 
-    // New method to apply the current theme to existing game items
-    private void applyCurrentTheme(Pane gameRoot) {
-        // Update background
-        updateBackground(gameRoot);
+    /**
+     * Applies the given theme configuration to the board, updating card art,
+     * chip images, and all scene backgrounds.
+     *
+     * @param theme the theme to apply
+     */
+    public void applyCurrentTheme(ThemeConfiguration theme) {
+        currentCardTheme = theme;
+        ThemeManager.setActiveTheme(theme);
+        customCardFrontPath = null;
+        customCardBackPath = null;
+        customChipFrontPath = null;
+        customChipBackPath = null;
+        customBackgroundPath = null;
+        applyCurrentTheme();
+    }
+
+    /**
+     * Re-applies the currently active theme to all scenes, chip images, and card images.
+     */
+    public void applyCurrentTheme() {
+        updateBackground(gameScene.getGameBg());
         updateStartSceneBackground();
+        updateMultiplayerSceneBackground();
+        updateHostGameSceneBackground();
+        updateJoinGameSceneBackground();
 
-        // Reload chip images
         bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
-        // Update existing chips
-        for (Chip chip : chips) {
+        for (Chips chip : chips) {
             chip.updateImages(bwFrontImage, bwBackImage);
         }
 
-        // Reload card images
         Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
         Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
 
-        // Update existing cards
         if (cards != null) {
-            for (Card card : cards) {
+            for (Cards card : cards) {
                 if (card != null) {
                     card.updateImages(cardFrontImage, cardBackImage);
-                    // Also update card text style if needed (e.g., color changes with theme)
                     Text cardNameText = card.getCardName();
-                    String cardName = cardNameText.getText().split("\n")[0].trim(); // Extract actual card name
+                    String cardName = cardNameText.getText().split("\n")[0].trim();
                     Matcher matcher = CARD_PATTERN.matcher(cardName);
                     if (matcher.matches() && !wilds.contains(cardName)) {
                         String value = matcher.group("value");
                         String suit = matcher.group("suit");
-                        cardNameText.setStyle(Card.getStyle(cardName, value, suit, currentCardTheme).getStyle());
+                        cardNameText.setStyle(Cards.getStyle(cardName, value, suit, currentCardTheme).getStyle());
                     } else {
-                        // For wild cards, re-apply wild card style
                         Text tempText = new Text(cardName);
                         cardNameText.setStyle(CardDataHelper.getWildCardName(tempText).getStyle());
                     }
-                    card.refreshTooltipContent(cardName, wilds); // Refresh the tooltip content
+                    card.refreshTooltipContent(cardName, wilds);
                 }
             }
         }
     }
 
-
+    /**
+     * Called when the application is shutting down.
+     * Saves the current game state and cleans up network connections.
+     */
     @Override
     public void stop() {
         saveGame();
+        leaveGame();
     }
 
+    /**
+     * Saves the current game state (card positions, chip/die states, theme, multiplayer info)
+     * to the application's saved game file.
+     */
     private void saveGame() {
-        if (cards == null) return; // Changed from cardPanes
+        if (cards == null) return;
 
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(SAVE_FILE))) {
-            oos.writeObject(getSaveData(new ArrayList<>())); // Pass an empty list, as cardStates are generated in getSaveData
+        String saveFile = PlatformPaths.getSaveFilePath();
+        try {
+            Files.createDirectories(Path.of(PlatformPaths.getAppDataDir()));
+        } catch (IOException e) {
+            System.err.println("Error creating save directory: " + e.getMessage());
+        }
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(saveFile))) {
+            oos.writeObject(getSaveData(new ArrayList<>()));
         } catch (IOException e) {
             System.err.println("Error saving game: " + e.getMessage());
         }
     }
 
+    /**
+     * Builds a {@link SaveData} object from the current board state, including card,
+     * chip, and die positions, multiplayer connection info, and theme settings.
+     *
+     * @param cardStates an initially empty list to populate with card states
+     * @return the complete save data snapshot
+     */
     private SaveData getSaveData(List<SaveData.CardState> cardStates) {
-        // Populate cardStates here, as it's needed for the SaveData constructor
-        for (Card card : cards) { // Iterate through Card objects
+        for (Cards card : cards) {
             if (card == null) continue;
-            StackPane pane = card.getCardPane(); // Get the pane from the Card object
+            StackPane pane = card.getCardPane();
             double tx = pane.getTranslateX();
             double ty = pane.getTranslateY();
-            // Removed iteration over transforms for translation, as translateX/Y are now directly used for dragging
-            // for (var t : pane.getTransforms()) {
-            //     if (t instanceof Translate tr) {
-            //         tx += tr.getX();
-            //         ty += tr.getY();
-            //     }
-            // }
 
             ImageView backView = (ImageView) pane.getChildren().get(0);
             ImageView frontView = (ImageView) pane.getChildren().get(1);
@@ -752,17 +1625,10 @@ public class TarotBoard extends Application {
 
         List<SaveData.ChipState> chipStates = getChipStates();
         List<SaveData.DieState> dieStates = new ArrayList<>();
-        for (Die die : dice) {
+        for (Dice die : dice) {
             StackPane diePane = die.getPane();
             double tx = diePane.getTranslateX();
             double ty = diePane.getTranslateY();
-            // Removed iteration over transforms for translation
-            // for (var t : diePane.getTransforms()) {
-            //     if (t instanceof Translate tr) {
-            //         tx += tr.getX();
-            //         ty += tr.getY();
-            //     }
-            // }
             Color dieColor = die.getDieColor();
 
             dieStates.add(new SaveData.DieState(
@@ -774,24 +1640,38 @@ public class TarotBoard extends Application {
             ));
         }
 
+        String mpIp = null;
+        int mpPort = 0;
+        if (isMultiplayer) {
+            if (isHost && gameServer != null) {
+                mpIp = "HOST";
+                mpPort = gameServer.getPort();
+            } else if (gameClient != null && gameClient.isConnected()) {
+                mpIp = joinGameScene.getJoinIpField().getText().trim();
+                try {
+                    mpPort = Integer.parseInt(joinGameScene.getJoinPortField().getText().trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+
         return new SaveData(cardStates, chipStates, dieStates, reshuffled, new ArrayList<>(cardNames),
                 customCardFrontPath, customCardBackPath, customChipFrontPath, customChipBackPath, customBackgroundPath,
-                currentCardTheme.getThemeName()); // Save the current theme name
+                currentCardTheme.getThemeName(),
+                isMultiplayer, mpIp, mpPort);
     }
 
+    /**
+     * Collects the current position, rotation, and color state of all chips on the board.
+     *
+     * @return a list of chip state snapshots
+     */
     private List<SaveData.ChipState> getChipStates() {
         List<SaveData.ChipState> chipStates = new ArrayList<>();
-        for (Chip chip : chips) {
+        for (Chips chip : chips) {
             StackPane chipPane = chip.getChipPane();
             double tx = chipPane.getTranslateX();
             double ty = chipPane.getTranslateY();
-            // Removed iteration over transforms for translation
-            // for (var t : chipPane.getTransforms()) {
-            //     if (t instanceof Translate tr) {
-            //         tx += tr.getX();
-            //         ty += tr.getY();
-            //     }
-            // }
 
             ImageView frontView = (ImageView) chipPane.getChildren().get(0);
             ImageView backView = (ImageView) chipPane.getChildren().get(1);
@@ -807,81 +1687,69 @@ public class TarotBoard extends Application {
         return chipStates;
     }
 
-    private void loadGame() {
-        File file = new File(SAVE_FILE);
-        if (!file.exists()) {
-            System.out.println("No save file found. Starting new game.");
-            return;
-        }
-
-        SaveData save;
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(SAVE_FILE))) {
-            save = (SaveData) ois.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error loading game: " + e.getMessage());
-            return;
-        }
-
+    /**
+     * Restores the board state from a {@link SaveData} object, including card names,
+     * piece positions, custom asset paths, theme, and multiplayer info.
+     *
+     * @param save the save data to restore
+     */
+    private void loadGame(SaveData save) {
         reshuffled = save.reshuffled();
         cardNames.setAll(save.cardNames());
 
-        // Load custom image paths from save data
         customCardFrontPath = save.customCardFrontPath();
         customCardBackPath = save.customCardBackPath();
         customChipFrontPath = save.customChipFrontPath();
         customChipBackPath = save.customChipBackPath();
         customBackgroundPath = save.customBackgroundPath();
-        currentCardTheme = ThemeManager.getThemeByName(save.themeName()); // Load theme from save
+        currentCardTheme = ThemeManager.getThemeByName(save.themeName());
+        ThemeManager.setActiveTheme(currentCardTheme);
 
-        // Remove existing cards from gameRoot before loading new ones
-        Pane gameRoot = (Pane) gameScene.getRoot();
-        if (cards != null) { // Changed from cardPanes
-            for (Card card : cards) { // Iterate through Card objects
+        if (cards != null) {
+            for (Cards card : cards) {
                 if (card != null) {
-                    gameRoot.getChildren().remove(card.getCardPane());
+                    gameScene.getGameContent().getChildren().remove(card.getCardPane());
                 }
             }
         }
-        cards = new Card[NUM_CARDS]; // Re-initialize cards array
+        cards = new Cards[NUM_CARDS];
+        pieceMap.clear();
 
-        // Load images for the current theme (assuming theme is saved or default)
         Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
         Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
 
-        // Update background and chip images based on loaded custom paths
-        updateBackground(gameRoot);
-        updateStartSceneBackground(); // Update start scene background
+        updateBackground(gameScene.getGameBg());
+        updateStartSceneBackground();
         bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
         int idx = 0;
         for (var cs : save.cards()) {
-            Card card; // Declare Card object
+            Cards card;
             String cardLogicalName = cardNames.get(idx);
 
             Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
             if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                card = new Card(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
-                card = new Card(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds); // Pass empty strings for value/suit for wild cards
+                card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
                 Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
-                // Manually set text and style for wild cards as Card constructor doesn't handle it directly
                 ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
                 card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
-            cards[idx] = card; // Store Card object
+            String pieceId = "card:" + idx;
+            cards[idx] = card;
 
-            StackPane pane = cards[idx].getCardPane(); // Get pane from Card object
+            StackPane pane = cards[idx].getCardPane();
 
             ImageView backView = (ImageView) pane.getChildren().get(0);
             ImageView frontView = (ImageView) pane.getChildren().get(1);
             Text text = (Text) pane.getChildren().get(2);
 
-            pane.getTransforms().clear(); // Clear any existing transforms
-            UIUtils.makeDraggable(pane);
-            this.makeDiscardable(pane, gameRoot, discardZone); // Make cards discardable
+            pane.getTransforms().clear();
+            setupPieceInteractions(pane, pieceId, true);
 
             pane.setTranslateX(cs.translateX());
             pane.setTranslateY(cs.translateY());
@@ -899,25 +1767,25 @@ public class TarotBoard extends Application {
                 if (matcher1.matches()) {
                     String value = matcher1.group("value");
                     String suit = matcher1.group("suit");
-                    var styled = Card.getStyle(cardLogicalName, value, suit, currentCardTheme);
+                    var styled = Cards.getStyle(cardLogicalName, value, suit, currentCardTheme);
                     text.setText(styled.getText());
                     text.setStyle(styled.getStyle());
                 }
             }
-            cards[idx].refreshTooltipContent(cardLogicalName, wilds); // Refresh the tooltip content
-            gameRoot.getChildren().add(pane); // Add the card to the gameRoot
+            cards[idx].refreshTooltipContent(cardLogicalName, wilds);
+            gameScene.getGameContent().getChildren().add(pane);
+            pieceMap.put(pieceId, pane);
             idx++;
         }
 
-        for (var ds : save.dice()) { // Corrected loop to iterate over save.dice()
+        for (var ds : save.dice()) {
             Color loadedColor = new Color(ds.red(), ds.green(), ds.blue(), ds.opacity());
-            Die die = new Die(ds.sides(), loadedColor);
+            Dice die = new Dice(ds.sides(), loadedColor);
             StackPane diePane = die.getPane();
 
             diePane.translateXProperty().unbind();
-            diePane.getTransforms().clear(); // Clear any existing transforms
-            UIUtils.makeDraggable(diePane);
-            this.makeDiscardable(diePane, gameRoot, discardZone); // Make dice discardable
+            diePane.getTransforms().clear();
+            setupPieceInteractions(diePane, die.getPieceId(), false);
 
             diePane.setTranslateX(ds.translateX());
             diePane.setTranslateY(ds.translateY());
@@ -926,11 +1794,130 @@ public class TarotBoard extends Application {
             die.setCurrentValue(ds.currentValue());
 
             dice.add(die);
-            gameRoot.getChildren().add(diePane);
+            gameScene.getGameContent().getChildren().add(diePane);
+            pieceMap.put(die.getPieceId(), diePane);
+        }
+        gameScene.bringCursorOverlayToFront();
+    }
+
+    /**
+     * Checks for a newer application release in a background thread and updates
+     * the provided label with the result. The label is shown only when an update
+     * is available and is made clickable to start the download.
+     *
+     * @param statusLabel the label to update with check status
+     */
+    public void checkForUpdates(Label statusLabel) {
+        new Thread(() -> {
+            try {
+                UpdateManager.ReleaseInfo release = UpdateManager.checkForUpdate();
+                Platform.runLater(() -> {
+                    if (release != null && UpdateManager.isNewerVersion(release.version())) {
+                        statusLabel.setText("Update v" + release.version() + " available (click to download)");
+                        statusLabel.setStyle("-fx-text-fill: white; -fx-font-size: 40; -fx-font-weight: bold; -fx-underline: true; -fx-cursor: hand;");
+                        statusLabel.setOnMouseClicked(_ -> downloadAndInstallUpdate(release));
+                        statusLabel.setVisible(true);
+                    }
+                });
+            } catch (Exception ignored) {
+            }
+        }).start();
+    }
+
+    /**
+     * Shows simple information alert dialog and waits for the user to dismiss it.
+     *
+     * @param title   the alert window title
+     * @param content the alert message text
+     */
+    private void showAlert(String title, String content) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
+    /**
+     * Downloads the given release MSI with a progress dialog, then launches the installer
+     * and exits the application.
+     *
+     * @param release the release to download and install
+     */
+    private void downloadAndInstallUpdate(UpdateManager.ReleaseInfo release) {
+        Stage progressStage = new Stage();
+        progressStage.setTitle("Downloading Update");
+        VBox vbox = new VBox(10);
+        vbox.setAlignment(Pos.CENTER);
+        vbox.setStyle("-fx-padding: 20;");
+        Label statusLabel = new Label("Downloading version " + release.version() + "...");
+        ProgressBar progressBar = new ProgressBar(0);
+        progressBar.setPrefWidth(300);
+        vbox.getChildren().addAll(statusLabel, progressBar);
+        Scene scene = new Scene(vbox);
+        progressStage.setScene(scene);
+        progressStage.setWidth(380);
+        progressStage.setHeight(130);
+        progressStage.show();
+
+        new Thread(() -> {
+            try {
+                java.nio.file.Path msiPath = UpdateManager.downloadUpdate(release.downloadUrl(),
+                        fraction -> Platform.runLater(() -> progressBar.setProgress(fraction)));
+                Platform.runLater(() -> {
+                    progressStage.close();
+                    try {
+                        UpdateManager.installUpdate(msiPath);
+                        showAlert("Update Downloaded", "The update has been downloaded.\nThe application will now close to complete the installation.");
+                        Platform.exit();
+                    } catch (IOException e) {
+                        showAlert("Install Failed", "Could not launch installer: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    progressStage.close();
+                    showAlert("Download Failed", "Could not download update: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+
+    private static boolean launched;
+
+    /**
+     * Application entry point. Handles {@code --version} and {@code --help}
+     * flags before launching the JavaFX application.
+     *
+     * @param args command-line arguments
+     */
+    public static void main(String[] args) {
+        if (args.length > 0) {
+            switch (args[0]) {
+                case "--version" -> {
+                    System.out.println("TarotBoard v" + UpdateManager.CURRENT_VERSION);
+                    return;
+                }
+                case "--help" -> {
+                    System.out.println("Usage: TarotBoard [--version] [--help]");
+                    return;
+                }
+            }
+        }
+        if (!launched) {
+            launched = true;
+            launch(args);
         }
     }
 
-    public static void main(String[] args) {
-        launch(args);
+    /**
+     * JavaFX application initializer. Re-enters {@link #main(String[])}
+     * with the raw launch arguments so that {@code main} is the sole CLI
+     * handler and is visibly referenced from code.
+     */
+    @Override
+    public void init() {
+        main(getParameters().getRaw().toArray(String[]::new));
     }
 }
