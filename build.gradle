@@ -4,6 +4,7 @@ plugins {
     id "com.gradleup.shadow" version "8.3.0"
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" //This is latest already don't touch
 }
 
 group = "com.mystic"
@@ -11,14 +12,28 @@ version = "3.0.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-repositories {
-    mavenCentral()
+application {
+    mainClass = "com.mystic.tarotboard.TarotBoard" //gluon see this
 }
 
+repositories {
+    mavenCentral()
+    google()
+    maven {
+        url 'https://nexus.gluonhq.com/nexus/content/repositories/releases'
+    }
+}
+
+// --- COMMON CONFIGURATION ---
 java {
     modularity.inferModulePath = true
 }
 
+dependencies {
+    implementation "com.google.code.gson:gson:2.10.1"
+}
+
+// --- JAVAFX & DESKTOP (JLINK/JPACKAGE) CONFIGURATION ---
 javafx {
     version = "21.0.1"
     modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
@@ -30,10 +45,6 @@ application {
     applicationDefaultJvmArgs = [
             "--enable-native-access=javafx.graphics"
     ]
-}
-
-dependencies {
-    implementation "com.google.code.gson:gson:2.10.1"
 }
 
 def jpackageType = project.findProperty('installerType') ?: 'msi'
@@ -78,4 +89,21 @@ tasks.register('runServer', JavaExec) {
     description = 'Run the headless dedicated server'
     mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
     classpath = sourceSets.main.runtimeClasspath
+}
+
+// --- ANDROID (GLUONFX) CONFIGURATION ---
+gluonfx {
+    target = "android"
+    appIdentifier = 'com.mystic.tarotboard'
+    
+    attachConfig {
+        version = '4.0.20'
+        services 'lifecycle'
+    }
+
+    release {
+        appLabel = 'TarotBoard'
+        versionCode = 1
+        versionName = '1.0'
+    }
 }
