@@ -113,7 +113,7 @@ jobs:
 
       - name: Build APK
         run: |
-          ./gradlew nativeBuild -PandroidBuild=true --stacktrace
+          ./gradlew nativeBuild -PandroidBuild=true --stacktrace --info
           ./gradlew nativePackage -PandroidBuild=true --stacktrace
         env:
           GRAALVM_HOME: ${{ env.JAVA_HOME }}
