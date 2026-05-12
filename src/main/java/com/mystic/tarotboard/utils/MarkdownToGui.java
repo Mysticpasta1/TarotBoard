@@ -43,6 +43,7 @@ public class MarkdownToGui {
                     int rowIndex = 0;
                     Node section = node.getFirstChild();
                     while (section != null) {
+                        // CRITICAL: Explicitly ignore TableSeparator to remove the "---" row
                         if (section instanceof TableHead || section instanceof TableBody) {
                             Node row = section.getFirstChild();
                             while (row != null) {
@@ -86,6 +87,7 @@ public class MarkdownToGui {
 
     private static void renderInline(Node parent, TextFlow flow, ScrollPane sp, VBox container) {
         Node child = parent.getFirstChild();
+        // If it's a simple text node with no children, use its content directly
         if (child == null && parent instanceof Text t) {
             addTextToFlow(String.valueOf(t.getChars()), flow, false);
             return;
