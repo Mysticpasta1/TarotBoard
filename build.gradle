@@ -11,7 +11,7 @@ plugins {
 group = "com.mystic"
 version = "3.0.0"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
 

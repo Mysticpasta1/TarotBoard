@@ -1815,7 +1815,7 @@ public class TarotBoard extends Application {
                     if (release != null && UpdateManager.isNewerVersion(release.version())) {
                         statusLabel.setText("Update v" + release.version() + " available (click to download)");
                         statusLabel.setStyle("-fx-text-fill: white; -fx-font-size: 40; -fx-font-weight: bold; -fx-underline: true; -fx-cursor: hand;");
-                        statusLabel.setOnMouseClicked(_ -> downloadAndInstallUpdate(release));
+                        statusLabel.setOnMouseClicked(event -> downloadAndInstallUpdate(release));
                         statusLabel.setVisible(true);
                     }
                 });

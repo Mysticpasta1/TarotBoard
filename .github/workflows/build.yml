@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: 25
+          java-version: 21
           distribution: temurin
 
       - name: Cache Gradle
@@ -56,7 +56,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: 25
+          java-version: 21
           distribution: temurin
 
       - name: Cache Gradle
@@ -90,7 +90,7 @@ jobs:
       - name: Set up GraalVM (provides native-image and JAVA_HOME)
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '25'
+          java-version: '21'
           distribution: 'graalvm'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: true
