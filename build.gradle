@@ -21,13 +21,7 @@ tasks.withType(JavaCompile).configureEach {
 
 application {
     mainClass = "com.mystic.tarotboard.TarotBoard"
-    if (isAndroidBuild) {
-        applicationDefaultJvmArgs = []
-    } else {
-        applicationDefaultJvmArgs = [
-            '--enable-native-access=javafx.graphics'
-        ]
-    }
+    applicationDefaultJvmArgs = ['--enable-native-access=javafx.graphics']
 }
 
 repositories {
@@ -96,7 +90,6 @@ tasks.register('runServer', JavaExec) {
     mainClass = 'com.mystic.tarotboard.network.server.HeadlessServer'
     classpath = sourceSets.main.runtimeClasspath
 }
-
 if (isAndroidBuild) {
     apply plugin: 'com.gluonhq.gluonfx-gradle-plugin'
 
@@ -104,12 +97,5 @@ if (isAndroidBuild) {
         target = "android"
         graalvmHome = System.getenv("GRAALVM_HOME")
     }
-
-    sourceSets {
-        main {
-            java {
-                exclude 'module-info.java'
-            }
-        }
-    }
 }
+
