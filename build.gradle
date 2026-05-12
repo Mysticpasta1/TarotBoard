@@ -16,7 +16,7 @@ repositories {
 }
 
 java {
-    modularity.inferModulePath = false
+    modularity.inferModulePath = true
 }
 
 javafx {

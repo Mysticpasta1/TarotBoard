@@ -2,26 +2,29 @@ name: Build & Publish Release APK
 
 on:
   push:
-    branches: [ master ]
+    branches: [master ]
   pull_request:
   workflow_dispatch:
 
 jobs:
-  Gradle:
+  android:
+    name: Build Android Release APK
     runs-on: ubuntu-latest
+
     steps:
-      - name: checkout code
-        uses: actions/checkout@v2
-      - name: setup jdk
-        uses: actions/setup-java@v1
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
         with:
-          java-version: 21
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-      - name: Releasing using Hub
-        uses: sangatdesai/release-apk@main
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build Android APK
+        uses: Kishanjvaghela/build-and-release-apk@v1
+        with:
+          command: assembleRelease
+          build_type: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_FOLDER: app
