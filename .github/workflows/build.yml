@@ -112,6 +112,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak-builder
+          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Build Flatpak
         run: flatpak-builder build-dir .github/flatpak/com.mystic.tarotboard.json --force-clean --user --install-deps-from=flathub --repo=repo
