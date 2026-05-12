@@ -4,13 +4,14 @@ plugins {
     id "com.gradleup.shadow" version "8.3.0"
     id "org.beryx.jlink" version "3.1.5"
     id "org.openjfx.javafxplugin" version "0.1.0"
-    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" //This is latest already don't touch
+    id "com.gluonhq.gluonfx-gradle-plugin" version "1.0.28" apply false
 }
 
 group = "com.mystic"
 version = "3.0.0"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+def isAndroidBuild = project.hasProperty('androidBuild') && project.property('androidBuild').toBoolean()
 
 application {
     mainClass = "com.mystic.tarotboard.TarotBoard" //gluon see this
@@ -18,10 +19,6 @@ application {
 
 repositories {
     mavenCentral()
-    google()
-    maven {
-        url 'https://nexus.gluonhq.com/nexus/content/repositories/releases'
-    }
 }
 
 // --- COMMON CONFIGURATION ---
@@ -92,18 +89,21 @@ tasks.register('runServer', JavaExec) {
 }
 
 // --- ANDROID (GLUONFX) CONFIGURATION ---
-gluonfx {
-    target = "android"
-    appIdentifier = 'com.mystic.tarotboard'
-    
-    attachConfig {
-        version = '4.0.20'
-        services 'lifecycle'
-    }
+if (isAndroidBuild) {
+    apply plugin: 'com.gluonhq.gluonfx-gradle-plugin'
+    gluonfx {
+        target = "android"
+        appIdentifier = 'com.mystic.tarotboard'
 
-    release {
-        appLabel = 'TarotBoard'
-        versionCode = 1
-        versionName = '1.0'
+        attachConfig {
+            version = '4.0.20'
+            services 'lifecycle'
+        }
+
+        release {
+            appLabel = 'TarotBoard'
+            versionCode = 1
+            versionName = '1.0'
+        }
     }
 }
