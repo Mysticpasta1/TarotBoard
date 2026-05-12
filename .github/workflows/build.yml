@@ -1,4 +1,4 @@
-name: Build TarotBoard
+name: Build And Release Linux And Windows Builds
 
 on:
   push:
