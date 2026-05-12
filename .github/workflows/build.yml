@@ -112,7 +112,9 @@ jobs:
           key: android-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
       - name: Build APK
-        run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
+        run: |
+          ./gradlew nativeBuild -PandroidBuild=true --stacktrace
+          ./gradlew nativePackage -PandroidBuild=true --stacktrace
         env:
           GRAALVM_HOME: ${{ env.JAVA_HOME }}
 
