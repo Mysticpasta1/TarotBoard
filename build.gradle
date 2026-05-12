@@ -19,6 +19,7 @@ application {
 
 repositories {
     mavenCentral()
+    google()
 }
 
 // --- COMMON CONFIGURATION ---
@@ -97,7 +98,7 @@ if (isAndroidBuild) {
     gluonfx {
         target = "android"
         appIdentifier = "com.mystic.tarotboard"
-        graalvmHome = System.getenv("GRAALVM_HOME") // Set GraalVM home
+        graalvmHome = System.getenv("GRAALVM_HOME")
 
         attachConfig {
             version = "4.0.20"
