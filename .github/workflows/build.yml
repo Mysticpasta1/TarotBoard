@@ -99,16 +99,14 @@ jobs:
           native-image --version
 
       - name: Set GRAALVM_HOME
-        uses: actions/set-env@v4
-        with:
-          name: GRAALVM_HOME
-          value: $GRAALVM_HOME
+        env:
+          GRAALVM_HOME: $GRAALVM_HOME
+        uses: echo GRAALVM_HOME
 
       - name: Set JAVA_HOME
-        uses: actions/set-env@v4
-        with:
-          name: JAVA_HOME
-          value: $JAVA_HOME
+        env:
+          JAVA_HOME: $JAVA_HOME
+        uses: echo JAVA_HOME
 
       - name: Build APK
         run: ./gradlew nativePackage -PandroidBuild=true --stacktrace
