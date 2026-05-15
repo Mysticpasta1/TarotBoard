@@ -2,6 +2,7 @@ package com.mystic.tarotboard.scenes;
 
 import com.mystic.tarotboard.TarotBoard;
 import com.mystic.tarotboard.utils.Styles;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -9,6 +10,10 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.transform.Scale;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 
 /**
  * Scene containing the join multiplayer setup UI: player name/color,
@@ -41,12 +46,15 @@ public class JoinGameScene {
         playerColorPicker = new ColorPicker(Color.color(0.2, 0.5, 1.0));
         playerColorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 12pt;");
 
-        joinIpField = new TextField("localhost");
+        // Set default to 127.0.0.1 for easier local testing
+        joinIpField = new TextField("127.0.0.1");
         joinIpField.setStyle(Styles.mpField());
         joinIpField.setMaxWidth(200);
+
         joinPortField = new TextField("5555");
         joinPortField.setStyle(Styles.mpField());
         joinPortField.setMaxWidth(100);
+        
         Button joinGameButton = new Button("Join Game");
         joinGameButton.setStyle(Styles.mpBtn());
         joinGameButton.setOnAction(event -> tarotBoard.joinGame());
@@ -67,7 +75,7 @@ public class JoinGameScene {
         chooseCursorBtn.setStyle(Styles.menuSmallBtn());
         chooseCursorBtn.setOnAction(event -> tarotBoard.chooseCursorImage());
 
-        networkStatusLabel = new Label("Offline");
+        networkStatusLabel = new Label("Checking connection...");
         networkStatusLabel.setStyle(Styles.mpLabel());
         networkStatusLabel.setAlignment(Pos.CENTER);
 
@@ -134,6 +142,32 @@ public class JoinGameScene {
         };
         scene.widthProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
         scene.heightProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
+    }
+
+    /**
+     * Checks for an active internet connection and updates the network status label.
+     */
+    public void updateOnlineStatus() {
+        new Thread(() -> {
+            boolean isOnline = false;
+            try (Socket socket = new Socket()) {
+                // Ping Google DNS to check for internet connection
+                socket.connect(new InetSocketAddress("8.8.8.8", 53), 1500);
+                isOnline = true;
+            } catch (IOException ignored) {
+            }
+
+            final boolean finalIsOnline = isOnline;
+            Platform.runLater(() -> {
+                if (finalIsOnline) {
+                    networkStatusLabel.setText("Online");
+                    networkStatusLabel.setStyle(Styles.mpStatusOk());
+                } else {
+                    networkStatusLabel.setText("Offline");
+                    networkStatusLabel.setStyle(Styles.mpStatusErr());
+                }
+            });
+        }).start();
     }
 
     /**

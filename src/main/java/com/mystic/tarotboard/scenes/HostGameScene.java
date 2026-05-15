@@ -2,6 +2,7 @@ package com.mystic.tarotboard.scenes;
 
 import com.mystic.tarotboard.TarotBoard;
 import com.mystic.tarotboard.utils.Styles;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -10,9 +11,13 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.transform.Scale;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+
 /**
  * Scene containing the host multiplayer setup UI: player name/color,
- * port selection, operator password, and cursor image picker.
+ * server port, operator password configuration, and cursor image picker.
  */
 public class HostGameScene {
     private final Scene scene;
@@ -33,23 +38,26 @@ public class HostGameScene {
      * @param baseHeight reference height for proportional scaling
      */
     public HostGameScene(TarotBoard tarotBoard, double baseWidth, double baseHeight) {
-        playerNameField = new TextField("Player");
+        playerNameField = new TextField("Host");
         playerNameField.setStyle(Styles.mpField());
         playerNameField.setMaxWidth(200);
-        playerColorPicker = new ColorPicker(Color.color(0.2, 0.5, 1.0));
+        playerColorPicker = new ColorPicker(Color.color(1.0, 0.2, 0.2));
         playerColorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 12pt;");
+
         hostPortField = new TextField("5555");
         hostPortField.setStyle(Styles.mpField());
         hostPortField.setMaxWidth(100);
+
         Button hostGameButton = new Button("Host Game");
         hostGameButton.setStyle(Styles.mpBtn());
         hostGameButton.setOnAction(event -> tarotBoard.hostGame());
 
         hostOpPasswordField = new PasswordField();
-        hostOpPasswordField.setPromptText("Host operator password");
         hostOpPasswordField.setText("admin");
         hostOpPasswordField.setStyle(Styles.mpField());
         hostOpPasswordField.setMaxWidth(200);
+        Label opPwLbl = new Label("Set Op Password:");
+        opPwLbl.setStyle(Styles.mpLabel());
 
         cursorStatusLabel = new Label("Default cursor");
         cursorStatusLabel.setStyle(Styles.mpSmallLabel());
@@ -57,7 +65,7 @@ public class HostGameScene {
         chooseCursorBtn.setStyle(Styles.menuSmallBtn());
         chooseCursorBtn.setOnAction(event -> tarotBoard.chooseCursorImage());
 
-        networkStatusLabel = new Label("Offline");
+        networkStatusLabel = new Label("Checking connection...");
         networkStatusLabel.setStyle(Styles.mpLabel());
         networkStatusLabel.setAlignment(Pos.CENTER);
 
@@ -83,11 +91,9 @@ public class HostGameScene {
         hostRow.setAlignment(Pos.CENTER);
         hostRow.setMaxWidth(Double.MAX_VALUE);
 
-        Label hostOpLbl = new Label("Host Op Password:");
-        hostOpLbl.setStyle(Styles.mpLabel());
-        HBox hostOpRow = new HBox(10, hostOpLbl, hostOpPasswordField);
-        hostOpRow.setAlignment(Pos.CENTER);
-        hostOpRow.setMaxWidth(Double.MAX_VALUE);
+        HBox opPwRow = new HBox(10, opPwLbl, hostOpPasswordField);
+        opPwRow.setAlignment(Pos.CENTER);
+        opPwRow.setMaxWidth(Double.MAX_VALUE);
 
         Label cursorLbl = new Label("Cursor:");
         cursorLbl.setStyle(Styles.mpLabel());
@@ -99,7 +105,7 @@ public class HostGameScene {
         backToStartBtn.setStyle(Styles.mpBtn());
         backToStartBtn.setOnAction(event -> tarotBoard.switchToStart());
 
-        layout.getChildren().addAll(title, nameRow, hostRow, hostOpRow, cursorRow, networkStatusLabel, backToStartBtn);
+        layout.getChildren().addAll(title, nameRow, hostRow, opPwRow, cursorRow, networkStatusLabel, backToStartBtn);
 
         StackPane root = new StackPane();
         mpBg = new Pane();
@@ -122,6 +128,32 @@ public class HostGameScene {
         };
         scene.widthProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
         scene.heightProperty().addListener((observableValue, number1, number2) -> scaleContent.run());
+    }
+
+    /**
+     * Checks for an active internet connection and updates the network status label.
+     */
+    public void updateOnlineStatus() {
+        new Thread(() -> {
+            boolean isOnline = false;
+            try (Socket socket = new Socket()) {
+                // Ping Google DNS to check for internet connection
+                socket.connect(new InetSocketAddress("8.8.8.8", 53), 1500);
+                isOnline = true;
+            } catch (IOException ignored) {
+            }
+
+            final boolean finalIsOnline = isOnline;
+            Platform.runLater(() -> {
+                if (finalIsOnline) {
+                    networkStatusLabel.setText("Online");
+                    networkStatusLabel.setStyle(Styles.mpStatusOk());
+                } else {
+                    networkStatusLabel.setText("Offline");
+                    networkStatusLabel.setStyle(Styles.mpStatusErr());
+                }
+            });
+        }).start();
     }
 
     /**
@@ -161,7 +193,7 @@ public class HostGameScene {
     }
 
     /**
-     * Returns the host port text field.
+     * Returns the server port text field.
      *
      * @return the host port field
      */
@@ -170,7 +202,7 @@ public class HostGameScene {
     }
 
     /**
-     * Returns the host operator password field.
+     * Returns the operator password configuration field.
      *
      * @return the operator password field
      */

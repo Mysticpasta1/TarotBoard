@@ -1,5 +1,7 @@
 package com.mystic.tarotboard.utils;
 
+import com.mystic.tarotboard.TarotBoard;
+import com.mystic.tarotboard.items.Cards;
 import com.mystic.tarotboard.theming.configs.KeyBindConfig;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -13,6 +15,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -37,6 +41,14 @@ public class UIUtils {
     }
 
     /**
+     * Callback invoked during a pile drag operation.
+     */
+    @FunctionalInterface
+    public interface PileDragCallback {
+        void onPileDrag(List<StackPane> pile, double newTranslateX, double newTranslateY);
+    }
+
+    /**
      * Callback invoked when a transform (flip or rotate) occurs.
      */
     @FunctionalInterface
@@ -55,11 +67,13 @@ public class UIUtils {
     /**
      * Makes a StackPane draggable with mouse press and drag events.
      *
-     * @param pane       the pane to make draggable
-     * @param onDragEnd  callback invoked when dragging ends, or null
-     * @param onDragMove callback invoked while dragging, or null
+     * @param pane           the pane to make draggable
+     * @param tarotBoard     the main application instance
+     * @param onDragEnd      callback invoked when dragging ends, or null
+     * @param onDragMove     callback invoked while dragging, or null
+     * @param onPileDrag     callback for dragging a pile of cards, or null
      */
-    public static void makeDraggable(StackPane pane, DragEndCallback onDragEnd, DragMoveCallback onDragMove) {
+    public static void makeDraggable(StackPane pane, TarotBoard tarotBoard, DragEndCallback onDragEnd, DragMoveCallback onDragMove, PileDragCallback onPileDrag) {
         final double[] dragDeltaX = new double[1];
         final double[] dragDeltaY = new double[1];
         final boolean[] isDragging = new boolean[1];
@@ -97,19 +111,66 @@ public class UIUtils {
                     newTranslateX = event.getSceneX() - dragDeltaX[0];
                     newTranslateY = event.getSceneY() - dragDeltaY[0];
                 }
-                pane.setTranslateX(newTranslateX);
-                pane.setTranslateY(newTranslateY);
+
+                KeyBindConfig kb = KeyBindConfig.getInstance();
+                if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
+                    List<StackPane> pile = findCardPile(pane, tarotBoard);
+                    if (pile.size() > 1 && onPileDrag != null) {
+                        onPileDrag.onPileDrag(pile, newTranslateX, newTranslateY);
+                    } else {
+                        pane.setTranslateX(newTranslateX);
+                        pane.setTranslateY(newTranslateY);
+                        if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
+                    }
+                } else {
+                    pane.setTranslateX(newTranslateX);
+                    pane.setTranslateY(newTranslateY);
+                    if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
+                }
                 wasDragged[0] = true;
-                if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
             }
         });
 
         pane.setOnMouseReleased(event -> {
-            if (isDragging[0] && wasDragged[0] && onDragEnd != null) {
-                onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
+            if (isDragging[0] && wasDragged[0]) {
+                KeyBindConfig kb = KeyBindConfig.getInstance();
+                if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
+                    List<StackPane> pile = findCardPile(pane, tarotBoard);
+                    if (pile.size() > 1) {
+                        for (StackPane cardPane : pile) {
+                            cardPane.setTranslateX(pane.getTranslateX());
+                            cardPane.setTranslateY(pane.getTranslateY());
+                            if (onDragEnd != null) {
+                                onDragEnd.onDragEnd(cardPane.getTranslateX(), cardPane.getTranslateY());
+                            }
+                        }
+                    } else if (onDragEnd != null) {
+                        onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
+                    }
+                } else if (onDragEnd != null) {
+                    onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
+                }
             }
             isDragging[0] = false;
         });
+    }
+
+    private static List<StackPane> findCardPile(StackPane draggedPane, TarotBoard tarotBoard) {
+        List<StackPane> pile = new ArrayList<>();
+        pile.add(draggedPane);
+
+        double x = draggedPane.getTranslateX();
+        double y = draggedPane.getTranslateY();
+
+        for (Cards card : tarotBoard.getCards()) {
+            StackPane cardPane = card.getCardPane();
+            if (cardPane != draggedPane && cardPane.getTranslateX() == x && cardPane.getTranslateY() == y) {
+                if (cardPane.getParent().getChildrenUnmodifiable().indexOf(cardPane) > draggedPane.getParent().getChildrenUnmodifiable().indexOf(draggedPane)) {
+                    pile.add(cardPane);
+                }
+            }
+        }
+        return pile;
     }
 
     /**

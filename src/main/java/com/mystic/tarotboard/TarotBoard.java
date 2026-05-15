@@ -17,6 +17,7 @@ import com.mystic.tarotboard.theming.RemoteCursor;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.utils.CardDataHelper;
+import com.mystic.tarotboard.utils.LogWindow;
 import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.SaveData;
 import com.mystic.tarotboard.utils.Styles;
@@ -88,7 +89,7 @@ public class TarotBoard extends Application {
             "Fugitive", "Devil", "Shadow", "Specter", "Phantom", "Void", "Wraith",
             "Ghoul", "Banshee", "Reverent", "Eidolon", "Shade",
             "Doppelganger", "Hollow", "Abyss", "Chimera", "Poltergeist",
-            "Wight", "Apparition", "Nightmare", "Succubus", "Incubus",
+            "Wight", "Apparition", "Nightmare", "Succubus", "Incubus", "Unknown",
             "Necromancer", "Fury", "Grim", "Harbinger", "Spectacle",
             "Lich", "Gorgon", "Drake", "Demon", "Frost",
             "Golem", "Hydra", "Inferno", "Juggernaut", "Kraken", "Reaper",
@@ -103,7 +104,7 @@ public class TarotBoard extends Application {
             "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
             "Zephyr", "Vesper", "Umbra", "Valkyrie", "Warden",
             "Zenith", "Yggdrasil", "Zodiac", "Phoenix", "Raven",
-            "Cipher", "Angel", "Knight"
+            "Cipher", "Angel", "Knight", "Venom"
     );
 
     private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
@@ -202,6 +203,24 @@ public class TarotBoard extends Application {
     }
 
     /**
+     * Returns the array of card items on the board.
+     *
+     * @return the cards array
+     */
+    public Cards[] getCards() {
+        return cards;
+    }
+
+    /**
+     * Returns the list of wild card names.
+     *
+     * @return the list of wilds
+     */
+    public static List<String> getWilds() {
+        return wilds;
+    }
+
+    /**
      * Returns the map of piece IDs to their visual panes.
      *
      * @return the piece map
@@ -281,6 +300,10 @@ public class TarotBoard extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
+        LogWindow logWindow = new LogWindow();
+        logWindow.setTitle("TarotBoard Console Log");
+        logWindow.show();
+
         TarotBoard.primaryStage = primaryStage;
         Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
         double baseWidth = screenBounds.getWidth();
@@ -304,6 +327,8 @@ public class TarotBoard extends Application {
         bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
+        gameScene.updateOperatorButtonsVisibility();
+        
         primaryStage.setScene(startScene.getScene());
         primaryStage.setX(screenBounds.getMinX());
         primaryStage.setY(screenBounds.getMinY());
@@ -349,6 +374,7 @@ public class TarotBoard extends Application {
             isMultiplayer = true;
             operators.clear();
             operators.add(myPlayerId);
+            gameServer.setIsOperatorCheck(operators::contains);
             hostOperatorPassword = hostGameScene.getHostOpPasswordField().getText();
             playerList.clear();
             playerList.addAll(gameServer.getPlayers());
@@ -361,6 +387,7 @@ public class TarotBoard extends Application {
             gameScene.getNetworkStatusInGame().setText("Hosting on port " + port);
             gameScene.getNetworkStatusInGame().setStyle(Styles.panelLabel());
             gameScene.setMultiplayerControlsVisible(true);
+            gameScene.updateOperatorButtonsVisibility(); // Update when hosting
 
             primaryStage.setScene(gameScene.getScene());
             primaryStage.setTitle("Game Scene - Hosting on port " + port);
@@ -369,6 +396,7 @@ public class TarotBoard extends Application {
             hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
             isMultiplayer = false;
             isHost = false;
+            gameScene.updateOperatorButtonsVisibility();
         }
     }
 
@@ -402,6 +430,7 @@ public class TarotBoard extends Application {
             gameScene.getNetworkStatusInGame().setText("Connected to " + ip + ":" + port);
             gameScene.getNetworkStatusInGame().setStyle(Styles.panelLabel());
             gameScene.setMultiplayerControlsVisible(true);
+            gameScene.updateOperatorButtonsVisibility(); // Update when joining
 
             primaryStage.setScene(gameScene.getScene());
             primaryStage.setTitle("Game Scene - Connected to " + ip + ":" + port);
@@ -409,6 +438,7 @@ public class TarotBoard extends Application {
             joinGameScene.getNetworkStatusLabel().setText("Failed to connect: " + e.getMessage());
             joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
             isMultiplayer = false;
+            gameScene.updateOperatorButtonsVisibility();
         }
     }
 
@@ -446,6 +476,7 @@ public class TarotBoard extends Application {
         if (gameScene != null) {
             gameScene.getNetworkStatusInGame().setText("");
             gameScene.setMultiplayerControlsVisible(false);
+            gameScene.updateOperatorButtonsVisibility(); // Reset to single player view
         }
         if (primaryStage != null) {
             primaryStage.setTitle("TarotBoard");
@@ -564,7 +595,7 @@ public class TarotBoard extends Application {
         }
     }
 
-    private boolean isOperator(int playerId) {
+    private boolean isNotOperator(int playerId) {
         if (operators.contains(playerId)) return false;
         System.out.println("[TarotBoard] Denied non-operator action from player " + playerId);
         return true;
@@ -603,6 +634,7 @@ public class TarotBoard extends Application {
     }
 
     private void handleOperatorStatus(Msg.OperatorStatus o) {
+        if (o.playerId() != myPlayerId) return; // Ensure this is for the current player
         isOperator = o.isOperator();
         if (joinGameScene != null) {
             if (isOperator) {
@@ -624,6 +656,7 @@ public class TarotBoard extends Application {
                 inGame.setText(current.replace(" [Operator]", ""));
             }
             inGame.setStyle(Styles.panelLabel());
+            gameScene.updateOperatorButtonsVisibility(); // Update UI when status changes
         }
     }
 
@@ -736,7 +769,7 @@ public class TarotBoard extends Application {
 
     private void handleReshuffleCards(Msg.ReshuffleCards m) {
         if (m.playerId() == myPlayerId) return;
-        if (isOperator(m.playerId())) return;
+        if (isNotOperator(m.playerId())) return;
         for (int a = 0; a < NUM_CARDS; a++) {
             if (cards[a] != null) {
                 StackPane cardPane = cards[a].getCardPane();
@@ -755,7 +788,7 @@ public class TarotBoard extends Application {
 
     private void handleResetDice(Msg.ResetDice m) {
         if (m.playerId() == myPlayerId) return;
-        if (isOperator(m.playerId())) return;
+        if (isNotOperator(m.playerId())) return;
         for (Dice die : dice) {
             gameScene.getGameContent().getChildren().remove(die.getPane());
             pieceMap.remove(die.getPieceId());
@@ -765,7 +798,7 @@ public class TarotBoard extends Application {
 
     private void handleResetChips(Msg.ResetChips m) {
         if (m.playerId() == myPlayerId) return;
-        if (isOperator(m.playerId())) return;
+        if (isNotOperator(m.playerId())) return;
         for (Chips chip : chips) {
             gameScene.getGameContent().getChildren().remove(chip.getChipPane());
             pieceMap.remove(chip.getPieceId());
@@ -775,7 +808,7 @@ public class TarotBoard extends Application {
 
     private void handleNewGame(Msg.NewGame m) {
         if (m.playerId() == myPlayerId) return;
-        if (isOperator(m.playerId())) return;
+        if (isNotOperator(m.playerId())) return;
         if (isHost) {
             newGame();
         } else {
@@ -812,18 +845,6 @@ public class TarotBoard extends Application {
             for (int i = 0; i < NUM_CARDS; i++) {
                 if (cards[i] != null) {
                     String logicalName = cardNames.get(i);
-                    Text text = cards[i].getCardName();
-                    Matcher matcher = CARD_PATTERN.matcher(logicalName);
-                    if (matcher.matches() && !wilds.contains(logicalName)) {
-                        String value = matcher.group("value");
-                        String suit = matcher.group("suit");
-                        text.setText(Cards.getStyle(logicalName, value, suit, currentCardTheme).getText());
-                        text.setStyle(Cards.getStyle(logicalName, value, suit, currentCardTheme).getStyle());
-                    } else {
-                        Text wildText = CardDataHelper.getWildCardName(new Text(logicalName + "\n \n" + "(Wild)"));
-                        text.setText(wildText.getText());
-                        text.setStyle(wildText.getStyle());
-                    }
                     cards[i].refreshTooltipContent(logicalName, wilds);
                 }
             }
@@ -981,10 +1002,18 @@ public class TarotBoard extends Application {
     }
 
     private void setupPieceInteractions(StackPane pane, String pieceId, boolean isChipOrCard) {
-        UIUtils.makeDraggable(pane,
+        UIUtils.makeDraggable(pane, this,
                 (x, y) -> sendPieceMove(pieceId, x, y),
-                (x, y) -> sendPieceMoveThrottled(pieceId, x, y)
+                (x, y) -> sendPieceMoveThrottled(pieceId, x, y),
+                (pile, x, y) -> {
+                    for (StackPane p : pile) {
+                        p.setTranslateX(x);
+                        p.setTranslateY(y);
+                        sendPieceMoveThrottled(getCardId(p), x, y);
+                    }
+                }
         );
+
         if (isChipOrCard) {
             boolean isCard = pieceId.startsWith("card:");
             UIUtils.makeFlippableAndRotatable(pane, !isCard,
@@ -1005,7 +1034,7 @@ public class TarotBoard extends Application {
         this.makeDiscardable(pane, gameScene.getDiscardZone(), pieceId);
     }
 
-    private void sendPieceMove(String pieceId, double x, double y) {
+    public void sendPieceMove(String pieceId, double x, double y) {
         if (!isMultiplayer) return;
         sendNetworkMessage(NetworkMessage.of(new Msg.PieceMove(myPlayerId, pieceId, x, y)));
     }
@@ -1025,7 +1054,7 @@ public class TarotBoard extends Application {
         sendNetworkMessage(NetworkMessage.of(new Msg.PieceRotate(myPlayerId, pieceId, rotation)));
     }
 
-    private void sendPieceFlip(String pieceId, boolean frontVis, boolean backVis, boolean textVis) {
+    public void sendPieceFlip(String pieceId, boolean frontVis, boolean backVis, boolean textVis) {
         if (!isMultiplayer) return;
         sendNetworkMessage(NetworkMessage.of(new Msg.PieceFlip(myPlayerId, pieceId, frontVis, backVis, textVis)));
     }
@@ -1128,10 +1157,12 @@ public class TarotBoard extends Application {
     }
 
     private void updateHostGameSceneBackground() {
+        hostGameScene.updateOnlineStatus();
         setLayoutBackground(hostGameScene.getMpBg(), hostGameScene.getScene());
     }
 
     private void updateJoinGameSceneBackground() {
+        joinGameScene.updateOnlineStatus();
         setLayoutBackground(joinGameScene.getMpBg(), joinGameScene.getScene());
     }
 
@@ -1178,9 +1209,6 @@ public class TarotBoard extends Application {
                 card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
                 card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
-                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
-                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
-                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
             String pieceId = "card:" + i;
             cards[i] = card;
@@ -1236,10 +1264,12 @@ public class TarotBoard extends Application {
                         pane.setRotate(0);
                         ImageView backView = (ImageView) pane.getChildren().get(0);
                         ImageView frontView = (ImageView) pane.getChildren().get(1);
-                        Node textNode = pane.getChildren().get(2);
+                        Node textNode = pane.getChildren().size() > 2 ? pane.getChildren().get(2) : null;
                         backView.setVisible(true);
                         frontView.setVisible(false);
-                        textNode.setVisible(false);
+                        if (textNode != null) {
+                            textNode.setVisible(false);
+                        }
                         pane.toBack();
                         isCard = true;
                         if (isMultiplayer && pieceId != null) {
@@ -1291,10 +1321,7 @@ public class TarotBoard extends Application {
             for (int a = 0; a < NUM_CARDS; a++) {
                 if (cards[a] != null) {
                     StackPane cardPane = cards[a].getCardPane();
-                    Text cardNameText = cards[a].getCardName();
                     String cardLogicalName = cardNames.get(a);
-                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
-
                     cardPane.setTranslateX(DEFAULT_DECK_X);
                     cardPane.setTranslateY(DEFAULT_DECK_Y);
                     cardPane.getTransforms().removeAll(cardPane.getTransforms());
@@ -1302,21 +1329,13 @@ public class TarotBoard extends Application {
 
                     ImageView backView = (ImageView) cardPane.getChildren().get(0);
                     ImageView frontView = (ImageView) cardPane.getChildren().get(1);
-                    Node textNode = cardPane.getChildren().get(2);
+                    Node textNode = cardPane.getChildren().size() > 2 ? cardPane.getChildren().get(2) : null;
                     backView.setVisible(true);
                     frontView.setVisible(false);
-                    textNode.setVisible(false);
-
-                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
-                        String value = matcher.group("value");
-                        String suit = matcher.group("suit");
-                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
-                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
-                    } else {
-                        Text text = new Text(cardLogicalName);
-                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
-                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
+                    if (textNode != null) {
+                        textNode.setVisible(false);
                     }
+
                     cards[a].refreshTooltipContent(cardLogicalName, wilds);
 
                     String pieceId = "card:" + a;
@@ -1378,12 +1397,14 @@ public class TarotBoard extends Application {
 
     public void switchToHostGame() {
         updateHostGameSceneBackground();
+        hostGameScene.updateOnlineStatus();
         primaryStage.setScene(hostGameScene.getScene());
         primaryStage.setTitle("Host Game");
     }
 
     public void switchToJoinGame() {
         updateJoinGameSceneBackground();
+        joinGameScene.updateOnlineStatus();
         primaryStage.setScene(joinGameScene.getScene());
         primaryStage.setTitle("Join Game");
     }
@@ -1485,19 +1506,7 @@ public class TarotBoard extends Application {
 
             for (int a = 0; a < NUM_CARDS; a++) {
                 if (cards[a] != null) {
-                    Text cardNameText = cards[a].getCardName();
                     String cardLogicalName = cardNames.get(a);
-                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
-                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
-                        String value = matcher.group("value");
-                        String suit = matcher.group("suit");
-                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
-                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
-                    } else {
-                        Text text = new Text(cardLogicalName);
-                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
-                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
-                    }
                     cards[a].refreshTooltipContent(cardLogicalName, wilds);
                 }
             }
@@ -1550,17 +1559,7 @@ public class TarotBoard extends Application {
             for (Cards card : cards) {
                 if (card != null) {
                     card.updateImages(cardFrontImage, cardBackImage);
-                    Text cardNameText = card.getCardName();
-                    String cardName = cardNameText.getText().split("\n")[0].trim();
-                    Matcher matcher = CARD_PATTERN.matcher(cardName);
-                    if (matcher.matches() && !wilds.contains(cardName)) {
-                        String value = matcher.group("value");
-                        String suit = matcher.group("suit");
-                        cardNameText.setStyle(Cards.getStyle(cardName, value, suit, currentCardTheme).getStyle());
-                    } else {
-                        Text tempText = new Text(cardName);
-                        cardNameText.setStyle(CardDataHelper.getWildCardName(tempText).getStyle());
-                    }
+                    String cardName = card.getCardName().getText();
                     card.refreshTooltipContent(cardName, wilds);
                 }
             }
@@ -1735,9 +1734,6 @@ public class TarotBoard extends Application {
                 card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
                 card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
-                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
-                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
-                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
             String pieceId = "card:" + idx;
             cards[idx] = card;
@@ -1761,17 +1757,6 @@ public class TarotBoard extends Application {
             backView.setVisible(cs.backVisible());
             frontView.setVisible(cs.frontVisible());
             text.setVisible(cs.textVisible());
-
-            if (!wilds.contains(cardLogicalName)) {
-                Matcher matcher1 = CARD_PATTERN.matcher(cardLogicalName);
-                if (matcher1.matches()) {
-                    String value = matcher1.group("value");
-                    String suit = matcher1.group("suit");
-                    var styled = Cards.getStyle(cardLogicalName, value, suit, currentCardTheme);
-                    text.setText(styled.getText());
-                    text.setStyle(styled.getStyle());
-                }
-            }
             cards[idx].refreshTooltipContent(cardLogicalName, wilds);
             gameScene.getGameContent().getChildren().add(pane);
             pieceMap.put(pieceId, pane);
@@ -1919,5 +1904,78 @@ public class TarotBoard extends Application {
     @Override
     public void init() {
         main(getParameters().getRaw().toArray(String[]::new));
+    }
+
+    public int getCardId(Cards card) {
+        for (int i = 0; i < cards.length; i++) {
+            if (cards[i] == card) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public String getCardId(StackPane pane) {
+        for (int i = 0; i < cards.length; i++) {
+            if (cards[i] != null && cards[i].getCardPane() == pane) {
+                return "card:" + i;
+            }
+        }
+        return null;
+    }
+
+    public void splitDeck() {
+        TextInputDialog dialog = new TextInputDialog("10");
+        dialog.setTitle("Split Deck");
+        dialog.setHeaderText("How many cards to split into a new pile?");
+        dialog.setContentText("Cards:");
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(value -> {
+            try {
+                int numToSplit = Integer.parseInt(value);
+                if (numToSplit <= 0) return;
+
+                List<Cards> deckCards = new ArrayList<>();
+                for (Cards card : cards) {
+                    if (card.getCardPane().getTranslateX() == DEFAULT_DECK_X &&
+                        card.getCardPane().getTranslateY() == DEFAULT_DECK_Y) {
+                        deckCards.add(card);
+                    }
+                }
+
+                if (numToSplit > deckCards.size()) {
+                    numToSplit = deckCards.size();
+                }
+
+                double newX = DEFAULT_DECK_X + CARD_WIDTH + 20;
+                double newY = DEFAULT_DECK_Y;
+
+                for (int i = 0; i < numToSplit; i++) {
+                    Cards card = deckCards.get(i);
+                    StackPane cardPane = card.getCardPane();
+                    cardPane.setTranslateX(newX);
+                    cardPane.setTranslateY(newY);
+                    sendPieceMove(getCardId(cardPane), newX, newY);
+                }
+            } catch (NumberFormatException e) {
+                // Ignore invalid input
+            }
+        });
+    }
+
+    public void moveWildsToPile() {
+        double newX = gameScene.getScene().getWidth() - CARD_WIDTH - 50;
+        double newY = 100;
+        int i = 0;
+        for (Cards card : cards) {
+            if (wilds.contains(card.getCardName().getText())) {
+                StackPane cardPane = card.getCardPane();
+                cardPane.setTranslateX(newX);
+                cardPane.setTranslateY(newY + i * 5);
+                sendPieceMove(getCardId(cardPane), cardPane.getTranslateX(), cardPane.getTranslateY());
+                i++;
+            }
+        }
     }
 }

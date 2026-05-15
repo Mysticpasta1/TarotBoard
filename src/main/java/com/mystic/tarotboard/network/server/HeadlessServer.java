@@ -119,6 +119,7 @@ public class HeadlessServer {
         operators.add(0);
         initDeck();
         gameServer = new GameServer(port, "Server", 0.5, 0.5, 0.5);
+        gameServer.setIsOperatorCheck(operators::contains);
         gameServer.setOnMessage(this::handleMessage);
         gameServer.start();
         System.out.println("[TarotBoard] Server started on port " + port

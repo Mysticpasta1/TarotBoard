@@ -45,6 +45,12 @@ public class GameScene {
     private final PasswordField opPwInGame;
     private final Button requestOpInGame;
 
+    // Operator-restricted buttons
+    private final Button resetDiceButton;
+    private final Button resetChipsButton;
+    private final Button reshuffleCardsButton;
+    private final Button newGameButton;
+
     /**
      * Constructs the game scene and wires all UI controls and event handlers.
      *
@@ -136,7 +142,7 @@ public class GameScene {
         diceInputGroup.setAlignment(Pos.CENTER_LEFT);
         diceInputGroup.setMaxWidth(Double.MAX_VALUE);
 
-        Button resetDiceButton = new Button("Reset Dice");
+        resetDiceButton = new Button("Reset Dice");
         resetDiceButton.setStyle(Styles.panelBtn());
         resetDiceButton.setMaxWidth(Double.MAX_VALUE);
         resetDiceButton.setOnAction(event -> tarotBoard.resetDice());
@@ -157,17 +163,17 @@ public class GameScene {
         });
         themeSelector.setOnAction(event -> tarotBoard.applyCurrentTheme(themeSelector.getValue()));
 
-        Button resetChips = new Button("Reset Chips");
-        resetChips.setStyle(Styles.panelBtn());
-        resetChips.setMaxWidth(Double.MAX_VALUE);
-        resetChips.setOnAction(event -> tarotBoard.resetChips());
+        resetChipsButton = new Button("Reset Chips");
+        resetChipsButton.setStyle(Styles.panelBtn());
+        resetChipsButton.setMaxWidth(Double.MAX_VALUE);
+        resetChipsButton.setOnAction(event -> tarotBoard.resetChips());
 
-        Button reshuffleCards = new Button("Reshuffle Cards");
-        reshuffleCards.setStyle(Styles.panelBtn());
-        reshuffleCards.setMaxWidth(Double.MAX_VALUE);
-        reshuffleCards.setOnAction(event -> tarotBoard.reshuffleCards());
+        reshuffleCardsButton = new Button("Reshuffle Cards");
+        reshuffleCardsButton.setStyle(Styles.panelBtn());
+        reshuffleCardsButton.setMaxWidth(Double.MAX_VALUE);
+        reshuffleCardsButton.setOnAction(event -> tarotBoard.reshuffleCards());
 
-        Button newGameButton = new Button("New Game");
+        newGameButton = new Button("New Game");
         newGameButton.setStyle(Styles.panelBtn());
         newGameButton.setMaxWidth(Double.MAX_VALUE);
         newGameButton.setOnAction(event -> tarotBoard.newGame());
@@ -232,8 +238,8 @@ public class GameScene {
                 spawnChipButton,
                 diceInputGroup,
                 resetDiceButton,
-                resetChips,
-                reshuffleCards,
+                resetChipsButton,
+                reshuffleCardsButton,
                 newGameButton,
                 networkStatusInGame,
                 opPwInGame,
@@ -279,7 +285,6 @@ public class GameScene {
         overlayPlayersBox.setAlignment(Pos.CENTER_LEFT);
         overlayContent.getChildren().addAll(overlayPlayersBox);
         overlayRoot.getChildren().add(overlayContent);
-        gameRoot.getChildren().add(overlayRoot);
         playerListOverlay = overlayRoot;
 
         var keybinds = KeyBindConfig.getInstance();
@@ -312,6 +317,16 @@ public class GameScene {
                 event.consume();
                 return;
             }
+            if (code == keybinds.splitDeck()) {
+                tarotBoard.splitDeck();
+                event.consume();
+                return;
+            }
+            if (code == keybinds.moveWilds()) {
+                tarotBoard.moveWildsToPile();
+                event.consume();
+                return;
+            }
             StackPane piece = tarotBoard.findPieceAtMouse(mouseX[0], mouseY[0]);
             if (piece != null) {
                 UIUtils.handlePieceKeyPress(piece, code);
@@ -335,12 +350,9 @@ public class GameScene {
         });
         scene.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             bringCursorOverlayToFront();
-            for (StackPane pane : tarotBoard.getPieceMap().values()) {
-                var pt = pane.sceneToLocal(mouseX[0], mouseY[0]);
-                if (pane.contains(pt)) {
-                    UIUtils.handlePieceClick(pane, event);
-                    break;
-                }
+            StackPane piece = tarotBoard.findPieceAtMouse(mouseX[0], mouseY[0]);
+            if (piece != null) {
+                UIUtils.handlePieceClick(piece, event);
             }
         });
     }
@@ -407,8 +419,35 @@ public class GameScene {
      */
     public void setMultiplayerControlsVisible(boolean visible) {
         opPwInGame.setVisible(visible);
+        opPwInGame.setManaged(visible);
         requestOpInGame.setVisible(visible);
+        requestOpInGame.setManaged(visible);
         disconnectButton.setVisible(visible);
+        disconnectButton.setManaged(visible);
+    }
+
+    /**
+     * Updates the visibility of operator-only buttons based on current permissions.
+     */
+    public void updateOperatorButtonsVisibility() {
+        boolean hasPerms = tarotBoard.isHost() || tarotBoard.isOperator() || !tarotBoard.isMultiplayer();
+        
+        // Use setVisible instead of setDisable
+        resetDiceButton.setVisible(hasPerms);
+        resetDiceButton.setManaged(hasPerms);
+        resetChipsButton.setVisible(hasPerms);
+        resetChipsButton.setManaged(hasPerms);
+        reshuffleCardsButton.setVisible(hasPerms);
+        reshuffleCardsButton.setManaged(hasPerms);
+        newGameButton.setVisible(hasPerms);
+        newGameButton.setManaged(hasPerms);
+        
+        // Hide the request operator stuff if they are already an operator or host
+        boolean showRequestOp = tarotBoard.isMultiplayer() && !tarotBoard.isHost() && !tarotBoard.isOperator();
+        opPwInGame.setVisible(showRequestOp);
+        opPwInGame.setManaged(showRequestOp);
+        requestOpInGame.setVisible(showRequestOp);
+        requestOpInGame.setManaged(showRequestOp);
     }
 
     /**

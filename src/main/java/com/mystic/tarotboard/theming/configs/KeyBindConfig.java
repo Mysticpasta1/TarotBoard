@@ -36,7 +36,10 @@ public record KeyBindConfig(
         KeyCode moveDown,
         KeyCode moveLeft,
         KeyCode moveRight,
-        int moveSpeed
+        int moveSpeed,
+        KeyCode pileDrag,
+        KeyCode splitDeck,
+        KeyCode moveWilds
 ) {
     private static KeyBindConfig instance;
 
@@ -56,7 +59,8 @@ public record KeyBindConfig(
                 KeyCode.UNDEFINED, KeyCode.UNDEFINED, KeyCode.UNDEFINED, KeyCode.UNDEFINED,
                 KeyCode.UNDEFINED, KeyCode.UNDEFINED,
                 KeyCode.UP, KeyCode.DOWN, KeyCode.LEFT, KeyCode.RIGHT,
-                10
+                10,
+                KeyCode.CONTROL, KeyCode.S, KeyCode.W
         );
     }
 
@@ -66,103 +70,115 @@ public record KeyBindConfig(
     }
 
     public KeyBindConfig withTogglePlayerList(KeyCode v) {
-        return new KeyBindConfig(v, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(v, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMultiFlip(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, v, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, v, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftLeftRotate(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, v, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, v, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlLeftRotate(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, v, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, v, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftRightRotate(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, v, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, v, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlRightRotate(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, v, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, v, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withDoubleLeftFlip(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, v, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, v, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withDoubleRightReset(boolean v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, v, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, v, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftLeftRotateButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, v, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, v, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlLeftRotateButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, v, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, v, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftRightRotateButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, v, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, v, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlRightRotateButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, v, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, v, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withFlipButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, v, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, v, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withResetButton(MouseButton v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, v, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, v, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftLeftRotateKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, v, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, v, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlLeftRotateKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, v, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, v, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withShiftRightRotateKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, v, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, v, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withCtrlRightRotateKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, v, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, v, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withFlipKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, v, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, v, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withResetKey(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, v, moveUp, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, v, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMoveUp(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, v, moveDown, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, v, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMoveDown(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, v, moveLeft, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, v, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMoveLeft(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, v, moveRight, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, v, moveRight, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMoveRight(KeyCode v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, v, moveSpeed);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, v, moveSpeed, pileDrag, splitDeck, moveWilds);
     }
 
     public KeyBindConfig withMoveSpeed(int v) {
-        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, v);
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, v, pileDrag, splitDeck, moveWilds);
+    }
+
+    public KeyBindConfig withPileDrag(KeyCode v) {
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, v, splitDeck, moveWilds);
+    }
+
+    public KeyBindConfig withSplitDeck(KeyCode v) {
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, v, moveWilds);
+    }
+
+    public KeyBindConfig withMoveWilds(KeyCode v) {
+        return new KeyBindConfig(togglePlayerList, multiFlip, shiftLeftRotate, ctrlLeftRotate, shiftRightRotate, ctrlRightRotate, doubleLeftFlip, doubleRightReset, shiftLeftRotateButton, ctrlLeftRotateButton, shiftRightRotateButton, ctrlRightRotateButton, flipButton, resetButton, shiftLeftRotateKey, ctrlLeftRotateKey, shiftRightRotateKey, ctrlRightRotateKey, flipKey, resetKey, moveUp, moveDown, moveLeft, moveRight, moveSpeed, pileDrag, splitDeck, v);
     }
 
     public void save() {

@@ -51,9 +51,8 @@ public class SettingsScene {
         VBox root = new VBox(tabs);
         root.setStyle("-fx-padding: 24;");
 
-        Scene scene = new Scene(root);
         Styles.applyBackgroundImage(root);
-        stage.setScene(scene);
+        stage.setScene(new Scene(root));
     }
 
     private static VBox createKeyBindsTab(Stage stage, Scene previousScene, ThemeConfiguration.GuiConfig gui) {
@@ -64,7 +63,7 @@ public class SettingsScene {
         bindsBox.setStyle("-fx-padding: 20;");
 
         Label title = new Label("Key Bindings");
-        title.setStyle("-fx-font-size: 16pt; -fx-font-weight: bold; -fx-text-fill: " + gui.settingsTextColor + ";");
+        title.setStyle("-fx-font-size: 20pt; -fx-font-weight: bold; -fx-text-fill: " + gui.settingsTextColor + ";");
         bindsBox.getChildren().add(title);
 
         bindsBox.getChildren().add(createBindRow("Toggle Player List", config.togglePlayerList(), stage));
@@ -93,6 +92,10 @@ public class SettingsScene {
 
         bindsBox.getChildren().add(createSpeedRow(config.moveSpeed(), v -> KeyBindConfig.update(c -> c.withMoveSpeed(v))));
 
+        bindsBox.getChildren().add(createBindRow("Pile Drag", config.pileDrag(), stage));
+        bindsBox.getChildren().add(createBindRow("Split Deck", config.splitDeck(), stage));
+        bindsBox.getChildren().add(createBindRow("Move Wilds", config.moveWilds(), stage));
+
         Button resetBtn = new Button("Reset to Defaults");
         resetBtn.setStyle(Styles.settingsResetBtn());
         resetBtn.setOnAction(event -> {
@@ -113,7 +116,7 @@ public class SettingsScene {
     }
 
     private static HBox createBindRow(String actionName, KeyCode current, Stage parent) {
-        Circle dot = new Circle(5, Color.WHITE);
+        Circle dot = new Circle(7, Color.WHITE);
         Label nameLabel = new Label(actionName);
         nameLabel.setStyle(Styles.settingsBindName());
 
@@ -136,6 +139,9 @@ public class SettingsScene {
                         case "Move Down" -> KeyBindConfig.update(c -> c.withMoveDown(bind));
                         case "Move Left" -> KeyBindConfig.update(c -> c.withMoveLeft(bind));
                         case "Move Right" -> KeyBindConfig.update(c -> c.withMoveRight(bind));
+                        case "Pile Drag" -> KeyBindConfig.update(c -> c.withPileDrag(bind));
+                        case "Split Deck" -> KeyBindConfig.update(c -> c.withSplitDeck(bind));
+                        case "Move Wilds" -> KeyBindConfig.update(c -> c.withMoveWilds(bind));
                     }
                     keyBtn.setText(formatKeyName(bind));
                     keyBtn.setStyle(Styles.settingsBindKey());
@@ -144,15 +150,16 @@ public class SettingsScene {
             });
         });
 
-        HBox row = new HBox(12, dot, nameLabel, keyBtn);
+        HBox row = new HBox(15, dot, nameLabel, keyBtn);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
     }
 
     private static HBox createMouseActionRow(String action, MouseButton button, java.util.function.Consumer<MouseButton> onButton, KeyCode keyCode, java.util.function.Consumer<KeyCode> onKeyCode, boolean enabled, java.util.function.Consumer<Boolean> onToggle, Stage parent) {
         Label actionLabel = new Label(action);
-        actionLabel.setStyle("-fx-font-size: 12pt; -fx-text-fill: white; -fx-min-width: 160;");
+        actionLabel.setStyle("-fx-font-size: 16pt; -fx-text-fill: white; -fx-min-width: 200;");
         ComboBox<MouseButton> btnCombo = new ComboBox<>();
+        btnCombo.setStyle("-fx-font-size: 14pt;");
         btnCombo.getItems().addAll(MouseButton.PRIMARY, MouseButton.SECONDARY, MouseButton.MIDDLE);
         btnCombo.setValue(button);
         btnCombo.setOnAction(event -> onButton.accept(btnCombo.getValue()));
@@ -176,20 +183,21 @@ public class SettingsScene {
             });
         });
         CheckBox cb = new CheckBox("On");
+        cb.setStyle("-fx-font-size: 14pt; -fx-text-fill: white;");
         cb.setSelected(enabled);
         cb.selectedProperty().addListener((observableValue, b, n) -> onToggle.accept(n));
-        HBox row = new HBox(10, actionLabel, btnCombo, keyBtn, cb);
+        HBox row = new HBox(12, actionLabel, btnCombo, keyBtn, cb);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
     }
 
     private static HBox createSpeedRow(int value, Consumer<Integer> onUpdate) {
         Label l = new Label("Move Speed (px)");
-        l.setStyle("-fx-font-size: 12pt; -fx-text-fill: white; -fx-min-width: 160;");
+        l.setStyle("-fx-font-size: 16pt; -fx-text-fill: white; -fx-min-width: 200;");
         Spinner<Integer> spin = new Spinner<>(1, 100, value);
-        spin.setStyle("-fx-pref-width: 80;");
+        spin.setStyle("-fx-font-size: 14pt; -fx-pref-width: 100;");
         spin.valueProperty().addListener((observableValue, i, n) -> onUpdate.accept(n));
-        HBox row = new HBox(10, l, spin);
+        HBox row = new HBox(12, l, spin);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
     }

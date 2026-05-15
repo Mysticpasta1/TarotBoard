@@ -245,6 +245,10 @@ public class ThemeConfiguration implements Serializable {
          */
         public int menuButtonWidth = 300;
         /**
+         * Height of menu buttons
+         */
+        public int menuButtonHeight = 60;
+        /**
          * Font size for small menu elements
          */
         public int menuSmallBtnSize = 12;

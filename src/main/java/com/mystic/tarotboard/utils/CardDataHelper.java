@@ -1,10 +1,6 @@
 package com.mystic.tarotboard.utils;
 
 import javafx.collections.ObservableList;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextAlignment;
-import javafx.scene.text.TextBoundsType;
-
 import java.util.Collections;
 import java.util.List;
 
@@ -12,8 +8,6 @@ import java.util.List;
  * Helper methods for generating and managing card name data.
  */
 public class CardDataHelper {
-
-    private static final double CARD_WIDTH = 150;
 
     /**
      * Populates the given list with card names formed from wilds, suits, and values.
@@ -40,21 +34,5 @@ public class CardDataHelper {
      */
     public static void generateShuffledCardNames(ObservableList<String> cardNames) {
         Collections.shuffle(cardNames);
-    }
-
-    /**
-     * Configures a Text node for displaying a wild card name with appropriate styling.
-     *
-     * @param cardNameText the Text node to configure
-     * @return the configured Text node
-     */
-    public static Text getWildCardName(Text cardNameText) {
-        cardNameText.setStyle(Styles.wildCardText());
-        cardNameText.setBoundsType(TextBoundsType.VISUAL);
-        cardNameText.setWrappingWidth(CARD_WIDTH);
-        cardNameText.setTextAlignment(TextAlignment.CENTER);
-        cardNameText.setTranslateY(0);
-        cardNameText.setVisible(false);
-        return cardNameText;
     }
 }

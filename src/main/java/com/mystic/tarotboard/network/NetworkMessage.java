@@ -153,6 +153,12 @@ public record NetworkMessage(String type, Msg data) implements Serializable {
         }
 
         /**
+         * Request to set up a specific game.
+         */
+        record SetupGame(int playerId, String gameType) implements Msg {
+        }
+
+        /**
          * Full state synchronization containing all cards, chips, and dice data.
          */
         record StateSync(

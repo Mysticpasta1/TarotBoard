@@ -30,7 +30,7 @@ public record Styles() {
     public static String menuButton() {
         int w = g().menuButtonWidth;
         int fs = g().menuButtonFontSize;
-        int h = fs * 2 + 15;
+        int h = g().menuButtonHeight;
         return "-fx-font-size: " + fs + "pt; -fx-pref-width: " + w + "; -fx-min-width: " + w + "; -fx-max-width: " + w + "; -fx-min-height: " + h + "; -fx-max-height: " + h + "; -fx-background-color: " + g().menuBtnBg + "; -fx-text-fill: " + g().menuBtnFg + ";";
     }
 
@@ -210,7 +210,7 @@ public record Styles() {
      * @return CSS string with font size and wild card color
      */
     public static String wildCardText() {
-        return "-fx-font-size: " + g().cardTextSize + "pt; -fx-fill: " + ThemeManager.getActiveTheme().getSuitStyles().getLast().getColorHex() + ";";
+        return "-fx-font-size: " + g().cardTextSize + "pt; -fx-fill: " + ThemeManager.getActiveTheme().getSuitStyles().getLast().colorHex() + ";";
     }
 
     /**
@@ -228,7 +228,7 @@ public record Styles() {
      * @return CSS string with font size, background, and text color
      */
     public static String settingsResetBtn() {
-        return "-fx-font-size: 11pt; -fx-background-color: " + g().resetBtnBg + "; -fx-text-fill: " + g().settingsBtnFg + ";";
+        return "-fx-font-size: 16pt; -fx-background-color: " + g().resetBtnBg + "; -fx-text-fill: " + g().settingsBtnFg + ";";
     }
 
     /**
@@ -237,7 +237,7 @@ public record Styles() {
      * @return CSS string with font size
      */
     public static String settingsCloseBtn() {
-        return "-fx-font-size: 11pt; -fx-background-color: " + g().settingsBtnBg + "; -fx-text-fill: " + g().settingsBtnFg + ";";
+        return "-fx-font-size: 16pt; -fx-background-color: " + g().settingsBtnBg + "; -fx-text-fill: " + g().settingsBtnFg + ";";
     }
 
     /**
@@ -246,7 +246,7 @@ public record Styles() {
      * @return CSS string with font size and text color
      */
     public static String settingsBindName() {
-        return "-fx-font-size: 13pt; -fx-text-fill: " + g().settingsTextColor + ";";
+        return "-fx-font-size: 16pt; -fx-text-fill: " + g().settingsTextColor + ";";
     }
 
     /**
@@ -255,7 +255,7 @@ public record Styles() {
      * @return CSS string with font size and minimum width
      */
     public static String settingsBindKey() {
-        return "-fx-font-size: 12pt; -fx-min-width: 100;";
+        return "-fx-font-size: 16pt; -fx-min-width: 150;";
     }
 
     /**
@@ -264,7 +264,7 @@ public record Styles() {
      * @return CSS string with font size, minimum width, and orange background
      */
     public static String settingsBindKeyRecording() {
-        return "-fx-font-size: 12pt; -fx-min-width: 100; -fx-background-color: #ffa500; -fx-text-fill: black;";
+        return "-fx-font-size: 16pt; -fx-min-width: 150; -fx-background-color: #ffa500; -fx-text-fill: black;";
     }
 
     /**

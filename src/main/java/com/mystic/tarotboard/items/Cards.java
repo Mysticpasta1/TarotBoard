@@ -23,6 +23,7 @@ public class Cards {
     private final StackPane cardPane;
     private final Tooltip cardTooltip;
     private String currentHoverText;
+    private final String logicalName;
 
     /**
      * Constructs a Cards display with given text, value, suit, dimensions, images, and wilds.
@@ -38,6 +39,7 @@ public class Cards {
      * @param wilds              the list of wild card identifiers
      */
     public Cards(String text, String value, String suit, double width, double height, Image cardFrontImage, Image cardBackImage, ThemeConfiguration themeConfiguration, List<String> wilds) {
+        this.logicalName = text;
         cardPane = new StackPane();
         ImageView cardFrontImageView = new ImageView(cardFrontImage);
         ImageView cardBackImageView = new ImageView(cardBackImage);

@@ -3,16 +3,20 @@ package com.mystic.tarotboard.network.server;
 import com.mystic.tarotboard.network.NetworkMessage;
 import com.mystic.tarotboard.network.NetworkMessage.Msg;
 import com.mystic.tarotboard.network.NetworkMessage.PlayerInfo;
+import org.bitlet.weupnp.GatewayDevice;
+import org.bitlet.weupnp.GatewayDiscover;
 
 import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Multi-client TCP server that accepts connections, assigns player IDs, and relays messages
  * between clients. The host player (playerId=0) is created at startup.
+ * It also handles UPnP port forwarding for easier global access.
  */
 public class GameServer {
     private final ServerSocket serverSocket;
@@ -21,6 +25,8 @@ public class GameServer {
     private final int hostPlayerId;
     private volatile boolean running;
     private Consumer<NetworkMessage> onMessage;
+    private GatewayDevice activeGateway;
+    private Predicate<Integer> isOperatorCheck = id -> false; // Default: no one is operator
 
     private final double[][] playerColors = {
             {1.0, 0.2, 0.2}, {0.2, 1.0, 0.2}, {0.2, 0.5, 1.0}, {1.0, 1.0, 0.2},
@@ -43,6 +49,16 @@ public class GameServer {
         this.hostPlayerId = 0;
         players.add(new PlayerInfo(0, hostName, hostR, hostG, hostB));
         this.running = true;
+    }
+
+    /**
+     * Sets the predicate used to check if a player is an operator.
+     * This is used to restrict certain actions to operators only.
+     *
+     * @param isOperatorCheck The predicate to use for checking operator status.
+     */
+    public void setIsOperatorCheck(Predicate<Integer> isOperatorCheck) {
+        this.isOperatorCheck = isOperatorCheck;
     }
 
     /**
@@ -82,9 +98,10 @@ public class GameServer {
     }
 
     /**
-     * Starts the server's connection acceptance loop in a daemon thread.
+     * Starts the server's connection acceptance loop in a daemon thread and attempts to set up port forwarding.
      */
     public void start() {
+        setupPortForwarding(true);
         Thread acceptThread = new Thread(() -> {
             while (running) {
                 try {
@@ -114,6 +131,11 @@ public class GameServer {
         acceptThread.start();
     }
 
+    /**
+     * Assigns a unique player ID to a new client.
+     *
+     * @return A unique player ID, or -1 if no ID could be assigned.
+     */
     private synchronized int assignPlayerId() {
         for (int i = 1; i < 100; i++) {
             int id = i;
@@ -161,10 +183,11 @@ public class GameServer {
     }
 
     /**
-     * Stops the server, closes all client connections and the server socket.
+     * Stops the server, closes all client connections, removes port forwarding, and closes the server socket.
      */
     public void stop() {
         running = false;
+        setupPortForwarding(false);
         for (var client : clients) client.close();
         clients.clear();
         try {
@@ -173,6 +196,45 @@ public class GameServer {
         }
     }
 
+    /**
+     * Attempts to automatically configure port forwarding using UPnP.
+     *
+     * @param enable true to add a port mapping, false to remove it.
+     */
+    private void setupPortForwarding(boolean enable) {
+        try {
+            if (enable) {
+                GatewayDiscover discover = new GatewayDiscover();
+                discover.discover();
+                activeGateway = discover.getValidGateway();
+
+                if (activeGateway != null) {
+                    String localAddress = activeGateway.getLocalAddress().getHostAddress();
+                    if (activeGateway.addPortMapping(getPort(), getPort(), localAddress, "TCP", "TarotBoard Server")) {
+                        System.out.println("UPnP: Port forwarding enabled for port " + getPort());
+                    } else {
+                        System.err.println("UPnP: Port forwarding failed. Please configure manually.");
+                    }
+                } else {
+                    System.err.println("UPnP: No gateway device found.");
+                }
+            } else {
+                if (activeGateway != null) {
+                    if (activeGateway.deletePortMapping(getPort(), "TCP")) {
+                        System.out.println("UPnP: Port forwarding disabled for port " + getPort());
+                    } else {
+                        System.err.println("UPnP: Failed to remove port forwarding.");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("UPnP: Could not configure port forwarding: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Handles communication with a single client connected to the server.
+     */
     private class ClientHandler {
         private final Socket socket;
         private final int playerId;
@@ -181,12 +243,22 @@ public class GameServer {
         private ObjectInputStream in;
         private volatile boolean active = true;
 
+        /**
+         * Constructs a new ClientHandler.
+         *
+         * @param socket   The client's socket.
+         * @param playerId The ID assigned to this client.
+         * @param info     PlayerInfo object for this client.
+         */
         ClientHandler(Socket socket, int playerId, PlayerInfo info) {
             this.socket = socket;
             this.playerId = playerId;
             this.info = info;
         }
 
+        /**
+         * Starts the client handler, setting up input/output streams and a message reading thread.
+         */
         void start() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
@@ -222,6 +294,11 @@ public class GameServer {
             }
         }
 
+        /**
+         * Sends a NetworkMessage to this client.
+         *
+         * @param msg The message to send.
+         */
         void send(NetworkMessage msg) {
             try {
                 out.writeObject(msg);
@@ -231,6 +308,11 @@ public class GameServer {
             }
         }
 
+        /**
+         * Handles an incoming NetworkMessage from the client, processing it or broadcasting it to others.
+         *
+         * @param msg The incoming NetworkMessage.
+         */
         private void handleMessage(NetworkMessage msg) {
             switch (msg.data()) {
                 case Msg.PlayerJoin join -> {
@@ -266,6 +348,34 @@ public class GameServer {
                     }
                     return;
                 }
+                case Msg.ReshuffleCards ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied ReshuffleCards from non-operator player " + playerId);
+                    }
+                }
+                case Msg.ResetDice ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied ResetDice from non-operator player " + playerId);
+                    }
+                }
+                case Msg.ResetChips ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied ResetChips from non-operator player " + playerId);
+                    }
+                }
+                case Msg.NewGame ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied NewGame from non-operator player " + playerId);
+                    }
+                }
                 default -> broadcast(msg, playerId);
             }
             if (onMessage != null) {
@@ -273,6 +383,9 @@ public class GameServer {
             }
         }
 
+        /**
+         * Disconnects the client, removes it from the server's active lists, and notifies other players.
+         */
         void disconnect() {
             if (!active) return;
             active = false;
@@ -286,6 +399,9 @@ public class GameServer {
             close();
         }
 
+        /**
+         * Closes the client's socket connection.
+         */
         void close() {
             active = false;
             try {
