@@ -85,8 +85,8 @@ public class GameScene {
             scale = Math.clamp(scale, 0.3, 3.0);
             gameContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
         };
-        scene.widthProperty().addListener((observableValue, number1, number2) -> scaleGameContent.run());
-        scene.heightProperty().addListener((observableValue, number1, number2) -> scaleGameContent.run());
+        scene.widthProperty().addListener((_,_,_) -> scaleGameContent.run());
+        scene.heightProperty().addListener((_,_,_) -> scaleGameContent.run());
 
         VBox controlPanelRight = new VBox(10);
         controlPanelRight.setAlignment(Pos.TOP_RIGHT);
@@ -95,20 +95,20 @@ public class GameScene {
         controlPanelRight.setMaxWidth(200);
 
         ColorPicker colorPicker = new ColorPicker(tarotBoard.getCurrentColor());
-        colorPicker.setOnAction(event -> tarotBoard.setCurrentColor(colorPicker.getValue()));
+        colorPicker.setOnAction(_ -> tarotBoard.setCurrentColor(colorPicker.getValue()));
         colorPicker.setMaxWidth(Double.MAX_VALUE);
         colorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 11pt;");
 
         Button spawnChipButton = new Button("Spawn Chip");
         spawnChipButton.setStyle(Styles.panelBtn());
         spawnChipButton.setMaxWidth(Double.MAX_VALUE);
-        spawnChipButton.setOnAction(event -> tarotBoard.spawnChip(colorPicker.getValue()));
+        spawnChipButton.setOnAction(_ -> tarotBoard.spawnChip(colorPicker.getValue()));
 
         TextField diceSidesInput = new TextField("20");
         diceSidesInput.setPrefWidth(60);
         diceSidesInput.setAlignment(Pos.CENTER);
         diceSidesInput.setStyle(Styles.panelBtn());
-        diceSidesInput.textProperty().addListener((observableValue, s, n) -> {
+        diceSidesInput.textProperty().addListener((_,_, n) -> {
             if (!n.matches("\\d*")) {
                 diceSidesInput.setText(n.replaceAll("\\D", ""));
                 return;
@@ -125,7 +125,7 @@ public class GameScene {
         Button spawnDieButton = new Button("Spawn Dice");
         spawnDieButton.setStyle(Styles.panelBtn());
         spawnDieButton.setMaxWidth(Double.MAX_VALUE);
-        spawnDieButton.setOnAction(event -> {
+        spawnDieButton.setOnAction(_ -> {
             try {
                 int sides = Integer.parseInt(diceSidesInput.getText());
                 if (sides > 0) {
@@ -145,7 +145,7 @@ public class GameScene {
         resetDiceButton = new Button("Reset Dice");
         resetDiceButton.setStyle(Styles.panelBtn());
         resetDiceButton.setMaxWidth(Double.MAX_VALUE);
-        resetDiceButton.setOnAction(event -> tarotBoard.resetDice());
+        resetDiceButton.setOnAction(_ -> tarotBoard.resetDice());
 
         ComboBox<ThemeConfiguration> themeSelector = new ComboBox<>(FXCollections.observableArrayList(ThemeManager.getThemes()));
         themeSelector.setValue(tarotBoard.getCurrentCardTheme());
@@ -161,32 +161,32 @@ public class GameScene {
                 return ThemeManager.getThemeByName(string);
             }
         });
-        themeSelector.setOnAction(event -> tarotBoard.applyCurrentTheme(themeSelector.getValue()));
+        themeSelector.setOnAction(_ -> tarotBoard.applyCurrentTheme(themeSelector.getValue()));
 
         resetChipsButton = new Button("Reset Chips");
         resetChipsButton.setStyle(Styles.panelBtn());
         resetChipsButton.setMaxWidth(Double.MAX_VALUE);
-        resetChipsButton.setOnAction(event -> tarotBoard.resetChips());
+        resetChipsButton.setOnAction(_ -> tarotBoard.resetChips());
 
         reshuffleCardsButton = new Button("Reshuffle Cards");
         reshuffleCardsButton.setStyle(Styles.panelBtn());
         reshuffleCardsButton.setMaxWidth(Double.MAX_VALUE);
-        reshuffleCardsButton.setOnAction(event -> tarotBoard.reshuffleCards());
+        reshuffleCardsButton.setOnAction(_ -> tarotBoard.reshuffleCards());
 
         newGameButton = new Button("New Game");
         newGameButton.setStyle(Styles.panelBtn());
         newGameButton.setMaxWidth(Double.MAX_VALUE);
-        newGameButton.setOnAction(event -> tarotBoard.newGame());
+        newGameButton.setOnAction(_ -> tarotBoard.newGame());
 
         Button helpButton2 = new Button("Help");
         helpButton2.setStyle(Styles.panelBtn());
         helpButton2.setMaxWidth(Double.MAX_VALUE);
-        helpButton2.setOnAction(event -> HelpScene.show(primaryStage));
+        helpButton2.setOnAction(_ -> HelpScene.show(primaryStage));
 
         Button backButton3 = new Button("Back to Start");
         backButton3.setStyle(Styles.panelBtn());
         backButton3.setMaxWidth(Double.MAX_VALUE);
-        backButton3.setOnAction(event -> {
+        backButton3.setOnAction(_ -> {
             tarotBoard.leaveGame();
             tarotBoard.switchToStart();
         });
@@ -194,7 +194,7 @@ public class GameScene {
         disconnectButton = new Button("Disconnect");
         disconnectButton.setStyle(Styles.panelBtn());
         disconnectButton.setMaxWidth(Double.MAX_VALUE);
-        disconnectButton.setOnAction(event -> {
+        disconnectButton.setOnAction(_ -> {
             tarotBoard.leaveGame();
             tarotBoard.switchToStart();
         });
@@ -214,7 +214,7 @@ public class GameScene {
         requestOpInGame.setStyle(Styles.panelSmall());
         requestOpInGame.setMaxWidth(Double.MAX_VALUE);
         requestOpInGame.setVisible(false);
-        requestOpInGame.setOnAction(event -> {
+        requestOpInGame.setOnAction(_ -> {
             String pw = opPwInGame.getText();
             if (!pw.isEmpty() && tarotBoard.isClientConnected()) {
                 tarotBoard.sendNetworkMessage(NetworkMessage.of(new Msg.RequestOperator(tarotBoard.getMyPlayerId(), pw)));
@@ -225,12 +225,12 @@ public class GameScene {
         Button chooseCursorInGame = new Button("Cursor Image");
         chooseCursorInGame.setStyle(Styles.panelSmall());
         chooseCursorInGame.setMaxWidth(Double.MAX_VALUE);
-        chooseCursorInGame.setOnAction(event -> tarotBoard.chooseCursorImage());
+        chooseCursorInGame.setOnAction(_ -> tarotBoard.chooseCursorImage());
 
         Button settingsInGameBtn = new Button("Settings");
         settingsInGameBtn.setStyle(Styles.panelBtn());
         settingsInGameBtn.setMaxWidth(Double.MAX_VALUE);
-        settingsInGameBtn.setOnAction(event -> SettingsScene.show(primaryStage));
+        settingsInGameBtn.setOnAction(_ -> SettingsScene.show(primaryStage));
 
         controlPanelRight.getChildren().addAll(
                 colorPicker,

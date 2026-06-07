@@ -144,6 +144,14 @@ public class UpdateManager {
      */
     public static void installUpdate(Path msiPath) throws IOException {
         String path = msiPath.toAbsolutePath().toString();
-        new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start();
+        try (Process process = new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start()) {
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("msiexec installation failed with exit code " + exitCode);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Installation interrupted", e);
+        }
     }
 }

@@ -78,9 +78,14 @@ public class UIUtils {
         final double[] dragDeltaY = new double[1];
         final boolean[] isDragging = new boolean[1];
         final boolean[] wasDragged = new boolean[1];
+        final double[] pressX = new double[1];
+        final double[] pressY = new double[1];
+        final boolean[] pileDragActive = new boolean[1];
+        @SuppressWarnings("unchecked")
+        final List<StackPane>[] cachedPile = new List[1];
 
         pane.setOnMousePressed(event -> {
-            if (!event.isShiftDown() && !event.isControlDown()) {
+            if (!event.isShiftDown()) {
                 var parent = pane.getParent();
                 if (parent != null) {
                     var local = parent.sceneToLocal(event.getSceneX(), event.getSceneY());
@@ -90,10 +95,13 @@ public class UIUtils {
                     dragDeltaX[0] = event.getSceneX() - pane.getTranslateX();
                     dragDeltaY[0] = event.getSceneY() - pane.getTranslateY();
                 }
+                pressX[0] = pane.getTranslateX();
+                pressY[0] = pane.getTranslateY();
+                pileDragActive[0] = false;
+                cachedPile[0] = null;
                 pane.toFront();
                 isDragging[0] = true;
                 wasDragged[0] = false;
-                if (onDragEnd != null) onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
             } else {
                 isDragging[0] = false;
             }
@@ -113,16 +121,33 @@ public class UIUtils {
                 }
 
                 KeyBindConfig kb = KeyBindConfig.getInstance();
-                if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
-                    List<StackPane> pile = findCardPile(pane, tarotBoard);
-                    if (pile.size() > 1 && onPileDrag != null) {
-                        onPileDrag.onPileDrag(pile, newTranslateX, newTranslateY);
+                if (event.isAltDown()) {
+                    if (!pileDragActive[0]) {
+                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, true);
+                        pileDragActive[0] = cachedPile[0].size() > 1;
+                    }
+                    if (pileDragActive[0] && onPileDrag != null) {
+                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY);
+                    } else {
+                        pane.setTranslateX(newTranslateX);
+                        pane.setTranslateY(newTranslateY);
+                        if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
+                    }
+                } else if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
+                    if (!pileDragActive[0]) {
+                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, false);
+                        pileDragActive[0] = cachedPile[0].size() > 1;
+                    }
+                    if (pileDragActive[0] && onPileDrag != null) {
+                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY);
                     } else {
                         pane.setTranslateX(newTranslateX);
                         pane.setTranslateY(newTranslateY);
                         if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
                     }
                 } else {
+                    pileDragActive[0] = false;
+                    cachedPile[0] = null;
                     pane.setTranslateX(newTranslateX);
                     pane.setTranslateY(newTranslateY);
                     if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
@@ -134,10 +159,15 @@ public class UIUtils {
         pane.setOnMouseReleased(event -> {
             if (isDragging[0] && wasDragged[0]) {
                 KeyBindConfig kb = KeyBindConfig.getInstance();
-                if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
-                    List<StackPane> pile = findCardPile(pane, tarotBoard);
-                    if (pile.size() > 1) {
-                        for (StackPane cardPane : pile) {
+                boolean wildsOnly = event.isAltDown();
+                boolean pileMode = wildsOnly || (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL);
+                if (pileMode) {
+                    if (!pileDragActive[0]) {
+                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, wildsOnly);
+                        pileDragActive[0] = cachedPile[0].size() > 1;
+                    }
+                    if (pileDragActive[0]) {
+                        for (StackPane cardPane : cachedPile[0]) {
                             cardPane.setTranslateX(pane.getTranslateX());
                             cardPane.setTranslateY(pane.getTranslateY());
                             if (onDragEnd != null) {
@@ -153,24 +183,56 @@ public class UIUtils {
             }
             isDragging[0] = false;
         });
+
+        pane.addEventHandler(MouseEvent.MOUSE_RELEASED, _ -> {
+            if (wasDragged[0] && !pileDragActive[0]) {
+                snapToNearestCard(pane, tarotBoard);
+            }
+        });
     }
 
-    private static List<StackPane> findCardPile(StackPane draggedPane, TarotBoard tarotBoard) {
+    private static List<StackPane> findCardPileAt(TarotBoard tarotBoard, double x, double y, StackPane draggedPane, boolean wildsOnly) {
         List<StackPane> pile = new ArrayList<>();
-        pile.add(draggedPane);
-
-        double x = draggedPane.getTranslateX();
-        double y = draggedPane.getTranslateY();
-
         for (Cards card : tarotBoard.getCards()) {
+            if (card == null) continue;
             StackPane cardPane = card.getCardPane();
-            if (cardPane != draggedPane && cardPane.getTranslateX() == x && cardPane.getTranslateY() == y) {
-                if (cardPane.getParent().getChildrenUnmodifiable().indexOf(cardPane) > draggedPane.getParent().getChildrenUnmodifiable().indexOf(draggedPane)) {
-                    pile.add(cardPane);
-                }
+            if (cardPane == null || cardPane == draggedPane) continue;
+            if (Math.abs(cardPane.getTranslateX() - x) < 5.0 && Math.abs(cardPane.getTranslateY() - y) < 5.0) {
+                if (wildsOnly && !tarotBoard.isWildCard(cardPane)) continue;
+                pile.add(cardPane);
             }
         }
+        if (!wildsOnly || tarotBoard.isWildCard(draggedPane)) {
+            pile.add(draggedPane);
+        }
         return pile;
+    }
+
+    private static void snapToNearestCard(StackPane pane, TarotBoard tarotBoard) {
+        double px = pane.getTranslateX();
+        double py = pane.getTranslateY();
+        double snapDistance = 50.0;
+
+        StackPane nearest = null;
+        double bestDist = snapDistance;
+
+        for (Cards card : tarotBoard.getCards()) {
+            if (card == null) continue;
+            StackPane cp = card.getCardPane();
+            if (cp == null || cp == pane) continue;
+            double dx = cp.getTranslateX() - px;
+            double dy = cp.getTranslateY() - py;
+            double dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                nearest = cp;
+            }
+        }
+
+        if (nearest != null) {
+            pane.setTranslateX(nearest.getTranslateX());
+            pane.setTranslateY(nearest.getTranslateY());
+        }
     }
 
     /**
@@ -440,12 +502,12 @@ public class UIUtils {
         int flips = 5;
         Timeline timeline = new Timeline();
         for (int i = 0; i < flips; i++) {
-            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), event -> {
+            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), _ -> {
                 f.setVisible(!f.isVisible());
                 b.setVisible(!f.isVisible());
             }));
         }
-        timeline.setOnFinished(event -> {
+        timeline.setOnFinished(_ -> {
             boolean showFront = new Random().nextBoolean();
             f.setVisible(showFront);
             b.setVisible(!showFront);

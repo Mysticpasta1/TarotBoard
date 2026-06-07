@@ -44,7 +44,6 @@ public class HeadlessServerLauncher extends Application {
                 System.out.println("Headless GameServer started on port " + port);
             } catch (IOException e) {
                 System.err.println("Failed to start Headless GameServer: " + e.getMessage());
-                e.printStackTrace();
             }
         }).start();
     }

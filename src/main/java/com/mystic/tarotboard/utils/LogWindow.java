@@ -6,7 +6,6 @@ import javafx.scene.control.TextArea;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 
@@ -51,12 +50,12 @@ public class LogWindow extends Stage {
     private void redirectSystemStreams() {
         OutputStream out = new OutputStream() {
             @Override
-            public void write(int b) throws IOException {
+            public void write(int b) {
                 Platform.runLater(() -> logTextArea.appendText(String.valueOf((char) b)));
             }
 
             @Override
-            public void write(byte[] b, int off, int len) throws IOException {
+            public void write(byte[] b, int off, int len) {
                 String text = new String(b, off, len);
                 Platform.runLater(() -> {
                     logTextArea.appendText(text);

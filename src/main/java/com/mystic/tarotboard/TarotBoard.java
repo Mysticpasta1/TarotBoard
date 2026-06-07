@@ -109,7 +109,7 @@ public class TarotBoard extends Application {
 
     private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
     private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
-    private static final double CARD_WIDTH = 150;
+    public static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
     private static Stage primaryStage;
     private GameScene gameScene;
@@ -212,24 +212,6 @@ public class TarotBoard extends Application {
     }
 
     /**
-     * Returns the list of wild card names.
-     *
-     * @return the list of wilds
-     */
-    public static List<String> getWilds() {
-        return wilds;
-    }
-
-    /**
-     * Returns the map of piece IDs to their visual panes.
-     *
-     * @return the piece map
-     */
-    public Map<String, StackPane> getPieceMap() {
-        return pieceMap;
-    }
-
-    /**
      * Returns the local player's network ID.
      *
      * @return the player ID
@@ -328,7 +310,7 @@ public class TarotBoard extends Application {
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
         gameScene.updateOperatorButtonsVisibility();
-        
+
         primaryStage.setScene(startScene.getScene());
         primaryStage.setX(screenBounds.getMinX());
         primaryStage.setY(screenBounds.getMinY());
@@ -845,6 +827,18 @@ public class TarotBoard extends Application {
             for (int i = 0; i < NUM_CARDS; i++) {
                 if (cards[i] != null) {
                     String logicalName = cardNames.get(i);
+                    Text text = cards[i].getCardName();
+                    Matcher matcher = CARD_PATTERN.matcher(logicalName);
+                    if (matcher.matches() && !wilds.contains(logicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        text.setText(Cards.getStyle(logicalName, value, suit, currentCardTheme).getText());
+                        text.setStyle(Cards.getStyle(logicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text wildText = CardDataHelper.getWildCardName(new Text(logicalName + "\n \n" + "(Wild)"));
+                        text.setText(wildText.getText());
+                        text.setStyle(wildText.getStyle());
+                    }
                     cards[i].refreshTooltipContent(logicalName, wilds);
                 }
             }
@@ -1210,6 +1204,12 @@ public class TarotBoard extends Application {
             } else {
                 card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             }
+
+            Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
+            ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
+            card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
+            card.refreshTooltipContent(cardLogicalName, wilds);
+
             String pieceId = "card:" + i;
             cards[i] = card;
 
@@ -1321,7 +1321,10 @@ public class TarotBoard extends Application {
             for (int a = 0; a < NUM_CARDS; a++) {
                 if (cards[a] != null) {
                     StackPane cardPane = cards[a].getCardPane();
+                    Text cardNameText = cards[a].getCardName();
                     String cardLogicalName = cardNames.get(a);
+                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+
                     cardPane.setTranslateX(DEFAULT_DECK_X);
                     cardPane.setTranslateY(DEFAULT_DECK_Y);
                     cardPane.getTransforms().removeAll(cardPane.getTransforms());
@@ -1329,11 +1332,20 @@ public class TarotBoard extends Application {
 
                     ImageView backView = (ImageView) cardPane.getChildren().get(0);
                     ImageView frontView = (ImageView) cardPane.getChildren().get(1);
-                    Node textNode = cardPane.getChildren().size() > 2 ? cardPane.getChildren().get(2) : null;
+                    Node textNode = cardPane.getChildren().get(2);
                     backView.setVisible(true);
                     frontView.setVisible(false);
-                    if (textNode != null) {
-                        textNode.setVisible(false);
+                    textNode.setVisible(false);
+
+                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text text = new Text(cardLogicalName);
+                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
+                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
                     }
 
                     cards[a].refreshTooltipContent(cardLogicalName, wilds);
@@ -1506,10 +1518,23 @@ public class TarotBoard extends Application {
 
             for (int a = 0; a < NUM_CARDS; a++) {
                 if (cards[a] != null) {
+                    Text cardNameText = cards[a].getCardName();
                     String cardLogicalName = cardNames.get(a);
+                    Matcher matcher = CARD_PATTERN.matcher(cardLogicalName);
+                    if (matcher.matches() && !wilds.contains(cardLogicalName)) {
+                        String value = matcher.group("value");
+                        String suit = matcher.group("suit");
+                        cardNameText.setText(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getText());
+                        cardNameText.setStyle(Cards.getStyle(cardLogicalName, value, suit, currentCardTheme).getStyle());
+                    } else {
+                        Text text = new Text(cardLogicalName);
+                        cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
+                        cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
+                    }
                     cards[a].refreshTooltipContent(cardLogicalName, wilds);
                 }
             }
+
             reshuffled = false;
             applyCurrentTheme();
             sendNetworkMessage(NetworkMessage.of(new Msg.NewGame(myPlayerId)));
@@ -1734,6 +1759,9 @@ public class TarotBoard extends Application {
                 card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
                 card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
+                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
+                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
             String pieceId = "card:" + idx;
             cards[idx] = card;
@@ -1757,6 +1785,18 @@ public class TarotBoard extends Application {
             backView.setVisible(cs.backVisible());
             frontView.setVisible(cs.frontVisible());
             text.setVisible(cs.textVisible());
+
+            if (!wilds.contains(cardLogicalName)) {
+                Matcher matcher1 = CARD_PATTERN.matcher(cardLogicalName);
+                if (matcher1.matches()) {
+                    String value = matcher1.group("value");
+                    String suit = matcher1.group("suit");
+                    var styled = Cards.getStyle(cardLogicalName, value, suit, currentCardTheme);
+                    text.setText(styled.getText());
+                    text.setStyle(styled.getStyle());
+                }
+            }
+
             cards[idx].refreshTooltipContent(cardLogicalName, wilds);
             gameScene.getGameContent().getChildren().add(pane);
             pieceMap.put(pieceId, pane);
@@ -1800,7 +1840,7 @@ public class TarotBoard extends Application {
                     if (release != null && UpdateManager.isNewerVersion(release.version())) {
                         statusLabel.setText("Update v" + release.version() + " available (click to download)");
                         statusLabel.setStyle("-fx-text-fill: white; -fx-font-size: 40; -fx-font-weight: bold; -fx-underline: true; -fx-cursor: hand;");
-                        statusLabel.setOnMouseClicked(event -> downloadAndInstallUpdate(release));
+                        statusLabel.setOnMouseClicked(_ -> downloadAndInstallUpdate(release));
                         statusLabel.setVisible(true);
                     }
                 });
@@ -1906,15 +1946,6 @@ public class TarotBoard extends Application {
         main(getParameters().getRaw().toArray(String[]::new));
     }
 
-    public int getCardId(Cards card) {
-        for (int i = 0; i < cards.length; i++) {
-            if (cards[i] == card) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     public String getCardId(StackPane pane) {
         for (int i = 0; i < cards.length; i++) {
             if (cards[i] != null && cards[i].getCardPane() == pane) {
@@ -1922,6 +1953,15 @@ public class TarotBoard extends Application {
             }
         }
         return null;
+    }
+
+    public boolean isWildCard(StackPane pane) {
+        for (int i = 0; i < cards.length; i++) {
+            if (cards[i] != null && cards[i].getCardPane() == pane) {
+                return i < cardNames.size() && wilds.contains(cardNames.get(i));
+            }
+        }
+        return false;
     }
 
     public void splitDeck() {
@@ -1939,7 +1979,7 @@ public class TarotBoard extends Application {
                 List<Cards> deckCards = new ArrayList<>();
                 for (Cards card : cards) {
                     if (card.getCardPane().getTranslateX() == DEFAULT_DECK_X &&
-                        card.getCardPane().getTranslateY() == DEFAULT_DECK_Y) {
+                            card.getCardPane().getTranslateY() == DEFAULT_DECK_Y) {
                         deckCards.add(card);
                     }
                 }
@@ -1968,9 +2008,9 @@ public class TarotBoard extends Application {
         double newX = gameScene.getScene().getWidth() - CARD_WIDTH - 50;
         double newY = 100;
         int i = 0;
-        for (Cards card : cards) {
-            if (wilds.contains(card.getCardName().getText())) {
-                StackPane cardPane = card.getCardPane();
+        for (int j = 0; j < cards.length; j++) {
+            if (cards[j] != null && j < cardNames.size() && wilds.contains(cardNames.get(j))) {
+                StackPane cardPane = cards[j].getCardPane();
                 cardPane.setTranslateX(newX);
                 cardPane.setTranslateY(newY + i * 5);
                 sendPieceMove(getCardId(cardPane), cardPane.getTranslateX(), cardPane.getTranslateY());

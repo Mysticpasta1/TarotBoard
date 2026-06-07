@@ -72,17 +72,6 @@ public class ThemeManager {
         }
     }
 
-    /**
-     * Returns the CSS string for the given key from the registry.
-     *
-     * @param key the CSS registry key
-     * @return the joined CSS string, or empty if not found
-     */
-    public static String getCss(String key) {
-        List<String> lines = cssRegistry.get(key);
-        return lines != null ? String.join("\n", lines) : "";
-    }
-
     private static void loadGuiRegistry() {
         Gson gson = new Gson();
         try (InputStream is = ThemeManager.class.getResourceAsStream(RESOURCE_GUI_PATH)) {
