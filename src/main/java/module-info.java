@@ -20,4 +20,5 @@ module tarotboard {
     exports com.mystic.tarotboard.items;
     exports com.mystic.tarotboard.theming;
     exports com.mystic.tarotboard.utils;
+    exports com.mystic.tarotboard.poker;
 }

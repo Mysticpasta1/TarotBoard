@@ -8,10 +8,17 @@ import com.mystic.tarotboard.network.NetworkMessage.Msg;
 import com.mystic.tarotboard.network.UpdateManager;
 import com.mystic.tarotboard.network.client.GameClient;
 import com.mystic.tarotboard.network.server.GameServer;
+import com.mystic.tarotboard.poker.CardCategory;
+import com.mystic.tarotboard.poker.HandResult;
+import com.mystic.tarotboard.poker.HandType;
+import com.mystic.tarotboard.poker.PokerBotAI;
+import com.mystic.tarotboard.poker.PokerClientState;
+import com.mystic.tarotboard.poker.PokerTable;
 import com.mystic.tarotboard.scenes.GameScene;
 import com.mystic.tarotboard.scenes.HostGameScene;
 import com.mystic.tarotboard.scenes.JoinGameScene;
 import com.mystic.tarotboard.scenes.MultiplayerScene;
+import com.mystic.tarotboard.scenes.PokerScene;
 import com.mystic.tarotboard.scenes.StartScene;
 import com.mystic.tarotboard.theming.RemoteCursor;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
@@ -45,6 +52,9 @@ import java.io.ByteArrayInputStream;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -113,6 +123,7 @@ public class TarotBoard extends Application {
     private static final double CARD_HEIGHT = 200;
     private static Stage primaryStage;
     private GameScene gameScene;
+    private PokerScene pokerScene;
     private StartScene startScene;
     private MultiplayerScene multiplayerScene;
     private HostGameScene hostGameScene;
@@ -157,6 +168,22 @@ public class TarotBoard extends Application {
     private final Set<Integer> operators = new HashSet<>();
     private String hostOperatorPassword = "admin";
 
+    private static final long POKER_ANTE = 10;
+    private static final long POKER_MIN_RAISE = 10;
+    private static final long POKER_STARTING_BANKROLL = 1000;
+    private static final int POKER_BOT_DELAY_SECONDS = 2;
+    /** Point value of a single physical chip piece staked in Poker Mode; chip color stays purely cosmetic. */
+    public static final long POKER_CHIP_VALUE = 10;
+
+    private PokerTable pokerTable;
+    private int pokerNextBotId = -1;
+    private final PokerClientState pokerClientState = new PokerClientState();
+    private final ScheduledExecutorService pokerBotScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "poker-bot-scheduler");
+        t.setDaemon(true);
+        return t;
+    });
+
     /**
      * Returns the game scene instance.
      *
@@ -191,6 +218,24 @@ public class TarotBoard extends Application {
      */
     public ThemeConfiguration getCurrentCardTheme() {
         return currentCardTheme;
+    }
+
+    /**
+     * Returns the currently loaded chip front image, used to render chip pieces.
+     *
+     * @return the chip front image
+     */
+    public Image getChipFrontImage() {
+        return bwFrontImage;
+    }
+
+    /**
+     * Returns the currently loaded chip back image, used to render chip pieces.
+     *
+     * @return the chip back image
+     */
+    public Image getChipBackImage() {
+        return bwBackImage;
     }
 
     /**
@@ -275,6 +320,58 @@ public class TarotBoard extends Application {
     }
 
     /**
+     * Returns the read-only poker display state used to render the Poker Mode panel, kept in sync
+     * whether this process is the poker authority or a non-authoritative client.
+     *
+     * @return the poker client display state
+     */
+    public PokerClientState getPokerClientState() {
+        return pokerClientState;
+    }
+
+    /**
+     * Returns whether this process owns the authoritative poker table (host or single-player).
+     *
+     * @return true if this process is the poker authority
+     */
+    public boolean isPokerAuthority() {
+        return isHost || !isMultiplayer;
+    }
+
+    /**
+     * Refreshes both the Poker Mode nav button on the game board and the dedicated
+     * {@link PokerScene}'s panel, keeping both in sync with the current poker display state.
+     */
+    private void refreshPokerUI() {
+        gameScene.updatePokerNavButton();
+        if (pokerScene != null) {
+            pokerScene.refreshPokerPanel();
+        }
+    }
+
+    /**
+     * Enters Poker Mode: starts a fresh table if one isn't already active, then switches the
+     * primary stage to the dedicated {@link PokerScene}.
+     */
+    public void enterPokerMode() {
+        if (!pokerClientState.pokerModeActive) {
+            startPokerMode();
+        }
+        primaryStage.setScene(pokerScene.getScene());
+        primaryStage.setTitle("Poker Mode");
+        refreshPokerUI();
+    }
+
+    /**
+     * Switches the primary stage back to the sandbox game board, leaving any active poker
+     * session running in the background.
+     */
+    public void switchToGameBoard() {
+        primaryStage.setScene(gameScene.getScene());
+        primaryStage.setTitle("Game Scene");
+    }
+
+    /**
      * Initializes and displays the primary stage with all game scenes,
      * including the main menu, multiplayer setup, and the game board.
      *
@@ -292,6 +389,7 @@ public class TarotBoard extends Application {
         double baseHeight = screenBounds.getHeight();
 
         gameScene = new GameScene(this, primaryStage, baseWidth, baseHeight);
+        pokerScene = new PokerScene(this, primaryStage, baseWidth, baseHeight);
         startScene = new StartScene(this, primaryStage, baseWidth, baseHeight);
         multiplayerScene = new MultiplayerScene(this, baseWidth, baseHeight);
         hostGameScene = new HostGameScene(this, baseWidth, baseHeight);
@@ -310,6 +408,7 @@ public class TarotBoard extends Application {
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
 
         gameScene.updateOperatorButtonsVisibility();
+        refreshPokerUI();
 
         primaryStage.setScene(startScene.getScene());
         primaryStage.setX(screenBounds.getMinX());
@@ -446,6 +545,11 @@ public class TarotBoard extends Application {
         }
         remoteCursors.clear();
         playerList.clear();
+        pokerTable = null;
+        pokerClientState.pokerModeActive = false;
+        pokerClientState.seats = List.of();
+        pokerClientState.myHoleCards = List.of();
+        pokerClientState.lastShowdown = null;
         if (hostGameScene != null) {
             hostGameScene.getNetworkStatusLabel().setText("Offline");
             hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpLabel());
@@ -459,6 +563,7 @@ public class TarotBoard extends Application {
             gameScene.getNetworkStatusInGame().setText("");
             gameScene.setMultiplayerControlsVisible(false);
             gameScene.updateOperatorButtonsVisibility(); // Reset to single player view
+            refreshPokerUI();
         }
         if (primaryStage != null) {
             primaryStage.setTitle("TarotBoard");
@@ -558,6 +663,14 @@ public class TarotBoard extends Application {
             case Msg.NewGame m -> handleNewGame(m);
             case Msg.SendState m -> handleSendState(m);
             case Msg.StateSync s -> handleStateSync(s);
+            case Msg.SetupGame m -> handleSetupGame(m);
+            case Msg.PokerSitDown m -> handlePokerSitDown(m);
+            case Msg.PokerAddBot m -> handlePokerAddBot(m);
+            case Msg.PokerStartHand m -> handlePokerStartHand(m);
+            case Msg.PokerAction m -> handlePokerAction(m);
+            case Msg.PokerStateSync s -> handlePokerStateSync(s);
+            case Msg.PokerDealPrivate m -> handlePokerDealPrivate(m);
+            case Msg.PokerShowdownResult m -> handlePokerShowdownResult(m);
             default -> {
             }
         }
@@ -933,6 +1046,10 @@ public class TarotBoard extends Application {
 
         if (gameServer != null) {
             gameServer.sendTo(m.playerId(), NetworkMessage.of(sync));
+        }
+
+        if (pokerTable != null) {
+            sendPokerStateTo(m.playerId());
         }
     }
 
@@ -1541,6 +1658,302 @@ public class TarotBoard extends Application {
         } else {
             sendNetworkMessage(NetworkMessage.of(new Msg.NewGame(myPlayerId)));
         }
+    }
+
+    // --- Poker Mode ---
+
+    /**
+     * Enters Poker Mode: creates a fresh poker table if this process is the authority
+     * (host or single-player), or requests the host to do so otherwise. The existing sandbox
+     * cards/chips/dice are left untouched.
+     */
+    public void startPokerMode() {
+        if (isPokerAuthority()) {
+            pokerTable = new PokerTable(POKER_ANTE, POKER_MIN_RAISE, wilds, values);
+            pokerNextBotId = -1;
+            refreshPokerDisplayFromTable();
+            broadcastPokerState();
+        }
+        sendNetworkMessage(NetworkMessage.of(new Msg.SetupGame(myPlayerId, "POKER")));
+        refreshPokerUI();
+    }
+
+    /**
+     * Claims a poker seat for the local player.
+     */
+    public void pokerSitDown() {
+        if (isPokerAuthority()) {
+            if (pokerTable == null) return;
+            pokerTable.sitDown(myPlayerId, false, POKER_STARTING_BANKROLL);
+            refreshPokerDisplayFromTable();
+            broadcastPokerState();
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.PokerSitDown(myPlayerId)));
+        }
+        refreshPokerUI();
+    }
+
+    /**
+     * Adds an AI-controlled seat. Only the poker authority or an operator may do this.
+     */
+    public void pokerAddBot() {
+        if (isPokerAuthority()) {
+            if (pokerTable == null) return;
+            pokerTable.sitDown(pokerNextBotId--, true, POKER_STARTING_BANKROLL);
+            refreshPokerDisplayFromTable();
+            broadcastPokerState();
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.PokerAddBot(myPlayerId)));
+        }
+        refreshPokerUI();
+    }
+
+    /**
+     * Deals a new poker hand. Only the poker authority or an operator may do this.
+     */
+    public void pokerStartHand() {
+        if (isPokerAuthority()) {
+            startPokerHandAuthoritative();
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.PokerStartHand(myPlayerId)));
+        }
+    }
+
+    /**
+     * Submits a betting action for the local player's turn.
+     *
+     * @param action one of {@code "CALL"}, {@code "RAISE"}, or {@code "FOLD"}
+     * @param amount the additional amount to commit this action (ignored for FOLD)
+     */
+    public void pokerAction(String action, long amount) {
+        if (isPokerAuthority()) {
+            applyPokerActionAuthoritative(myPlayerId, action, amount);
+        } else {
+            sendNetworkMessage(NetworkMessage.of(new Msg.PokerAction(myPlayerId, action, amount)));
+        }
+    }
+
+    private void startPokerHandAuthoritative() {
+        if (pokerTable == null) return;
+        try {
+            pokerTable.startHand(buildPokerDeck());
+        } catch (IllegalStateException e) {
+            System.out.println("[TarotBoard] Cannot start poker hand: " + e.getMessage());
+            return;
+        }
+        for (PokerTable.Seat seat : pokerTable.seats()) {
+            if (seat.playerId() == myPlayerId) {
+                pokerClientState.myHoleCards = seat.holeCards();
+            } else if (!seat.isBot() && seat.active() && isHost) {
+                sendPokerDealPrivateTo(seat.playerId(), seat.holeCards());
+            }
+        }
+        refreshPokerDisplayFromTable();
+        broadcastPokerState();
+        refreshPokerUI();
+        schedulePokerBotTurnIfNeeded();
+    }
+
+    private Deque<String> buildPokerDeck() {
+        List<String> deck = new ArrayList<>(wilds);
+        for (String suit : suits) {
+            for (String value : values) {
+                deck.add(value + " of " + suit);
+            }
+        }
+        Collections.shuffle(deck);
+        return new ArrayDeque<>(deck);
+    }
+
+    private void sendPokerDealPrivateTo(int playerId, List<String> holeCards) {
+        if (gameServer != null) {
+            gameServer.sendTo(playerId,
+                    NetworkMessage.of(new Msg.PokerDealPrivate(playerId, new ArrayList<>(holeCards))));
+        }
+    }
+
+    private void applyPokerActionAuthoritative(int playerId, String action, long amount) {
+        if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+        if (!pokerTable.applyAction(playerId, action, amount)) {
+            System.out.println("[TarotBoard] Rejected poker action " + action + " from player " + playerId);
+            return;
+        }
+        refreshPokerDisplayFromTable();
+        broadcastPokerState();
+        refreshPokerUI();
+        if (pokerTable.phase() == PokerTable.Phase.SHOWDOWN) {
+            broadcastPokerShowdown();
+            pokerScene.showPokerShowdown(pokerClientState.lastShowdown);
+        } else {
+            schedulePokerBotTurnIfNeeded();
+        }
+    }
+
+    private void schedulePokerBotTurnIfNeeded() {
+        if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+        Integer turnPlayerId = pokerTable.currentTurnPlayerId();
+        if (turnPlayerId == null) return;
+        PokerTable.Seat seat = pokerTable.seats().stream()
+                .filter(s -> s.playerId() == turnPlayerId).findFirst().orElse(null);
+        if (seat == null || !seat.isBot()) return;
+        pokerBotScheduler.schedule(() -> Platform.runLater(() -> {
+            if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+            Integer current = pokerTable.currentTurnPlayerId();
+            if (current == null || current != seat.playerId()) return;
+            PokerBotAI.BotDecision decision = PokerBotAI.decide(seat.holeCards(), wilds, values,
+                    pokerTable.currentBet(), seat.contributionThisRound(), seat.bankroll(), POKER_MIN_RAISE,
+                    new Random());
+            applyPokerActionAuthoritative(seat.playerId(), decision.action(), decision.amount());
+        }), POKER_BOT_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void refreshPokerDisplayFromTable() {
+        if (pokerTable == null) return;
+        pokerClientState.pokerModeActive = true;
+        List<PokerClientState.SeatView> views = new ArrayList<>();
+        for (PokerTable.Seat s : pokerTable.seats()) {
+            views.add(new PokerClientState.SeatView(s.playerId(), s.isBot(), s.folded(), s.active(),
+                    s.holeCards().size(), s.bankroll(), s.contributionThisRound()));
+        }
+        pokerClientState.seats = views;
+        Integer turn = pokerTable.currentTurnPlayerId();
+        pokerClientState.currentTurnPlayerId = turn == null ? -1 : turn;
+        pokerClientState.potTotal = pokerTable.potTotal();
+        pokerClientState.currentBet = pokerTable.currentBet();
+        pokerClientState.phase = pokerTable.phase();
+        pokerClientState.lastShowdown = pokerTable.lastShowdown();
+    }
+
+    private void broadcastPokerState() {
+        if (pokerTable == null) return;
+        sendPokerStateTo(null);
+    }
+
+    private void sendPokerStateTo(Integer onlyToPlayerId) {
+        List<PokerTable.Seat> seats = pokerTable.seats();
+        int n = seats.size();
+        int[] seatPlayerIds = new int[n];
+        boolean[] seatIsBot = new boolean[n];
+        boolean[] seatFolded = new boolean[n];
+        boolean[] seatActive = new boolean[n];
+        int[] seatHoleCardCount = new int[n];
+        long[] seatBankroll = new long[n];
+        long[] seatContribution = new long[n];
+        for (int i = 0; i < n; i++) {
+            PokerTable.Seat s = seats.get(i);
+            seatPlayerIds[i] = s.playerId();
+            seatIsBot[i] = s.isBot();
+            seatFolded[i] = s.folded();
+            seatActive[i] = s.active();
+            seatHoleCardCount[i] = s.holeCards().size();
+            seatBankroll[i] = s.bankroll();
+            seatContribution[i] = s.contributionThisRound();
+        }
+        Integer turn = pokerTable.currentTurnPlayerId();
+        var sync = new Msg.PokerStateSync(seatPlayerIds, seatIsBot, seatFolded, seatActive,
+                seatHoleCardCount, seatBankroll, seatContribution,
+                turn == null ? -1 : turn, pokerTable.potTotal(), pokerTable.currentBet(),
+                pokerTable.phase().name());
+        if (onlyToPlayerId != null) {
+            if (gameServer != null) gameServer.sendTo(onlyToPlayerId, NetworkMessage.of(sync));
+        } else {
+            sendNetworkMessage(NetworkMessage.of(sync));
+        }
+    }
+
+    private void broadcastPokerShowdown() {
+        PokerTable.ShowdownResult result = pokerTable.lastShowdown();
+        if (result == null) return;
+        int n = result.results().size();
+        int[] seatIds = new int[n];
+        ArrayList<ArrayList<String>> revealed = new ArrayList<>();
+        ArrayList<String> handTypeNames = new ArrayList<>();
+        int[] handRanks = new int[n];
+        long[] scores = new long[n];
+        for (int i = 0; i < n; i++) {
+            var entry = result.results().get(i);
+            seatIds[i] = entry.playerId();
+            revealed.add(new ArrayList<>(entry.hand().cardsUsed()));
+            handTypeNames.add(entry.hand().type().name());
+            handRanks[i] = entry.hand().type().rank();
+            scores[i] = entry.hand().score();
+        }
+        int[] winningIds = result.winningPlayerIds().stream().mapToInt(Integer::intValue).toArray();
+        var msg = new Msg.PokerShowdownResult(seatIds, revealed, handTypeNames, handRanks, scores,
+                winningIds, result.potWon());
+        sendNetworkMessage(NetworkMessage.of(msg));
+    }
+
+    private void handleSetupGame(Msg.SetupGame m) {
+        if (!"POKER".equals(m.gameType()) || m.playerId() == myPlayerId) return;
+        if (isHost) {
+            if (isNotOperator(m.playerId())) return;
+            pokerTable = new PokerTable(POKER_ANTE, POKER_MIN_RAISE, wilds, values);
+            pokerNextBotId = -1;
+            refreshPokerDisplayFromTable();
+            broadcastPokerState();
+        }
+        refreshPokerUI();
+    }
+
+    private void handlePokerSitDown(Msg.PokerSitDown m) {
+        if (!isHost || pokerTable == null) return;
+        pokerTable.sitDown(m.playerId(), false, POKER_STARTING_BANKROLL);
+        refreshPokerDisplayFromTable();
+        broadcastPokerState();
+    }
+
+    private void handlePokerAddBot(Msg.PokerAddBot m) {
+        if (!isHost || pokerTable == null) return;
+        if (isNotOperator(m.playerId())) return;
+        pokerTable.sitDown(pokerNextBotId--, true, POKER_STARTING_BANKROLL);
+        refreshPokerDisplayFromTable();
+        broadcastPokerState();
+    }
+
+    private void handlePokerStartHand(Msg.PokerStartHand m) {
+        if (!isHost) return;
+        if (isNotOperator(m.playerId())) return;
+        startPokerHandAuthoritative();
+    }
+
+    private void handlePokerAction(Msg.PokerAction m) {
+        if (!isHost) return;
+        applyPokerActionAuthoritative(m.playerId(), m.action(), m.amount());
+    }
+
+    private void handlePokerStateSync(Msg.PokerStateSync s) {
+        pokerClientState.pokerModeActive = true;
+        List<PokerClientState.SeatView> views = new ArrayList<>();
+        for (int i = 0; i < s.seatPlayerIds().length; i++) {
+            views.add(new PokerClientState.SeatView(s.seatPlayerIds()[i], s.seatIsBot()[i], s.seatFolded()[i],
+                    s.seatActive()[i], s.seatHoleCardCount()[i], s.seatBankroll()[i], s.seatContribution()[i]));
+        }
+        pokerClientState.seats = views;
+        pokerClientState.currentTurnPlayerId = s.currentTurnPlayerId();
+        pokerClientState.potTotal = s.potTotal();
+        pokerClientState.currentBet = s.currentBet();
+        pokerClientState.phase = PokerTable.Phase.valueOf(s.phase());
+        refreshPokerUI();
+    }
+
+    private void handlePokerDealPrivate(Msg.PokerDealPrivate m) {
+        if (m.playerId() != myPlayerId) return;
+        pokerClientState.myHoleCards = new ArrayList<>(m.holeCards());
+        refreshPokerUI();
+    }
+
+    private void handlePokerShowdownResult(Msg.PokerShowdownResult m) {
+        List<PokerTable.ShowdownEntry> entries = new ArrayList<>();
+        for (int i = 0; i < m.seatPlayerIds().length; i++) {
+            HandType type = HandType.valueOf(m.handTypeNames().get(i));
+            HandResult hand = new HandResult(type, 0, List.of(), CardCategory.NEUTRAL, m.scoresAwarded()[i],
+                    new ArrayList<>(m.revealedHoleCards().get(i)));
+            entries.add(new PokerTable.ShowdownEntry(m.seatPlayerIds()[i], hand));
+        }
+        List<Integer> winningIds = Arrays.stream(m.winningPlayerIds()).boxed().toList();
+        pokerClientState.lastShowdown = new PokerTable.ShowdownResult(entries, winningIds, m.potWon());
+        pokerScene.showPokerShowdown(pokerClientState.lastShowdown);
     }
 
     /**

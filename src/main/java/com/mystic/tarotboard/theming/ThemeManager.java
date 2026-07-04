@@ -323,6 +323,53 @@ public class ThemeManager {
     }
 
     /**
+     * Returns the Court Set group name a suit belongs to (e.g. "CELESTIAL_COURT"), or
+     * {@code null} if the suit does not belong to any known Court Set (wild cards have no suit).
+     * The returned names match the {@code groupName} values in {@code suits.json} and are ordered
+     * by Court Set priority (Celestial highest, Dark Expanse lowest) via {@link #getCourtSetPriority(String)}.
+     *
+     * @param suit the suit name
+     * @return the Court Set group name, or {@code null} if unknown
+     */
+    public static String getCourtSetName(String suit) {
+        if (CELESTIAL_COURT.contains(suit)) {
+            return "CELESTIAL_COURT";
+        } else if (UMBRAL_DOMINION.contains(suit)) {
+            return "UMBRAL_DOMINION";
+        } else if (INFERNAL_PACT.contains(suit)) {
+            return "INFERNAL_PACT";
+        } else if (VERDANT_CYCLE.contains(suit)) {
+            return "VERDANT_CYCLE";
+        } else if (AETHERIC_LOOM.contains(suit)) {
+            return "AETHERIC_LOOM";
+        } else if (DARK_EXPANSE.contains(suit)) {
+            return "DARK_EXPANSE";
+        }
+        return null;
+    }
+
+    /**
+     * Returns the tiebreak priority ordinal for a Court Set name, per the poker rules'
+     * hierarchy (Celestial &gt; Umbral &gt; Infernal &gt; Verdant &gt; Aetheric &gt; Dark Expanse).
+     * Lower values win ties. Returns {@link Integer#MAX_VALUE} for an unknown/null group name.
+     *
+     * @param courtSetName the Court Set group name, as returned by {@link #getCourtSetName(String)}
+     * @return the priority ordinal (0 = highest priority)
+     */
+    public static int getCourtSetPriority(String courtSetName) {
+        if (courtSetName == null) return Integer.MAX_VALUE;
+        return switch (courtSetName) {
+            case "CELESTIAL_COURT" -> 0;
+            case "UMBRAL_DOMINION" -> 1;
+            case "INFERNAL_PACT" -> 2;
+            case "VERDANT_CYCLE" -> 3;
+            case "AETHERIC_LOOM" -> 4;
+            case "DARK_EXPANSE" -> 5;
+            default -> Integer.MAX_VALUE;
+        };
+    }
+
+    /**
      * Returns the currently active theme, defaulting to "Default" if none is set.
      *
      * @return the active ThemeConfiguration

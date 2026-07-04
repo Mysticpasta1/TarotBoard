@@ -172,6 +172,62 @@ public record NetworkMessage(String type, Msg data) implements Serializable {
                 double[] dieR, double[] dieG, double[] dieB, double[] dieO
         ) implements Msg {
         }
+
+        /**
+         * Claims a Poker Mode seat for a real (human) player. Bot seats are added directly by the
+         * authority and never travel over the network as a request.
+         */
+        record PokerSitDown(int playerId) implements Msg {
+        }
+
+        /**
+         * Request to deal a new poker hand. Only the host or an operator may issue this.
+         */
+        record PokerStartHand(int playerId) implements Msg {
+        }
+
+        /**
+         * Request to add an AI-controlled seat. Only the host or an operator may issue this.
+         */
+        record PokerAddBot(int playerId) implements Msg {
+        }
+
+        /**
+         * A betting action for the seat whose turn it currently is.
+         *
+         * @param action one of {@code "CALL"}, {@code "RAISE"}, or {@code "FOLD"}
+         * @param amount the additional amount being committed this action (ignored for FOLD)
+         */
+        record PokerAction(int playerId, String action, long amount) implements Msg {
+        }
+
+        /**
+         * A full resync of the public poker table state (never includes hole cards), broadcast by
+         * the authority after every mutation.
+         */
+        record PokerStateSync(
+                int[] seatPlayerIds, boolean[] seatIsBot, boolean[] seatFolded, boolean[] seatActive,
+                int[] seatHoleCardCount, long[] seatBankroll, long[] seatContribution,
+                int currentTurnPlayerId, long potTotal, long currentBet, String phase
+        ) implements Msg {
+        }
+
+        /**
+         * A player's own dealt hand. Sent privately (host-to-single-client only, never broadcast)
+         * so opponents never see this message.
+         */
+        record PokerDealPrivate(int playerId, ArrayList<String> holeCards) implements Msg {
+        }
+
+        /**
+         * The outcome of a completed hand, broadcast once betting concludes.
+         */
+        record PokerShowdownResult(
+                int[] seatPlayerIds, ArrayList<ArrayList<String>> revealedHoleCards,
+                ArrayList<String> handTypeNames, int[] handRanks, long[] scoresAwarded,
+                int[] winningPlayerIds, long potWon
+        ) implements Msg {
+        }
     }
 
     /**

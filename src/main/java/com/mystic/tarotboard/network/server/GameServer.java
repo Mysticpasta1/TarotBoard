@@ -376,6 +376,27 @@ public class GameServer {
                         System.out.println("Denied NewGame from non-operator player " + playerId);
                     }
                 }
+                case Msg.SetupGame ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied SetupGame from non-operator player " + playerId);
+                    }
+                }
+                case Msg.PokerStartHand ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied PokerStartHand from non-operator player " + playerId);
+                    }
+                }
+                case Msg.PokerAddBot ignored -> {
+                    if (isOperatorCheck.test(playerId)) {
+                        broadcast(msg, playerId);
+                    } else {
+                        System.out.println("Denied PokerAddBot from non-operator player " + playerId);
+                    }
+                }
                 default -> broadcast(msg, playerId);
             }
             if (onMessage != null) {

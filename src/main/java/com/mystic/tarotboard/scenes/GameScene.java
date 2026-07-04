@@ -51,6 +51,9 @@ public class GameScene {
     private final Button reshuffleCardsButton;
     private final Button newGameButton;
 
+    // Poker Mode entry point (the poker table itself lives in PokerScene)
+    private final Button pokerNavButton;
+
     /**
      * Constructs the game scene and wires all UI controls and event handlers.
      *
@@ -232,6 +235,11 @@ public class GameScene {
         settingsInGameBtn.setMaxWidth(Double.MAX_VALUE);
         settingsInGameBtn.setOnAction(_ -> SettingsScene.show(primaryStage));
 
+        pokerNavButton = new Button("Start Poker Mode");
+        pokerNavButton.setStyle(Styles.panelBtn());
+        pokerNavButton.setMaxWidth(Double.MAX_VALUE);
+        pokerNavButton.setOnAction(_ -> tarotBoard.enterPokerMode());
+
         controlPanelRight.getChildren().addAll(
                 colorPicker,
                 chooseCursorInGame,
@@ -241,6 +249,7 @@ public class GameScene {
                 resetChipsButton,
                 reshuffleCardsButton,
                 newGameButton,
+                pokerNavButton,
                 networkStatusInGame,
                 opPwInGame,
                 requestOpInGame,
@@ -448,6 +457,20 @@ public class GameScene {
         opPwInGame.setManaged(showRequestOp);
         requestOpInGame.setVisible(showRequestOp);
         requestOpInGame.setManaged(showRequestOp);
+    }
+
+    /**
+     * Updates the Poker Mode nav button's label and visibility. The button starts Poker Mode
+     * (if not already active, and this player has permission) or navigates to the dedicated
+     * {@link PokerScene} (if already active, for any player to join/spectate).
+     */
+    public void updatePokerNavButton() {
+        boolean active = tarotBoard.getPokerClientState().pokerModeActive;
+        boolean hasPerms = tarotBoard.isHost() || tarotBoard.isOperator() || !tarotBoard.isMultiplayer();
+        pokerNavButton.setText(active ? "Poker Mode" : "Start Poker Mode");
+        boolean visible = active || hasPerms;
+        pokerNavButton.setVisible(visible);
+        pokerNavButton.setManaged(visible);
     }
 
     /**

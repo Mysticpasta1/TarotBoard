@@ -2,9 +2,14 @@ package com.mystic.tarotboard.network.server;
 
 import com.mystic.tarotboard.network.NetworkMessage;
 import com.mystic.tarotboard.network.NetworkMessage.Msg;
+import com.mystic.tarotboard.poker.PokerBotAI;
+import com.mystic.tarotboard.poker.PokerTable;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Standalone headless TarotBoard server that acts as the authoritative game host (playerId=0).
@@ -55,10 +60,23 @@ public class HeadlessServer {
 
     private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
 
+    private static final long POKER_ANTE = 10;
+    private static final long POKER_MIN_RAISE = 10;
+    private static final long POKER_STARTING_BANKROLL = 1000;
+    private static final int POKER_BOT_DELAY_SECONDS = 2;
+
     private final GameServer gameServer;
     private final List<String> cardNames = new ArrayList<>();
     private final Set<Integer> operators = new HashSet<>();
     private final String operatorPassword;
+    private final ScheduledExecutorService botScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "poker-bot-scheduler");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Random random = new Random();
+    private PokerTable pokerTable;
+    private int nextBotId = -1;
 
     private static class TrackedChip {
         final String id;
@@ -161,9 +179,151 @@ public class HeadlessServer {
             case Msg.DeletePiece m -> untrackPiece(m.pieceId());
             case Msg.PieceMove m -> updatePiecePos(m.pieceId(), m.x(), m.y());
             case Msg.PieceRotate m -> updatePieceRot(m.pieceId(), m.rotation());
+            case Msg.SetupGame m -> {
+                if (isOperator(m.playerId()) && "POKER".equals(m.gameType())) startPokerMode();
+            }
+            case Msg.PokerSitDown m -> handlePokerSitDown(m);
+            case Msg.PokerAddBot m -> {
+                if (isOperator(m.playerId())) addPokerBot();
+            }
+            case Msg.PokerStartHand m -> {
+                if (isOperator(m.playerId())) startPokerHand();
+            }
+            case Msg.PokerAction m -> applyPokerAction(m.playerId(), m.action(), m.amount());
             default -> {
             }
         }
+    }
+
+    private void startPokerMode() {
+        pokerTable = new PokerTable(POKER_ANTE, POKER_MIN_RAISE, wilds, values);
+        nextBotId = -1;
+        System.out.println("[TarotBoard] Poker Mode started");
+        broadcastPokerState();
+    }
+
+    private void handlePokerSitDown(Msg.PokerSitDown m) {
+        if (pokerTable == null) return;
+        pokerTable.sitDown(m.playerId(), false, POKER_STARTING_BANKROLL);
+        broadcastPokerState();
+    }
+
+    private void addPokerBot() {
+        if (pokerTable == null) return;
+        pokerTable.sitDown(nextBotId--, true, POKER_STARTING_BANKROLL);
+        broadcastPokerState();
+    }
+
+    private void startPokerHand() {
+        if (pokerTable == null) return;
+        try {
+            pokerTable.startHand(buildShuffledDeck());
+        } catch (IllegalStateException e) {
+            System.out.println("[TarotBoard] Cannot start poker hand: " + e.getMessage());
+            return;
+        }
+        for (PokerTable.Seat seat : pokerTable.seats()) {
+            if (!seat.isBot() && seat.active()) {
+                gameServer.sendTo(seat.playerId(),
+                        NetworkMessage.of(new Msg.PokerDealPrivate(seat.playerId(), new ArrayList<>(seat.holeCards()))));
+            }
+        }
+        broadcastPokerState();
+        scheduleBotTurnIfNeeded();
+    }
+
+    private Deque<String> buildShuffledDeck() {
+        List<String> deck = new ArrayList<>(wilds);
+        for (String suit : suits) {
+            for (String value : values) {
+                deck.add(value + " of " + suit);
+            }
+        }
+        Collections.shuffle(deck, random);
+        return new ArrayDeque<>(deck);
+    }
+
+    private void applyPokerAction(int playerId, String action, long amount) {
+        if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+        if (!pokerTable.applyAction(playerId, action, amount)) {
+            System.out.println("[TarotBoard] Rejected poker action " + action + " from player " + playerId);
+            return;
+        }
+        broadcastPokerState();
+        if (pokerTable.phase() == PokerTable.Phase.SHOWDOWN) {
+            broadcastShowdown();
+        } else {
+            scheduleBotTurnIfNeeded();
+        }
+    }
+
+    private void scheduleBotTurnIfNeeded() {
+        if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+        Integer turnPlayerId = pokerTable.currentTurnPlayerId();
+        if (turnPlayerId == null) return;
+        PokerTable.Seat seat = pokerTable.seats().stream()
+                .filter(s -> s.playerId() == turnPlayerId).findFirst().orElse(null);
+        if (seat == null || !seat.isBot()) return;
+        botScheduler.schedule(() -> {
+            if (pokerTable == null || pokerTable.phase() != PokerTable.Phase.BETTING) return;
+            Integer current = pokerTable.currentTurnPlayerId();
+            if (current == null || current != seat.playerId()) return;
+            PokerBotAI.BotDecision decision = PokerBotAI.decide(seat.holeCards(), wilds, values,
+                    pokerTable.currentBet(), seat.contributionThisRound(), seat.bankroll(), POKER_MIN_RAISE, random);
+            applyPokerAction(seat.playerId(), decision.action(), decision.amount());
+        }, POKER_BOT_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void broadcastPokerState() {
+        if (pokerTable == null) return;
+        List<PokerTable.Seat> seats = pokerTable.seats();
+        int n = seats.size();
+        int[] seatPlayerIds = new int[n];
+        boolean[] seatIsBot = new boolean[n];
+        boolean[] seatFolded = new boolean[n];
+        boolean[] seatActive = new boolean[n];
+        int[] seatHoleCardCount = new int[n];
+        long[] seatBankroll = new long[n];
+        long[] seatContribution = new long[n];
+        for (int i = 0; i < n; i++) {
+            PokerTable.Seat s = seats.get(i);
+            seatPlayerIds[i] = s.playerId();
+            seatIsBot[i] = s.isBot();
+            seatFolded[i] = s.folded();
+            seatActive[i] = s.active();
+            seatHoleCardCount[i] = s.holeCards().size();
+            seatBankroll[i] = s.bankroll();
+            seatContribution[i] = s.contributionThisRound();
+        }
+        Integer turn = pokerTable.currentTurnPlayerId();
+        var sync = new Msg.PokerStateSync(seatPlayerIds, seatIsBot, seatFolded, seatActive,
+                seatHoleCardCount, seatBankroll, seatContribution,
+                turn == null ? -1 : turn, pokerTable.potTotal(), pokerTable.currentBet(),
+                pokerTable.phase().name());
+        gameServer.broadcastToAll(NetworkMessage.of(sync));
+    }
+
+    private void broadcastShowdown() {
+        PokerTable.ShowdownResult result = pokerTable.lastShowdown();
+        if (result == null) return;
+        int n = result.results().size();
+        int[] seatIds = new int[n];
+        ArrayList<ArrayList<String>> revealed = new ArrayList<>();
+        ArrayList<String> handTypeNames = new ArrayList<>();
+        int[] handRanks = new int[n];
+        long[] scores = new long[n];
+        for (int i = 0; i < n; i++) {
+            var entry = result.results().get(i);
+            seatIds[i] = entry.playerId();
+            revealed.add(new ArrayList<>(entry.hand().cardsUsed()));
+            handTypeNames.add(entry.hand().type().name());
+            handRanks[i] = entry.hand().type().rank();
+            scores[i] = entry.hand().score();
+        }
+        int[] winningIds = result.winningPlayerIds().stream().mapToInt(Integer::intValue).toArray();
+        var msg = new Msg.PokerShowdownResult(seatIds, revealed, handTypeNames, handRanks, scores,
+                winningIds, result.potWon());
+        gameServer.broadcastToAll(NetworkMessage.of(msg));
     }
 
     private boolean isOperator(int playerId) {
