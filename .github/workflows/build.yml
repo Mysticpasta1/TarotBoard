@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java 26
         uses: actions/setup-java@v4
@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install build dependencies
         run: |
@@ -92,7 +92,7 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
@@ -136,7 +136,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install build dependencies
         run: |
@@ -181,7 +181,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java 26
         uses: actions/setup-java@v4
@@ -210,7 +210,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java 26
         uses: actions/setup-java@v4
@@ -244,13 +244,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Setup GraalVM
+      # GraalVM releases trail the JDK: 25 is the newest line, so it does the
+      # native-image work while temurin 26 (set up after, so it wins JAVA_HOME)
+      # satisfies the project's Gradle toolchain. The lane compiles at --release 24.
+      - name: Setup GraalVM 25
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '26'
+          java-version: '25'
           distribution: 'graalvm'
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: 'temurin'
 
       - name: Setup Gradle 8.14
         uses: gradle/actions/setup-gradle@v3
@@ -278,7 +287,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

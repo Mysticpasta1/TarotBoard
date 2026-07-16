@@ -170,4 +170,10 @@ if (project.hasProperty("androidBuild")) {
     gluonfx {
         target = "android"
     }
+    // Two ceilings force old bytecode here: native-image rejects class files newer
+    // than its own JDK (newest GraalVM is 25), and the Gradle 8.14 this lane runs on
+    // (GluonFX does not support Gradle 9) cannot parse class files past Java 24.
+    tasks.withType(JavaCompile).configureEach {
+        options.release = 24
+    }
 }

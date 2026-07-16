@@ -144,7 +144,10 @@ public class UpdateManager {
      */
     public static void installUpdate(Path msiPath) throws IOException {
         String path = msiPath.toAbsolutePath().toString();
-        try (Process process = new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start()) {
+        // Not try-with-resources: Process is AutoCloseable only since Java 26, and the
+        // Android lane compiles at --release 25. waitFor() already reaps the process.
+        Process process = new ProcessBuilder("msiexec.exe", "/i", path, "/passive", "/norestart").start();
+        try {
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 throw new IOException("msiexec installation failed with exit code " + exitCode);
