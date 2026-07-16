@@ -290,8 +290,20 @@ jobs:
       - name: Build Android APK
         run: |
           unset ANDROID_SDK_ROOT ANDROID_HOME
-          df -h /
-          gradle nativeBuild nativePackage -PandroidBuild=true
+          echo "--- runner capacity (native-image sizes itself from these) ---"
+          nproc; free -h; df -h /
+          gradle nativeBuild nativePackage -PandroidBuild=true --stacktrace
+
+      # A killed builder writes no log at all, so the absence of process-compile-*.log
+      # below is itself the finding: native-image errors are logged, a SIGKILL is not.
+      # The kernel records the kill even though Substrate cannot, so ask it directly.
+      - name: Was the builder killed?
+        if: failure()
+        run: |
+          echo "--- memory now ---"; free -h
+          echo "--- kernel OOM killer ---"
+          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom" | tail -20 \
+            || echo "(no OOM killer entries — the builder died of something else)"
 
       # Substrate writes the real native-image error to log files and prints only
       # "Compilation failed" to the console; without this step a failure here is
