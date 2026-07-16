@@ -196,14 +196,24 @@ if (project.hasProperty("androidBuild")) {
         // Gson fills these in reflectively, and native-image keeps reflective access
         // only for classes named here. Unregistered, the ThemeManager static block
         // still "succeeds" — it catches the failure and logs it — but leaves the theme
-        // registries empty, so the first getGui() NPEs midway through start().
+        // registries empty, so the first getSuitColor() throws out of start().
+        //
+        // java.lang.Class and RecordComponent are here because Gson reaches the record
+        // API reflectively (Class.getMethod("getRecordComponents"), and getName/getType
+        // on the result) rather than calling it directly. Without them that lookup
+        // fails, Gson decides records are unsupported, and falls back to writing fields
+        // directly — which on a record's final fields throws IllegalAccessException.
+        // SuitStyle and GuiStyle are records, so they need this; the plain classes here
+        // do not.
         reflectionList = [
                 'com.mystic.tarotboard.theming.ThemeConfiguration',
                 'com.mystic.tarotboard.theming.ThemeConfiguration$GuiConfig',
                 'com.mystic.tarotboard.theming.ThemeConfiguration$CursorConfig',
                 'com.mystic.tarotboard.theming.SuitStyle',
                 'com.mystic.tarotboard.theming.GuiStyle',
-                'com.mystic.tarotboard.theming.configs.KeyBindConfig'
+                'com.mystic.tarotboard.theming.configs.KeyBindConfig',
+                'java.lang.Class',
+                'java.lang.reflect.RecordComponent'
         ]
     }
 }
