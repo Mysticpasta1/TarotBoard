@@ -12,17 +12,20 @@ import com.mystic.tarotboard.utils.UIUtils;
 import javafx.animation.PauseTransition;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.text.Font;
-import javafx.scene.text.Text;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 import javafx.stage.Stage;
@@ -57,11 +60,18 @@ public class GameScene {
     /** The long-press piece menu, or null when nothing is open. */
     private Pane pieceMenu;
 
-    /** Pinch limits, beyond which the board is either unreadable or a single card. */
+    /** Zoom limits, beyond which the board is either unreadable or a single card. */
     private static final double MIN_ZOOM = 0.5;
     private static final double MAX_ZOOM = 4.0;
+    /** How much one notch of the wheel zooms by. */
+    private static final double WHEEL_ZOOM_STEP = 1.1;
+    /** Arm span of the discard zone's cross, inside its 90px box. */
+    private static final double DISCARD_CROSS_SIZE = 34;
     /** How far a finger may wander during a long press before it counts as a drag. */
     private static final double LONG_PRESS_SLOP = 14;
+    /** Shortest gap between cursor positions sent to peers. */
+    private static final long CURSOR_SEND_INTERVAL_MS = 50;
+    private long lastCursorSend;
     private final Label networkStatusInGame;
     private final Button disconnectButton;
     private final PasswordField opPwInGame;
@@ -115,6 +125,8 @@ public class GameScene {
         scene.widthProperty().addListener((obs, oldV, newV) -> scaleGameContent.run());
         scene.heightProperty().addListener((obs, oldV, newV) -> scaleGameContent.run());
         installTouchControls(scene);
+        installWheelZoom();
+        installBoardPan();
 
         VBox controlPanelRight = new VBox(10);
         controlPanelRight.setAlignment(Pos.TOP_RIGHT);
@@ -260,6 +272,13 @@ public class GameScene {
         settingsInGameBtn.setMaxWidth(Double.MAX_VALUE);
         settingsInGameBtn.setOnAction(event -> SettingsScene.show(primaryStage));
 
+        // Zoom and pan have no scrollbars to show where the board went, so there has to be
+        // a way back to a known view on every platform that can move it.
+        Button resetViewBtn = new Button("Reset View");
+        resetViewBtn.setStyle(Styles.panelSmall());
+        resetViewBtn.setMaxWidth(Double.MAX_VALUE);
+        resetViewBtn.setOnAction(event -> resetView());
+
         // Split deck, move wilds and the player list are keystrokes everywhere else, which
         // a tablet has no way to send. Filled in further down, once playerListOverlay
         // exists for the Players button to toggle.
@@ -276,6 +295,7 @@ public class GameScene {
                 resetChipsButton,
                 reshuffleCardsButton,
                 newGameButton,
+                resetViewBtn,
                 touchActions,
                 networkStatusInGame,
                 opPwInGame,
@@ -294,10 +314,7 @@ public class GameScene {
         discardZone = new StackPane();
         discardZone.setStyle(Styles.discardZone());
         discardZone.setPrefSize(90, 90);
-        Text trashText = new Text("✖");
-        trashText.setFont(Font.font(36));
-        trashText.setFill(Color.web("#cc0000"));
-        discardZone.getChildren().add(trashText);
+        discardZone.getChildren().add(discardCross());
         discardZone.setLayoutX(10);
         discardZone.layoutYProperty().bind(scene.heightProperty().subtract(100));
         gameRoot.getChildren().add(discardZone);
@@ -349,19 +366,7 @@ public class GameScene {
                 }
             });
 
-            // Pinch and pan have no scrollbars to show where the board went, so there has
-            // to be a way back to a known view.
-            Button resetViewBtn = new Button("Reset View");
-            resetViewBtn.setStyle(Styles.panelSmall());
-            resetViewBtn.setMaxWidth(Double.MAX_VALUE);
-            resetViewBtn.setOnAction(event -> {
-                userZoom = 1.0;
-                panX = 0;
-                panY = 0;
-                rescale.run();
-            });
-
-            touchActions.getChildren().addAll(splitDeckBtn, moveWildsBtn, playersBtn, resetViewBtn);
+            touchActions.getChildren().addAll(splitDeckBtn, moveWildsBtn, playersBtn);
         }
 
         var keybinds = KeyBindConfig.getInstance();
@@ -452,10 +457,115 @@ public class GameScene {
     private void trackMouse(MouseEvent event) {
         mouseX[0] = event.getSceneX();
         mouseY[0] = event.getSceneY();
-        if (tarotBoard.isMultiplayer()) {
-            tarotBoard.sendNetworkMessage(NetworkMessage.of(
-                    new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+        if (!tarotBoard.isMultiplayer()) return;
+        // Throttled to match the piece moves this rides alongside. A pointer reports every
+        // pixel it crosses, so sending each one put a serialise-and-write on the FX thread
+        // for every event of a drag — the drag being exactly when the thread has the least
+        // to spare. Peers cannot see a cursor updated faster than their own frames anyway.
+        long now = System.currentTimeMillis();
+        if (now - lastCursorSend < CURSOR_SEND_INTERVAL_MS) return;
+        lastCursorSend = now;
+        tarotBoard.sendNetworkMessage(NetworkMessage.of(
+                new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+    }
+
+    /**
+     * Builds the discard zone's cross out of two strokes.
+     *
+     * <p>This was a "✖" (U+2716), a Dingbats character that Android's fonts do not carry
+     * and that Gluon's cut-down font set has nothing to fall back to, so the zone came up
+     * as an empty box on a tablet while looking right on desktop. A shape has no font to
+     * miss and draws the same everywhere.</p>
+     */
+    private Node discardCross() {
+        Line down = new Line(0, 0, DISCARD_CROSS_SIZE, DISCARD_CROSS_SIZE);
+        Line up = new Line(0, DISCARD_CROSS_SIZE, DISCARD_CROSS_SIZE, 0);
+        for (Line stroke : List.of(down, up)) {
+            stroke.setStroke(Color.web("#cc0000"));
+            stroke.setStrokeWidth(5);
+            // Rounded ends, so the arms read as a drawn mark rather than as cut bars.
+            stroke.setStrokeLineCap(StrokeLineCap.ROUND);
         }
+        return new Group(down, up);
+    }
+
+    /**
+     * Returns the board to a known view: unzoomed, unpanned, fitted to the window.
+     */
+    private void resetView() {
+        userZoom = 1.0;
+        panX = 0;
+        panY = 0;
+        rescale.run();
+    }
+
+    /**
+     * Whether a press landed on the board itself rather than on a piece or a control.
+     *
+     * <p>The board's own panes are the only things this accepts, which is what separates a
+     * pan from a piece drag: a press on a card reports the card's image or its pane, never
+     * the board underneath it. The control panel and the discard zone are children of the
+     * scene root and are likewise not the board.</p>
+     */
+    private boolean isBoardBackground(Object target) {
+        return target == gameBg || target == gameContent || target == gameRoot;
+    }
+
+    /**
+     * Zooms the board with the mouse wheel, the desktop counterpart to the pinch gesture.
+     *
+     * <p>A handler rather than a filter, and hung off the scene root rather than the scene,
+     * so a control that has its own use for a wheel — a dropdown's list, a scrolling pane —
+     * still gets it first and this only sees what nothing else wanted. Android is excluded
+     * because a scroll there is two fingers panning, which {@link #installTouchControls}
+     * already claims.</p>
+     */
+    private void installWheelZoom() {
+        if (PlatformPaths.isAndroid()) return;
+        gameRoot.addEventHandler(ScrollEvent.SCROLL, event -> {
+            if (event.getDeltaY() == 0) return;
+            // A notch is a fixed step rather than a multiple of the reported delta, which
+            // varies wildly between a wheel, a trackpad and a free-spinning wheel.
+            double step = event.getDeltaY() > 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP;
+            userZoom = Math.clamp(userZoom * step, MIN_ZOOM, MAX_ZOOM);
+            rescale.run();
+            event.consume();
+        });
+    }
+
+    /**
+     * Drags the whole board with the left button held on empty board.
+     *
+     * <p>The press decides whether the gesture is a pan, and the drag only follows through
+     * on that decision: a card dragged out from under the pointer would otherwise hand the
+     * board the rest of the gesture and slide it along underneath the card. Filters, so the
+     * decision is made before a piece's own handlers see the press.</p>
+     *
+     * <p>Desktop only. Android pans with two fingers, and a touch there arrives as a
+     * synthesised mouse drag as well, so this would pan a second time on top of the
+     * gesture that already did.</p>
+     */
+    private void installBoardPan() {
+        if (PlatformPaths.isAndroid()) return;
+        double[] last = new double[2];
+        boolean[] panning = {false};
+
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            panning[0] = event.getButton() == MouseButton.PRIMARY && isBoardBackground(event.getTarget());
+            last[0] = event.getSceneX();
+            last[1] = event.getSceneY();
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+            if (!panning[0]) return;
+            // Screen pixels, matching the Translate that runs before the board's scale: the
+            // board keeps up with the pointer whatever it is zoomed to.
+            panX += event.getSceneX() - last[0];
+            panY += event.getSceneY() - last[1];
+            last[0] = event.getSceneX();
+            last[1] = event.getSceneY();
+            rescale.run();
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> panning[0] = false);
     }
 
     /**

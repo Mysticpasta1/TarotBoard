@@ -18,6 +18,7 @@ import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.utils.CardDataHelper;
 import com.mystic.tarotboard.utils.LogWindow;
+import com.mystic.tarotboard.utils.OcclusionCuller;
 import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.SaveData;
 import com.mystic.tarotboard.utils.Styles;
@@ -161,6 +162,9 @@ public class TarotBoard extends Application {
     private static final double DEFAULT_DECK_X = 50;
     private static final double DEFAULT_DECK_Y = 50;
 
+    /** Node property under which every piece pane carries its own piece id. */
+    private static final String PIECE_ID_KEY = "tb_pieceId";
+
     private GameServer gameServer;
     private GameClient gameClient;
     private boolean isMultiplayer;
@@ -172,6 +176,8 @@ public class TarotBoard extends Application {
     private final Map<String, StackPane> pieceMap = new HashMap<>();
     private final List<NetworkMessage.PlayerInfo> playerList = new ArrayList<>();
     private final Map<String, Long> lastPieceMoveTime = new HashMap<>();
+    /** Keeps the stacked-away bulk of the deck out of the render and pick passes. */
+    private OcclusionCuller cardCuller;
 
     private final Set<Integer> operators = new HashSet<>();
     private String hostOperatorPassword = "admin";
@@ -318,6 +324,7 @@ public class TarotBoard extends Application {
         double baseHeight = DESIGN_HEIGHT;
 
         gameScene = new GameScene(this, primaryStage, baseWidth, baseHeight);
+        cardCuller = new OcclusionCuller(gameScene.getGameContent());
         startScene = new StartScene(this, primaryStage, baseWidth, baseHeight);
         multiplayerScene = new MultiplayerScene(this, baseWidth, baseHeight);
         hostGameScene = new HostGameScene(this, baseWidth, baseHeight);
@@ -358,13 +365,18 @@ public class TarotBoard extends Application {
      * @return the topmost piece pane at the coordinates, or null if none found
      */
     public StackPane findPieceAtMouse(double mouseX, double mouseY) {
-        Set<Node> pieces = new HashSet<>(pieceMap.values());
         List<Node> content = gameScene.getGameContent().getChildren();
         for (int i = content.size() - 1; i >= 0; i--) {
             Node node = content.get(i);
-            if (!pieces.contains(node)) continue;
-            var pt = node.sceneToLocal(mouseX, mouseY);
-            if (node.contains(pt)) return (StackPane) node;
+            // A piece is known by the id its own pane carries. Collecting the piece map into
+            // a set to test against rebuilt a set of every piece on the board on each call,
+            // and this runs on every click, keypress and touch.
+            if (!(node instanceof StackPane pane) || pieceIdOf(pane) == null) continue;
+            // A piece the culler has hidden is one an identical piece is sitting on top of;
+            // that top piece is reached first and is the one the player is pointing at.
+            if (!pane.isVisible()) continue;
+            var pt = pane.sceneToLocal(mouseX, mouseY);
+            if (pane.contains(pt)) return pane;
         }
         return null;
     }
@@ -1046,6 +1058,14 @@ public class TarotBoard extends Application {
     }
 
     private void setupPieceInteractions(StackPane pane, String pieceId, boolean isChipOrCard) {
+        // The pane carries its own id, so the handlers below can name the piece they are
+        // acting on without searching the board for it. The searches this replaces ran per
+        // event and per pile member, over a deck of thousands.
+        pane.getProperties().put(PIECE_ID_KEY, pieceId);
+        if (pieceId.startsWith("card:")) {
+            cardCuller.track(pane);
+        }
+
         UIUtils.makeDraggable(pane, this,
                 (x, y) -> sendPieceMove(pieceId, x, y),
                 (x, y) -> sendPieceMoveThrottled(pieceId, x, y),
@@ -2014,13 +2034,29 @@ public class TarotBoard extends Application {
         main(getParameters().getRaw().toArray(String[]::new));
     }
 
+    /**
+     * Returns the piece id of any board piece, or null if the pane is not one.
+     */
+    private static String pieceIdOf(StackPane pane) {
+        return pane == null ? null : (String) pane.getProperties().get(PIECE_ID_KEY);
+    }
+
     public String getCardId(StackPane pane) {
-        for (int i = 0; i < cards.length; i++) {
-            if (cards[i] != null && cards[i].getCardPane() == pane) {
-                return "card:" + i;
-            }
+        String id = pieceIdOf(pane);
+        return id != null && id.startsWith("card:") ? id : null;
+    }
+
+    /**
+     * Returns the deck index encoded in a card's piece id, or -1 if the pane is not a card.
+     */
+    private int cardIndexOf(StackPane pane) {
+        String id = getCardId(pane);
+        if (id == null) return -1;
+        try {
+            return Integer.parseInt(id.substring("card:".length()));
+        } catch (NumberFormatException e) {
+            return -1;
         }
-        return null;
     }
 
     /**
@@ -2030,19 +2066,13 @@ public class TarotBoard extends Application {
      * @return true if the pane belongs to a chip
      */
     public boolean isChip(StackPane pane) {
-        for (Chips chip : chips) {
-            if (chip.getChipPane() == pane) return true;
-        }
-        return false;
+        String id = pieceIdOf(pane);
+        return id != null && id.startsWith("chip:");
     }
 
     public boolean isWildCard(StackPane pane) {
-        for (int i = 0; i < cards.length; i++) {
-            if (cards[i] != null && cards[i].getCardPane() == pane) {
-                return i < cardNames.size() && wilds.contains(cardNames.get(i));
-            }
-        }
-        return false;
+        int i = cardIndexOf(pane);
+        return i >= 0 && i < cardNames.size() && wilds.contains(cardNames.get(i));
     }
 
     public void splitDeck() {
