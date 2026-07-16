@@ -44,6 +44,29 @@ public record Styles() {
     }
 
     /**
+     * Style for the long-press piece menu on touch screens.
+     *
+     * <p>Sized independently of the rest of the GUI config because a popup is not a child
+     * of the scaled content pane: the board shrinks to fit the screen, but this menu is
+     * laid out in raw screen pixels and has to stay tappable at any board scale.</p>
+     *
+     * @return CSS string for the menu container
+     */
+    public static String touchMenu() {
+        return "-fx-background-color: " + g().overlayContentBg + "; -fx-background-radius: " + g().overlayRadius + ";";
+    }
+
+    /**
+     * Style for one entry of the long-press piece menu. See {@link #touchMenu()}.
+     *
+     * @return CSS string for a menu item
+     */
+    public static String touchMenuItem() {
+        return "-fx-font-size: 16pt; -fx-padding: 12 20 12 20; -fx-background-radius: 4;"
+                + " -fx-background-color: " + g().menuBtnBg + "; -fx-text-fill: " + g().menuBtnFg + ";";
+    }
+
+    /**
      * Style for multiplayer scene title text.
      *
      * @return CSS string with bold font size

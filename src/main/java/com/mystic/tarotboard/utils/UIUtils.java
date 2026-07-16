@@ -258,6 +258,83 @@ public class UIUtils {
         if (onToFront != null) pane.getProperties().put("tb_onToFront", onToFront);
     }
 
+    /**
+     * Rotates a piece by {@code delta} degrees and raises it.
+     *
+     * <p>Does nothing unless the piece has both a visible and a hidden face, matching the
+     * guard the click and key handlers use: a piece mid-deal has no back to rotate.</p>
+     *
+     * @param pane  the piece to rotate
+     * @param delta the rotation to apply, in degrees
+     */
+    public static void rotatePiece(Pane pane, double delta) {
+        Node front = null, back = null;
+        for (Node node : pane.getChildren()) {
+            if (node instanceof ImageView imageView) {
+                if (imageView.isVisible()) front = imageView;
+                else back = imageView;
+            }
+        }
+        if (front == null || back == null) return;
+        pane.setRotate(pane.getRotate() + delta);
+        pane.toFront();
+        fireTransform(pane, "rotate", pane.getRotate());
+    }
+
+    /**
+     * Turns a piece over, showing whichever face is currently hidden.
+     *
+     * @param pane the piece to flip
+     */
+    public static void flipPiece(Pane pane) {
+        boolean isChip = Boolean.TRUE.equals(pane.getProperties().get("tb_isChip"));
+        if (isChip) {
+            ImageView chipFront = (ImageView) pane.getChildren().get(0);
+            ImageView chipBack = (ImageView) pane.getChildren().get(1);
+            chipFront.setVisible(!chipFront.isVisible());
+            chipBack.setVisible(!chipBack.isVisible());
+            pane.toFront();
+            fireTransform(pane, "flip", chipFront.isVisible() ? 1 : 0);
+            return;
+        }
+        Node front = null, back = null, text = null;
+        for (Node node : pane.getChildren()) {
+            if (node instanceof ImageView imageView) {
+                if (imageView.isVisible()) front = imageView;
+                else back = imageView;
+            }
+            if (node instanceof Text t) text = t;
+        }
+        if (front == null || back == null) return;
+        front.setVisible(!front.isVisible());
+        back.setVisible(!back.isVisible());
+        pane.toFront();
+        if (text != null) text.setVisible(!front.isVisible() && !text.isVisible());
+        fireTransform(pane, "flip", front.isVisible() ? 1 : 0);
+    }
+
+    /**
+     * Returns a piece to its unrotated orientation and raises it.
+     *
+     * @param pane the piece to straighten
+     */
+    public static void resetPieceRotation(Pane pane) {
+        pane.setRotate(0);
+        pane.toFront();
+        fireTransform(pane, "rotate", 0);
+    }
+
+    /**
+     * Reports a change to the callbacks a piece was registered with, so that multiplayer
+     * peers and the z-order stay in step regardless of which input triggered it.
+     */
+    private static void fireTransform(Pane pane, String kind, double value) {
+        TransformCallback onTransform = (TransformCallback) pane.getProperties().get("tb_onTransform");
+        ToFrontCallback onToFront = (ToFrontCallback) pane.getProperties().get("tb_onToFront");
+        if (onTransform != null) onTransform.onTransform(kind, value);
+        if (onToFront != null) onToFront.onToFront();
+    }
+
     public static void handlePieceClick(Pane pane, MouseEvent event) {
         if (!event.isStillSincePress()) return;
 

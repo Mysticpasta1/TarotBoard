@@ -85,10 +85,12 @@ public class StartScene {
         logoView.setPreserveRatio(true);
         logoView.setFitWidth(1200);
         logoView.setMouseTransparent(true);
-        StackPane.setAlignment(logoView, Pos.TOP_CENTER);
-        StackPane.setMargin(logoView, new Insets(100, 0, 0, 0));
+        VBox.setMargin(logoView, new Insets(0, 0, 40, 0));
 
-        startLayout.getChildren().addAll(singlePlayerBtn, multiplayerBtn, continueButton, settingsBtn, helpButton, quitButton);
+        // The logo is a sibling of the buttons rather than a layer over them: overlaying a
+        // top-aligned logo on a centre-aligned button stack lets the two collide whenever
+        // the stack is tall enough to reach the logo, which it is at every resolution.
+        startLayout.getChildren().addAll(logoView, singlePlayerBtn, multiplayerBtn, continueButton, settingsBtn, helpButton, quitButton);
 
         StackPane startRoot = new StackPane();
         startBg = new Pane();
@@ -96,9 +98,7 @@ public class StartScene {
         startContent.setPrefSize(baseWidth, baseHeight);
         startContent.setMaxSize(baseWidth, baseHeight);
         startContent.setMinSize(baseWidth, baseHeight);
-        startContent.getChildren().addAll(startLayout, logoView, updateStatusLabel);
-        StackPane.setAlignment(logoView, Pos.TOP_CENTER);
-        StackPane.setMargin(logoView, new Insets(100, 0, 0, 0));
+        startContent.getChildren().addAll(startLayout, updateStatusLabel);
         startRoot.getChildren().addAll(startBg, startContent);
 
         scene = new Scene(startRoot);

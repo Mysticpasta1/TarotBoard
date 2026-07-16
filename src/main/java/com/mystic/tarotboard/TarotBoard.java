@@ -60,6 +60,25 @@ public class TarotBoard extends Application {
     public TarotBoard() {
     }
 
+    /**
+     * The resolution every scene is laid out at, before being scaled to fit the real
+     * window.
+     *
+     * <p>The scenes size their content to these values and then apply a
+     * {@code min(w/baseWidth, h/baseHeight)} scale, so the whole UI shrinks to fit a small
+     * screen instead of being cropped by it. These must stay a fixed design size rather
+     * than the actual screen: feeding the screen's own size in makes that ratio 1.0 on
+     * every device, which leaves the fixed element sizes (a 1200px logo, 800x120 buttons)
+     * unscaled and overflowing anything smaller than a desktop monitor. The values match
+     * what the UI was authored against — a 1200px-wide logo reads as ~62% of 1920.</p>
+     */
+    private static final double DESIGN_WIDTH = 1920;
+
+    /**
+     * Design-space height. See {@link #DESIGN_WIDTH}.
+     */
+    private static final double DESIGN_HEIGHT = 1080;
+
     private static final List<String> wilds = List.of(
             "Joker", "Soul", "Light", "Dark", "Judgement", "Chorus", "Life", "Death", "Wrath",
             "Pride", "Greed", "Lust", "Envy", "Gluttony", "Sloth", "Chasity", "Temperance", "Charity",
@@ -295,8 +314,8 @@ public class TarotBoard extends Application {
 
         TarotBoard.primaryStage = primaryStage;
         Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
-        double baseWidth = screenBounds.getWidth();
-        double baseHeight = screenBounds.getHeight();
+        double baseWidth = DESIGN_WIDTH;
+        double baseHeight = DESIGN_HEIGHT;
 
         gameScene = new GameScene(this, primaryStage, baseWidth, baseHeight);
         startScene = new StartScene(this, primaryStage, baseWidth, baseHeight);
@@ -1961,8 +1980,28 @@ public class TarotBoard extends Application {
         }
         if (!launched) {
             launched = true;
+            enableTouchGestures();
             launch(args);
         }
+    }
+
+    /**
+     * Turns on JavaFX's touch gesture recognition, which is off unless asked for.
+     *
+     * <p>Without these, a touch screen only ever produces synthesised mouse events, so
+     * {@code setOnZoom} and {@code setOnScroll} never fire and pinch-to-zoom and
+     * two-finger pan are simply dead. Glass reads each property once, from a static
+     * initializer, when it builds the view's event handler — so this has to run before the
+     * toolkit starts, which is why it sits here rather than in {@code start()}.</p>
+     *
+     * <p>Desktop is left alone: there the same gestures would come from a trackpad, where
+     * they already work, and enabling scroll recognition would double up with the mouse
+     * wheel.</p>
+     */
+    private static void enableTouchGestures() {
+        if (!PlatformPaths.isAndroid()) return;
+        System.setProperty("com.sun.javafx.gestures.zoom", "true");
+        System.setProperty("com.sun.javafx.gestures.scroll", "true");
     }
 
     /**

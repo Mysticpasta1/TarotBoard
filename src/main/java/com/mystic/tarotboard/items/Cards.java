@@ -5,15 +5,16 @@ import com.mystic.tarotboard.theming.SuitStyle;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.theming.GuiStyle;
+import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.Styles;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.effect.Blend;
-import javafx.scene.effect.BlendMode;
-import javafx.scene.effect.ColorInput;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -45,6 +46,8 @@ public class Cards {
     private static final Pattern NAME_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
     private static final String SYMBOL_ASSET_ROOT = "/com/mystic/tarotboard/assets/";
     private static final Map<String, Image> SYMBOL_CACHE = new HashMap<>();
+    /** Recoloured symbols, keyed by source image and tint. See {@code tinted}. */
+    private static final Map<String, Image> TINT_CACHE = new HashMap<>();
 
     /** Card geometry, expressed as fractions of the card's width or height. */
     private static final double CORNER_RADIUS_RATIO = 0.05;
@@ -205,7 +208,11 @@ public class Cards {
         for (Text label : List.of(valueLabel, suitLabel, noteLabel)) {
             label.setWrappingWidth(nameWidth);
             label.setTextAlignment(TextAlignment.CENTER);
-            label.setEffect(new DropShadow(width * 0.03, 0, 1, Color.rgb(0, 0, 0, 0.85)));
+            // Android's GL pipeline cannot build effect peers and takes the renderer down
+            // with it when it tries, so the shadow is dropped there rather than the frame.
+            if (!PlatformPaths.isAndroid()) {
+                label.setEffect(new DropShadow(width * 0.03, 0, 1, Color.rgb(0, 0, 0, 0.85)));
+            }
         }
         suitLabel.setOpacity(0.85);
         noteLabel.setOpacity(0.7);
@@ -351,13 +358,41 @@ public class Cards {
     }
 
     private static void setSymbol(ImageView view, Image image, String tint) {
-        view.setImage(image);
         if (image == null || tint == null) {
-            view.setEffect(null);
+            view.setImage(image);
             return;
         }
-        view.setEffect(new Blend(BlendMode.SRC_ATOP, null,
-                new ColorInput(0, 0, view.getFitWidth(), view.getFitHeight(), webColor(tint))));
+        view.setImage(tinted(image, webColor(tint)));
+    }
+
+    /**
+     * Returns {@code image} recoloured to {@code color}, keeping its alpha.
+     *
+     * <p>This is what {@code Blend(SRC_ATOP, ColorInput)} used to do on the GPU, moved to
+     * the pixels because Android cannot do it: building that effect needs a Flood peer,
+     * which the mobile GL pipeline fails to create, and the exception kills the renderer
+     * mid-frame — the board freezes the moment a card turns face up. Recolouring once and
+     * caching is also less work than an effect on every one of thousands of symbol nodes.</p>
+     */
+    private static Image tinted(Image image, Color color) {
+        String key = System.identityHashCode(image) + "@" + color;
+        return TINT_CACHE.computeIfAbsent(key, k -> {
+            int w = (int) image.getWidth();
+            int h = (int) image.getHeight();
+            if (w <= 0 || h <= 0) return image;
+            WritableImage out = new WritableImage(w, h);
+            PixelReader in = image.getPixelReader();
+            if (in == null) return image;
+            PixelWriter writer = out.getPixelWriter();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    double alpha = in.getColor(x, y).getOpacity();
+                    writer.setColor(x, y, new Color(color.getRed(), color.getGreen(), color.getBlue(),
+                            alpha * color.getOpacity()));
+                }
+            }
+            return out;
+        });
     }
 
     private static Image loadSymbol(String folder, String name) {

@@ -6,21 +6,27 @@ import com.mystic.tarotboard.network.NetworkMessage.Msg;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
 import com.mystic.tarotboard.theming.configs.KeyBindConfig;
+import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.Styles;
 import com.mystic.tarotboard.utils.UIUtils;
+import javafx.animation.PauseTransition;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.transform.Scale;
+import javafx.scene.transform.Translate;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import javafx.util.StringConverter;
 
 import java.util.*;
@@ -39,6 +45,23 @@ public class GameScene {
     private final Pane playerListOverlay;
     private final double[] mouseX = new double[1];
     private final double[] mouseY = new double[1];
+    /** Pinch zoom applied on top of the scale that fits the board to the window. */
+    private double userZoom = 1.0;
+    /** Two-finger pan of the board, in screen pixels. */
+    private double panX;
+    private double panY;
+    /** Reapplies the board's fit scale together with {@link #userZoom} and the pan. */
+    private Runnable rescale = () -> {
+    };
+    private final Pane gameRoot;
+    /** The long-press piece menu, or null when nothing is open. */
+    private Pane pieceMenu;
+
+    /** Pinch limits, beyond which the board is either unreadable or a single card. */
+    private static final double MIN_ZOOM = 0.5;
+    private static final double MAX_ZOOM = 4.0;
+    /** How far a finger may wander during a long press before it counts as a drag. */
+    private static final double LONG_PRESS_SLOP = 14;
     private final Label networkStatusInGame;
     private final Button disconnectButton;
     private final PasswordField opPwInGame;
@@ -61,7 +84,7 @@ public class GameScene {
     public GameScene(TarotBoard tarotBoard, Stage primaryStage, double baseWidth, double baseHeight) {
         this.tarotBoard = tarotBoard;
 
-        Pane gameRoot = new Pane();
+        gameRoot = new Pane();
         gameBg = new Pane();
         gameBg.prefWidthProperty().bind(gameRoot.widthProperty());
         gameBg.prefHeightProperty().bind(gameRoot.heightProperty());
@@ -82,10 +105,16 @@ public class GameScene {
             if (w <= 0 || h <= 0) return;
             double scale = Math.min(w / baseWidth, h / baseHeight);
             scale = Math.clamp(scale, 0.3, 3.0);
-            gameContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
+            // The pan runs before the scale so it stays in screen pixels: a finger that
+            // travels an inch moves the board an inch, whatever the board is zoomed to.
+            gameContent.getTransforms().setAll(
+                    new Translate(panX, panY),
+                    new Scale(scale * userZoom, scale * userZoom, baseWidth / 2, baseHeight / 2));
         };
+        this.rescale = scaleGameContent;
         scene.widthProperty().addListener((obs, oldV, newV) -> scaleGameContent.run());
         scene.heightProperty().addListener((obs, oldV, newV) -> scaleGameContent.run());
+        installTouchControls(scene);
 
         VBox controlPanelRight = new VBox(10);
         controlPanelRight.setAlignment(Pos.TOP_RIGHT);
@@ -231,6 +260,13 @@ public class GameScene {
         settingsInGameBtn.setMaxWidth(Double.MAX_VALUE);
         settingsInGameBtn.setOnAction(event -> SettingsScene.show(primaryStage));
 
+        // Split deck, move wilds and the player list are keystrokes everywhere else, which
+        // a tablet has no way to send. Filled in further down, once playerListOverlay
+        // exists for the Players button to toggle.
+        VBox touchActions = new VBox(10);
+        touchActions.setVisible(PlatformPaths.isAndroid());
+        touchActions.setManaged(PlatformPaths.isAndroid());
+
         controlPanelRight.getChildren().addAll(
                 colorPicker,
                 chooseCursorInGame,
@@ -240,6 +276,7 @@ public class GameScene {
                 resetChipsButton,
                 reshuffleCardsButton,
                 newGameButton,
+                touchActions,
                 networkStatusInGame,
                 opPwInGame,
                 requestOpInGame,
@@ -285,6 +322,47 @@ public class GameScene {
         overlayContent.getChildren().addAll(overlayPlayersBox);
         overlayRoot.getChildren().add(overlayContent);
         playerListOverlay = overlayRoot;
+
+        if (PlatformPaths.isAndroid()) {
+            Button splitDeckBtn = new Button("Split Deck");
+            splitDeckBtn.setStyle(Styles.panelBtn());
+            splitDeckBtn.setMaxWidth(Double.MAX_VALUE);
+            splitDeckBtn.setOnAction(event -> tarotBoard.splitDeck());
+
+            Button moveWildsBtn = new Button("Move Wilds");
+            moveWildsBtn.setStyle(Styles.panelBtn());
+            moveWildsBtn.setMaxWidth(Double.MAX_VALUE);
+            moveWildsBtn.setOnAction(event -> tarotBoard.moveWildsToPile());
+
+            // Desktop shows the list only while the key is held; a finger has nothing to
+            // hold, so this toggles.
+            Button playersBtn = new Button("Players");
+            playersBtn.setStyle(Styles.panelBtn());
+            playersBtn.setMaxWidth(Double.MAX_VALUE);
+            playersBtn.setOnAction(event -> {
+                if (!tarotBoard.isMultiplayer()) return;
+                if (playerListOverlay.isVisible()) {
+                    playerListOverlay.setVisible(false);
+                } else {
+                    rebuildPlayerListOverlay();
+                    playerListOverlay.setVisible(true);
+                }
+            });
+
+            // Pinch and pan have no scrollbars to show where the board went, so there has
+            // to be a way back to a known view.
+            Button resetViewBtn = new Button("Reset View");
+            resetViewBtn.setStyle(Styles.panelSmall());
+            resetViewBtn.setMaxWidth(Double.MAX_VALUE);
+            resetViewBtn.setOnAction(event -> {
+                userZoom = 1.0;
+                panX = 0;
+                panY = 0;
+                rescale.run();
+            });
+
+            touchActions.getChildren().addAll(splitDeckBtn, moveWildsBtn, playersBtn, resetViewBtn);
+        }
 
         var keybinds = KeyBindConfig.getInstance();
         // MOUSE_MOVED stops arriving the moment a button goes down, so tracking it alone
@@ -377,6 +455,145 @@ public class GameScene {
         if (tarotBoard.isMultiplayer()) {
             tarotBoard.sendNetworkMessage(NetworkMessage.of(
                     new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+        }
+    }
+
+    /**
+     * Wires up the touch-only controls.
+     *
+     * <p>Only the actions that a touch screen cannot otherwise reach are rebuilt here.
+     * Dragging a piece and double-tapping to flip already work, because a single touch
+     * arrives as a synthesised mouse event; everything else on a piece is behind a
+     * modifier key or the right mouse button, so it moves to a long-press menu. Zoom and
+     * pan are new to touch — a phone cannot show a 1920x1080 board legibly at once.</p>
+     *
+     * <p>Android only: on desktop these same events come from a trackpad and the board is
+     * already reachable with keys and buttons.</p>
+     */
+    private void installTouchControls(Scene scene) {
+        if (!PlatformPaths.isAndroid()) return;
+
+        scene.addEventFilter(ZoomEvent.ZOOM, event -> {
+            userZoom = Math.clamp(userZoom * event.getZoomFactor(), MIN_ZOOM, MAX_ZOOM);
+            rescale.run();
+            event.consume();
+        });
+
+        // Two fingers only. A one-finger drag has to stay free to move a piece, and with
+        // scroll recognition on it would otherwise pan the board underneath the piece at
+        // the same time.
+        scene.addEventFilter(ScrollEvent.SCROLL, event -> {
+            if (event.getTouchCount() < 2) return;
+            panX += event.getDeltaX();
+            panY += event.getDeltaY();
+            rescale.run();
+            event.consume();
+        });
+
+        PauseTransition longPress = new PauseTransition(Duration.millis(450));
+        double[] pressScene = new double[2];
+
+        longPress.setOnFinished(event -> {
+            StackPane piece = tarotBoard.findPieceAtMouse(pressScene[0], pressScene[1]);
+            if (piece != null) showPieceMenu(piece, pressScene[0], pressScene[1]);
+        });
+
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            // While the menu is up, a press belongs to the menu. Starting the timer again
+            // would rebuild the menu underneath the finger mid-tap, swapping out the very
+            // button being pressed so its release lands on nothing and the tap is lost.
+            if (pieceMenu != null) return;
+            pressScene[0] = event.getSceneX();
+            pressScene[1] = event.getSceneY();
+            longPress.playFromStart();
+        });
+        // A press that turns into a drag is a move, not a long press. The slop is
+        // deliberately generous: a finger resting on glass wanders a few pixels.
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+            if (Math.hypot(event.getSceneX() - pressScene[0], event.getSceneY() - pressScene[1]) > LONG_PRESS_SLOP) {
+                longPress.stop();
+            }
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> longPress.stop());
+    }
+
+    /**
+     * Shows the touch menu of everything that can be done to a single piece.
+     *
+     * <p>Built as a node inside the scene rather than a {@link ContextMenu}, because a
+     * popup is a second window and Android's toolkit drives a single window: a popup menu
+     * does render there, but no touch ever reaches it, so every entry is dead. This also
+     * has to hang off {@code gameRoot} rather than {@code gameContent}, or it would be
+     * scaled and panned along with the board it is acting on.</p>
+     *
+     * @param piece  the piece the finger went down on
+     * @param sceneX scene X to open the menu at
+     * @param sceneY scene Y to open the menu at
+     */
+    private void showPieceMenu(StackPane piece, double sceneX, double sceneY) {
+        hidePieceMenu();
+
+        VBox panel = new VBox(4);
+        panel.setStyle(Styles.touchMenu());
+        panel.getChildren().addAll(
+                touchItem("Flip", () -> UIUtils.flipPiece(piece)),
+                touchItem("Rotate 90 left", () -> UIUtils.rotatePiece(piece, -90)),
+                touchItem("Rotate 90 right", () -> UIUtils.rotatePiece(piece, 90)),
+                touchItem("Nudge 1 left", () -> UIUtils.rotatePiece(piece, -1)),
+                touchItem("Nudge 1 right", () -> UIUtils.rotatePiece(piece, 1)),
+                touchItem("Reset rotation", () -> UIUtils.resetPieceRotation(piece)),
+                touchItem("Bring to front", piece::toFront));
+
+        if (tarotBoard.isChip(piece)) {
+            panel.getChildren().add(touchItem("Flip whole stack", () -> UIUtils.multiFlip(piece)));
+        }
+
+        // Catches the tap that dismisses the menu. Without it that tap would fall through
+        // to the board and move whatever piece happened to be underneath.
+        Pane scrim = new Pane();
+        scrim.prefWidthProperty().bind(scene.widthProperty());
+        scrim.prefHeightProperty().bind(scene.heightProperty());
+        // An empty Pane paints nothing and so has nothing to hit-test against; without
+        // this the dismiss tap sails straight through to the board behind it.
+        scrim.setPickOnBounds(true);
+        scrim.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            hidePieceMenu();
+            event.consume();
+        });
+
+        Pane overlay = new Pane(scrim, panel);
+        pieceMenu = overlay;
+        gameRoot.getChildren().add(overlay);
+
+        // Measure before placing, so a piece near an edge opens a menu that is still
+        // wholly on screen.
+        panel.applyCss();
+        panel.layout();
+        double w = panel.prefWidth(-1);
+        double h = panel.prefHeight(-1);
+        panel.setLayoutX(Math.max(0, Math.min(sceneX, scene.getWidth() - w)));
+        panel.setLayoutY(Math.max(0, Math.min(sceneY, scene.getHeight() - h)));
+    }
+
+    /**
+     * Builds a menu entry sized for a fingertip rather than a mouse pointer.
+     */
+    private Button touchItem(String text, Runnable action) {
+        Button item = new Button(text);
+        item.setStyle(Styles.touchMenuItem());
+        item.setMaxWidth(Double.MAX_VALUE);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.setOnAction(event -> {
+            action.run();
+            hidePieceMenu();
+        });
+        return item;
+    }
+
+    private void hidePieceMenu() {
+        if (pieceMenu != null) {
+            gameRoot.getChildren().remove(pieceMenu);
+            pieceMenu = null;
         }
     }
 
