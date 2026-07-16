@@ -282,9 +282,16 @@ public class TarotBoard extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
-        LogWindow logWindow = new LogWindow();
-        logWindow.setTitle("TarotBoard Console Log");
-        logWindow.show();
+        // Desktop only: the launchers there run with noConsole, so this window is the
+        // only place log output can surface. Android already has logcat, and opening it
+        // there would instead hide every startup failure, because it points System.err
+        // at a TextArea on a second Stage that Android's single-window toolkit never
+        // shows.
+        if (!PlatformPaths.isAndroid()) {
+            LogWindow logWindow = new LogWindow();
+            logWindow.setTitle("TarotBoard Console Log");
+            logWindow.show();
+        }
 
         TarotBoard.primaryStage = primaryStage;
         Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
