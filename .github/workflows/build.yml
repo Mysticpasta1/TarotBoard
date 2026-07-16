@@ -242,10 +242,24 @@ jobs:
     name: Android APK (GluonFX, best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
+    # Without this the job inherits the 6 hour default, and continue-on-error means a
+    # hang burns all six of them and still reports the workflow green. Substrate takes
+    # roughly 20 minutes when it is working, so an hour is generous.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # The runner ships an Android SDK of its own, around 13GB, against roughly 14GB
+      # free — and Substrate then downloads a second SDK, an NDK, and a GraalVM on top.
+      # Deleting the preinstalled one buys the room for that and, more importantly, is
+      # what makes Substrate's SDK the only one on the machine: see the build step.
+      - name: Free disk space
+        run: |
+          echo "--- before ---"; df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          echo "--- after ---"; df -h /
 
       # Gluon's GraalVM fork is not on setup-graalvm, so it is fetched by hand and
       # used as daemon JVM, compile toolchain, and native-image. It is pinned to the
@@ -267,13 +281,16 @@ jobs:
         with:
           gradle-version: '8.14'
 
-      # Substrate downloads its own Android SDK and points ANDROID_HOME at it, but
-      # the runner image preexports ANDROID_SDK_ROOT at its own copy. The Android
-      # Gradle plugin refuses to build when the two disagree, so drop the runner's
-      # copy and leave Substrate's ANDROID_HOME as the only SDK on offer.
+      # Substrate downloads its own Android SDK and points ANDROID_HOME at it, but the
+      # runner image preexports *both* ANDROID_SDK_ROOT and ANDROID_HOME at its own copy.
+      # Only the first was dropped here, so ANDROID_HOME still named the runner's SDK and
+      # sdkmanager went off to install Platform 34 into it — which is the package that
+      # then warned "Archive is not a ZIP archive" and stalled at 89% unzipping. Both are
+      # unset so the only SDK left is the one Substrate manages under ~/.gluon.
       - name: Build Android APK
         run: |
-          unset ANDROID_SDK_ROOT
+          unset ANDROID_SDK_ROOT ANDROID_HOME
+          df -h /
           gradle nativeBuild nativePackage -PandroidBuild=true
 
       # Substrate writes the real native-image error to log files and prints only
