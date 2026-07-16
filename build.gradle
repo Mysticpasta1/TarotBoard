@@ -8,7 +8,7 @@ buildscript {
     }
     dependencies {
         if (project.hasProperty("androidBuild")) {
-            classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.23"
+            classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.25"
         }
     }
 }
@@ -25,13 +25,20 @@ plugins {
 group = "com.mystic"
 version = "3.0.0"
 
-// The Android lane uses GluonFX 1.0.23 with Oracle GraalVM JDK 23.  Oracle
-// GraalVM has -H:+ForceNoROSectionRelocations (required by Substrate) but lacks
-// the CAP cache entries for Android cross-compilation; -H:-UseCAPCache disables
-// the cache lookup so native-image computes values at build time.  Gluon's custom
-// GraalVM has the CAP cache but does NOT have ForceNoROSectionRelocations, so it
-// cannot be used.  --release 21 keeps bytecode at Java 21 level for Substrate
-// compatibility.  Desktop builds stay on 26.
+// The Android lane pins GluonFX 1.0.25 (Substrate 0.0.65) against Gluon's own
+// GraalVM java23 build; the two are a matched set and neither half can move alone:
+//
+//   - Substrate >= 0.0.66 hardcodes -H:+ForceNoROSectionRelocations, an option no
+//     current GraalVM (Gluon's fork included) still defines, so those versions
+//     cannot link against any available GraalVM.
+//   - Substrate always passes -H:+UseCAPCache and ships the CAP cache it uses for
+//     Android cross-compilation.  Only the 0.0.64/0.0.65 cache contains
+//     CLOCK_REALTIME, which GraalVM 23's PosixDirectives requires; the caches in
+//     0.0.63 and 0.0.66+ predate it and fail with "Missing CAP cache value".
+//
+// The cache is not optional (cross-compiled aarch64 probes cannot run on the x64
+// builder), so 0.0.64/0.0.65 are the only versions that satisfy both constraints.
+// Desktop builds stay on 26; --release 21 keeps the sources honest on every lane.
 java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 23 : 26)
 
 repositories {
@@ -186,9 +193,5 @@ if (project.hasProperty("androidBuild")) {
     apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
     gluonfx {
         target = "android"
-        // Oracle GraalVM lacks the CAP cache entries for Android cross-compilation.
-        // -H:-UseCAPCache disables the cache lookup so native-image computes the
-        // values at build time instead of failing with "Missing CAP cache".
-        compilerArgs = ["-H:-UseCAPCache"]
     }
 }

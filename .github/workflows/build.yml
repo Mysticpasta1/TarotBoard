@@ -233,14 +233,12 @@ jobs:
           if-no-files-found: error
 
   android:
-    # Best effort, allowed to fail so it never blocks a release.  Uses Oracle
-    # GraalVM JDK 23 which has -H:+ForceNoROSectionRelocations (needed by
-    # Substrate 0.0.63+).  Gluon's custom GraalVM does NOT have this flag, so it
-    # cannot be used.  Oracle GraalVM lacks the CAP cache entries for Android
-    # cross-compilation, but -H:-UseCAPCache in build.gradle makes native-image
-    # compute the values at build time instead.  --release 21 in build.gradle keeps
-    # bytecode at Java 21 level for Substrate compatibility.  Gradle 8.14 because
-    # GluonFX does not support Gradle 9.
+    # Best effort, allowed to fail so it never blocks a release. JavaFX reaches
+    # Android only through GluonFX/Substrate, which needs Gluon's own GraalVM fork
+    # rather than any stock GraalVM: Substrate cross-compiles using the CAP cache it
+    # ships, and that cache is generated against the fork. See build.gradle for why
+    # GluonFX is pinned to 1.0.25 and why this GraalVM must stay in lockstep with it.
+    # Gradle 8.14 because GluonFX does not support Gradle 9.
     name: Android APK (GluonFX, best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -249,16 +247,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # Oracle GraalVM JDK 23 is required because Gluon's custom GraalVM
-      # (23+25.1-dev, Sept 2024) does not include -H:+ForceNoROSectionRelocations,
-      # which Substrate requires.  Oracle GraalVM lacks the Android CAP cache, but
-      # -H:-UseCAPCache in build.gradle disables the cache lookup so native-image
-      # computes the values at build time.  This sets JAVA_HOME and GRAALVM_HOME.
-      - name: Setup GraalVM 23
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '23'
-          distribution: 'graalvm'
+      # Gluon's GraalVM fork is not on setup-graalvm, so it is fetched by hand and
+      # used as daemon JVM, compile toolchain, and native-image. It is pinned to the
+      # exact release Substrate 0.0.65's CAP cache was generated against.
+      - name: Setup Gluon GraalVM 23
+        run: |
+          set -euo pipefail
+          URL="https://github.com/gluonhq/graal/releases/download/gluon-23%2B25.1-dev-2409082136/graalvm-java23-linux-amd64-gluon-23+25.1-dev.tar.gz"
+          mkdir -p /tmp/graalvm
+          curl -fsSL "$URL" -o /tmp/graalvm/graalvm.tar.gz
+          tar -xzf /tmp/graalvm/graalvm.tar.gz -C /tmp/graalvm
+          GRAALVM_DIR=$(find /tmp/graalvm -maxdepth 1 -mindepth 1 -type d -name "graalvm-*" | head -1)
+          echo "GRAALVM_HOME=${GRAALVM_DIR}" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=${GRAALVM_DIR}" >> "$GITHUB_ENV"
+          echo "${GRAALVM_DIR}/bin" >> "$GITHUB_PATH"
 
       - name: Setup Gradle 8.14
         uses: gradle/actions/setup-gradle@v3
