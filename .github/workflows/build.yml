@@ -267,8 +267,14 @@ jobs:
         with:
           gradle-version: '8.14'
 
+      # Substrate downloads its own Android SDK and points ANDROID_HOME at it, but
+      # the runner image preexports ANDROID_SDK_ROOT at its own copy. The Android
+      # Gradle plugin refuses to build when the two disagree, so drop the runner's
+      # copy and leave Substrate's ANDROID_HOME as the only SDK on offer.
       - name: Build Android APK
-        run: gradle nativeBuild nativePackage -PandroidBuild=true
+        run: |
+          unset ANDROID_SDK_ROOT
+          gradle nativeBuild nativePackage -PandroidBuild=true
 
       # Substrate writes the real native-image error to log files and prints only
       # "Compilation failed" to the console; without this step a failure here is
