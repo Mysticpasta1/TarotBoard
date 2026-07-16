@@ -18,6 +18,19 @@ import java.nio.file.Paths;
  * Provides static CSS style strings derived from the active theme configuration.
  */
 public record Styles() {
+
+    /**
+     * The drop shadow behind a multiplayer label, or nothing at all on Android.
+     *
+     * <p>An effect there throws mid-frame rather than degrading, and rendering stops with
+     * it: the screen holds the last good frame while the app carries on, which reads as a
+     * hang. These labels are on the host and join screens, so a tablet reaches them the
+     * moment it opens multiplayer. Same reason the card labels drop their shadow.</p>
+     */
+    private static String labelShadow() {
+        return PlatformPaths.isAndroid() ? ""
+                : "; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 2, 0.5, 0, 1);";
+    }
     private static ThemeConfiguration.GuiConfig g() {
         return ThemeManager.getActiveTheme().getGui();
     }
@@ -99,7 +112,7 @@ public record Styles() {
      * @return CSS string with font size and text color
      */
     public static String mpLabel() {
-        return "-fx-font-size: " + g().mpLabelFontSize + "pt; -fx-font-weight: bold; -fx-background-color: " + g().mpLabelBg + "; -fx-text-fill: " + g().mpLabelColor + "; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 2, 0.5, 0, 1);";
+        return "-fx-font-size: " + g().mpLabelFontSize + "pt; -fx-font-weight: bold; -fx-background-color: " + g().mpLabelBg + "; -fx-text-fill: " + g().mpLabelColor + labelShadow();
     }
 
     /**
@@ -108,7 +121,7 @@ public record Styles() {
      * @return CSS string with font size and label color
      */
     public static String mpSmallLabel() {
-        return "-fx-font-size: " + g().mpSmallFontSize + "pt; -fx-font-weight: bold; -fx-background-color: " + g().mpLabelBg + "; -fx-text-fill: " + g().mpLabelColor + "; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 2, 0.5, 0, 1);";
+        return "-fx-font-size: " + g().mpSmallFontSize + "pt; -fx-font-weight: bold; -fx-background-color: " + g().mpLabelBg + "; -fx-text-fill: " + g().mpLabelColor + labelShadow();
     }
 
     /**

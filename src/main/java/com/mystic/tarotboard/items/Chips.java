@@ -1,13 +1,16 @@
 package com.mystic.tarotboard.items;
 
-import javafx.scene.effect.Blend;
-import javafx.scene.effect.BlendMode;
-import javafx.scene.effect.ColorInput;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Represents a poker chip in the TarotBoard UI, displaying front/back images
@@ -18,6 +21,9 @@ public class Chips {
     private final Color chipColor;
     private final String pieceId;
     private static int chipCounter = 0;
+
+    /** Tinted chip faces, keyed by source image and colour. See {@code tinted}. */
+    private static final Map<String, Image> TINT_CACHE = new HashMap<>();
 
     /**
      * The fixed radius used for all chip circles.
@@ -61,15 +67,46 @@ public class Chips {
     }
 
     private ImageView createChipImageView(Image image, Color chipColor) {
-        ImageView imageView = new ImageView(image);
+        ImageView imageView = new ImageView(tinted(image, chipColor));
         imageView.setFitWidth(Chips.CHIP_RADIUS);
         imageView.setFitHeight(Chips.CHIP_RADIUS);
-
-        ColorInput colorInput = new ColorInput(0, 0, Chips.CHIP_RADIUS, Chips.CHIP_RADIUS, chipColor);
-        Blend blendEffect = new Blend(BlendMode.MULTIPLY, colorInput, null);
-        imageView.setEffect(blendEffect);
-
         return imageView;
+    }
+
+    /**
+     * Multiplies a greyscale chip face by its colour, once, into a plain image.
+     *
+     * <p>This was a {@link javafx.scene.effect.Blend} of a {@code ColorInput} over the
+     * face, which is the same arithmetic but asks the renderer to redo it every frame,
+     * into an offscreen buffer per chip per face. Android's GL pipeline is the reason it
+     * cannot stay: it has no effect peers to build, which is already why the card labels
+     * drop their shadow there, and the cost grows with every chip spawned, so a table
+     * that has been played on a while is the slowest one. Two chips of one colour share
+     * a tinted face, so the cache holds one image per colour rather than per chip.</p>
+     */
+    private static Image tinted(Image image, Color color) {
+        String key = System.identityHashCode(image) + "@" + color;
+        return TINT_CACHE.computeIfAbsent(key, k -> {
+            int w = (int) image.getWidth();
+            int h = (int) image.getHeight();
+            PixelReader in = image.getPixelReader();
+            if (w <= 0 || h <= 0 || in == null) return image;
+            WritableImage out = new WritableImage(w, h);
+            PixelWriter writer = out.getPixelWriter();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    Color src = in.getColor(x, y);
+                    // MULTIPLY, matching the Blend this replaces: the greyscale artwork
+                    // shades the colour, and the face's own alpha is what keeps its edge.
+                    writer.setColor(x, y, new Color(
+                            src.getRed() * color.getRed(),
+                            src.getGreen() * color.getGreen(),
+                            src.getBlue() * color.getBlue(),
+                            src.getOpacity() * color.getOpacity()));
+                }
+            }
+            return out;
+        });
     }
 
     /**

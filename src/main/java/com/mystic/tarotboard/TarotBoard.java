@@ -1517,10 +1517,11 @@ public class TarotBoard extends Application {
         StackPane diePane = die.getPane();
         setupPieceInteractions(diePane, die.getPieceId(), false);
 
+        var centre = gameScene.visibleBoardCentre();
         int randomX = new Random().nextInt(-5, 5);
         int randomY = new Random().nextInt(-5, 5);
-        diePane.setTranslateX((gameScene.getScene().getWidth() / 2) + randomX);
-        diePane.setTranslateY((gameScene.getScene().getHeight() / 2) + randomY);
+        diePane.setTranslateX(centre.getX() + randomX);
+        diePane.setTranslateY(centre.getY() + randomY);
         gameScene.getGameContent().getChildren().add(diePane);
         dice.add(die);
         pieceMap.put(die.getPieceId(), diePane);
@@ -1541,10 +1542,11 @@ public class TarotBoard extends Application {
         Chips chip = new Chips(chipColor, bwFrontImage, bwBackImage);
         StackPane chipPane = chip.getChipPane();
 
+        var centre = gameScene.visibleBoardCentre();
         int randomX = new Random().nextInt(-5, 5);
         int randomY = new Random().nextInt(-5, 5);
-        chipPane.setTranslateX((gameScene.getScene().getWidth() / 2) + randomX);
-        chipPane.setTranslateY((gameScene.getScene().getHeight() / 2) + randomY);
+        chipPane.setTranslateX(centre.getX() + randomX);
+        chipPane.setTranslateY(centre.getY() + randomY);
 
         setupPieceInteractions(chipPane, chip.getPieceId(), true);
 

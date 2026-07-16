@@ -78,15 +78,24 @@ public class UIUtils {
      * @param onPileDrag     callback for dragging a pile of cards, or null
      */
     public static void makeDraggable(StackPane pane, TarotBoard tarotBoard, DragEndCallback onDragEnd, DragMoveCallback onDragMove, PileDragCallback onPileDrag) {
-        final double[] dragDeltaX = new double[1];
-        final double[] dragDeltaY = new double[1];
-        final boolean[] isDragging = new boolean[1];
-        final boolean[] wasDragged = new boolean[1];
-        final double[] pressX = new double[1];
-        final double[] pressY = new double[1];
-        final boolean[] pileDragActive = new boolean[1];
-        @SuppressWarnings("unchecked")
-        final List<StackPane>[] cachedPile = new List[1];
+        // A pane can be wired more than once — a reshuffle re-runs the setup over every
+        // card in the deck — so the gesture's state lives on the pane rather than in this
+        // call. The handlers below replace one another on a rewire, and would otherwise
+        // be left reading a previous call's state while writing this one's.
+        DragState existing = (DragState) pane.getProperties().get(DRAG_STATE);
+        boolean firstWiring = existing == null;
+        final DragState state = firstWiring ? new DragState() : existing;
+        if (firstWiring) pane.getProperties().put(DRAG_STATE, state);
+
+        final double[] dragDeltaX = state.dragDelta;
+        final double[] dragDeltaY = state.dragDeltaY;
+        final boolean[] isDragging = state.isDragging;
+        final boolean[] wasDragged = state.wasDragged;
+        final double[] pressX = state.pressX;
+        final double[] pressY = state.pressY;
+        final boolean[] pileDragActive = state.pileDragActive;
+        final boolean[] pileResolved = state.pileResolved;
+        final List<StackPane>[] cachedPile = state.cachedPile;
 
         pane.setOnMousePressed(event -> {
             if (!event.isShiftDown()) {
@@ -102,6 +111,7 @@ public class UIUtils {
                 pressX[0] = pane.getTranslateX();
                 pressY[0] = pane.getTranslateY();
                 pileDragActive[0] = false;
+                pileResolved[0] = false;
                 cachedPile[0] = null;
                 pane.toFront();
                 isDragging[0] = true;
@@ -124,24 +134,9 @@ public class UIUtils {
                     newTranslateY = event.getSceneY() - dragDeltaY[0];
                 }
 
-                KeyBindConfig kb = KeyBindConfig.getInstance();
-                if (event.isAltDown()) {
-                    if (!pileDragActive[0]) {
-                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, true);
-                        pileDragActive[0] = cachedPile[0].size() > 1;
-                    }
-                    if (pileDragActive[0] && onPileDrag != null) {
-                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY, false);
-                    } else {
-                        pane.setTranslateX(newTranslateX);
-                        pane.setTranslateY(newTranslateY);
-                        if (onDragMove != null) onDragMove.onDragMove(newTranslateX, newTranslateY);
-                    }
-                } else if (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL) {
-                    if (!pileDragActive[0]) {
-                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, false);
-                        pileDragActive[0] = cachedPile[0].size() > 1;
-                    }
+                if (pileRequested(event)) {
+                    resolvePile(tarotBoard, pane, event.isAltDown(), pressX, pressY,
+                            pileResolved, pileDragActive, cachedPile);
                     if (pileDragActive[0] && onPileDrag != null) {
                         onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY, false);
                     } else {
@@ -162,14 +157,9 @@ public class UIUtils {
 
         pane.setOnMouseReleased(event -> {
             if (isDragging[0] && wasDragged[0]) {
-                KeyBindConfig kb = KeyBindConfig.getInstance();
-                boolean wildsOnly = event.isAltDown();
-                boolean pileMode = wildsOnly || (event.isControlDown() && kb.pileDrag() == KeyCode.CONTROL);
-                if (pileMode) {
-                    if (!pileDragActive[0]) {
-                        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, wildsOnly);
-                        pileDragActive[0] = cachedPile[0].size() > 1;
-                    }
+                if (pileRequested(event)) {
+                    resolvePile(tarotBoard, pane, event.isAltDown(), pressX, pressY,
+                            pileResolved, pileDragActive, cachedPile);
                     if (pileDragActive[0]) {
                         // onDragEnd only ever reports the dragged pane's own id, so routing
                         // the whole pile through it told peers one card moved N times and
@@ -187,11 +177,79 @@ public class UIUtils {
             isDragging[0] = false;
         });
 
-        pane.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> {
-            if (wasDragged[0] && !pileDragActive[0]) {
-                snapToNearestCard(pane, tarotBoard);
-            }
-        });
+        // addEventHandler stacks where the setters above replace, so this is added once per
+        // pane for the life of the board. Re-adding it on every rewire left a dead handler
+        // (and the state it captured) on all four thousand cards per reshuffle.
+        if (firstWiring) {
+            pane.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> {
+                if (wasDragged[0] && !pileDragActive[0]) {
+                    snapToNearestCard(pane, tarotBoard);
+                }
+            });
+        }
+    }
+
+    /** Marks the drag state a pane carries, so a rewire reuses it rather than replacing it. */
+    private static final String DRAG_STATE = "tb_dragState";
+
+    /** Whether a plain drag takes the whole pile with it. See {@link #setTouchPileDrag}. */
+    private static boolean touchPileDrag;
+
+    /**
+     * Makes a plain drag move the whole pile, standing in for the held key that asks for
+     * one on a desktop.
+     *
+     * <p>Pile drag was reachable only through Alt or Ctrl, which a touch screen has no way
+     * to send, so it was simply absent on a tablet. A latch rather than a gesture of its
+     * own: the alternatives are all taken — one finger drags a piece, two pan the board,
+     * and a long press opens the piece menu.</p>
+     */
+    public static void setTouchPileDrag(boolean on) {
+        touchPileDrag = on;
+    }
+
+    /**
+     * Works out once per gesture which pieces travel with the dragged one.
+     *
+     * <p>The pile is the one sitting under the press, and the press does not move, so the
+     * answer cannot change mid-drag. It was recomputed on every frame that failed to find
+     * a pile — a scan of the whole deck per frame, for the common case of dragging a card
+     * that is on its own. Harmless behind a held key on a desktop; not behind a latch on a
+     * tablet, which is left on across drags.</p>
+     */
+    private static void resolvePile(TarotBoard tarotBoard, StackPane pane, boolean wildsOnly,
+                                    double[] pressX, double[] pressY, boolean[] pileResolved,
+                                    boolean[] pileDragActive, List<StackPane>[] cachedPile) {
+        if (pileResolved[0]) return;
+        cachedPile[0] = findCardPileAt(tarotBoard, pressX[0], pressY[0], pane, wildsOnly);
+        pileDragActive[0] = cachedPile[0].size() > 1;
+        pileResolved[0] = true;
+    }
+
+    /** Whether a drag should carry the pile rather than the single piece under the finger. */
+    private static boolean pileRequested(MouseEvent event) {
+        if (touchPileDrag || event.isAltDown()) return true;
+        return event.isControlDown() && KeyBindConfig.getInstance().pileDrag() == KeyCode.CONTROL;
+    }
+
+    /**
+     * One in-progress drag gesture's state, held by the pane it belongs to.
+     *
+     * <p>Single-element arrays rather than plain fields because the handlers close over
+     * them exactly as they did when they were locals.</p>
+     */
+    private static final class DragState {
+        final double[] dragDelta = new double[1];
+        final double[] dragDeltaY = new double[1];
+        final boolean[] isDragging = new boolean[1];
+        final boolean[] wasDragged = new boolean[1];
+        final double[] pressX = new double[1];
+        final double[] pressY = new double[1];
+        final boolean[] pileDragActive = new boolean[1];
+        /** Whether this gesture has already worked out its pile; see {@code resolvePile}. */
+        final boolean[] pileResolved = new boolean[1];
+        @SuppressWarnings("unchecked")
+        final List<StackPane>[] cachedPile = new List[1];
     }
 
     private static List<StackPane> findCardPileAt(TarotBoard tarotBoard, double x, double y, StackPane draggedPane, boolean wildsOnly) {
