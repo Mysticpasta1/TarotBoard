@@ -246,14 +246,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # GraalVM 25 (the newest line) only does the native-image work, via GRAALVM_HOME.
-      # Temurin 24 is set up after it so it wins JAVA_HOME: Gradle 8.14's daemon cannot
-      # run past Java 24, and the same JDK serves as the lane's compile toolchain.
-      - name: Setup GraalVM 25
+      # GraalVM 24, not 25: Gluon's Substrate passes -H:+ForceNoROSectionRelocations
+      # to native-image, which GraalVM 25 removed but 24 still accepts. It only does
+      # the native-image work, via GRAALVM_HOME. Temurin 24 is set up after it so it
+      # wins JAVA_HOME: Gradle 8.14's daemon cannot run past Java 24, and the same
+      # JDK serves as the lane's compile toolchain.
+      - name: Setup GraalVM 24
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '25'
-          distribution: 'graalvm'
+          java-version: '24'
+          distribution: 'graalvm-community'
 
       - name: Setup Java 24
         uses: actions/setup-java@v4
