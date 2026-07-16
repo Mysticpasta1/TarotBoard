@@ -259,7 +259,7 @@ jobs:
         run: |
           gh release download "gluon-23+25.1-dev-2409082136" \
             --repo gluonhq/graal \
-            --pattern "*linux-x64*jdk-23*.tar.gz" \
+            --pattern "graalvm-java23-linux-amd64-gluon-23+25.1-dev.tar.gz" \
             --dir /tmp/graalvm
           tar -xzf /tmp/graalvm/*.tar.gz -C /tmp/graalvm
           GRAALVM_DIR=$(find /tmp/graalvm -maxdepth 1 -type d -name "graalvm-*" | head -1)
