@@ -233,12 +233,12 @@ jobs:
           if-no-files-found: error
 
   android:
-    # Best effort, allowed to fail so it never blocks a release. Uses Oracle
-    # GraalVM JDK 23: Gluon's custom builds are too old for Substrate 0.0.69
-    # (missing -H:+ForceNoROSectionRelocations) and graalvm-community lacks the
-    # CAP cache entries for Android cross-compilation.  --release 21 in build.gradle
-    # keeps bytecode at Java 21 level for Substrate compatibility.  Gradle 8.14
-    # because GluonFX does not support Gradle 9.
+    # Best effort, allowed to fail so it never blocks a release.  Uses GluonFX
+    # 1.0.23 (Substrate 0.0.63, which predates -H:+ForceNoROSectionRelocations)
+    # with Gluon's custom GraalVM 23+25.1-dev (which includes CAP cache entries for
+    # Android cross-compilation).  --release 21 in build.gradle keeps bytecode at
+    # Java 21 level for Substrate compatibility.  Gradle 8.14 because GluonFX does
+    # not support Gradle 9.
     name: Android APK (GluonFX, best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -247,18 +247,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # Oracle GraalVM JDK 23 is needed (not graalvm-community, not Gluon's custom
-      # build) because: 1) Gluon's latest custom GraalVM (23+25.1-dev, Sept 2024) is
-      # too old for Substrate 0.0.69, which requires -H:+ForceNoROSectionRelocations
-      # — a flag absent from that build; 2) graalvm-community JDK 21 lacks the CAP
-      # cache entries native-image needs for Android cross-compilation.  Oracle
-      # GraalVM has both the flag and a native-image compatible with Substrate's CAP
-      # cache.  This sets JAVA_HOME and GRAALVM_HOME.
-      - name: Setup GraalVM 23
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '23'
-          distribution: 'graalvm'
+      # Gluon's custom GraalVM build is required (not Oracle, not Community)
+      # because it bundles CAP cache entries for Android cross-compilation.
+      # Substrate 0.0.63 (shipped with GluonFX 1.0.23) does not need the
+      # -H:+ForceNoROSectionRelocations flag, so this older GraalVM build is
+      # compatible.  We download the linux-x64 JDK 23 tarball from the latest
+      # Gluon GraalVM release and set GRAALVM_HOME.
+      - name: Setup Gluon GraalVM 23
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "gluon-23+25.1-dev-2409082136" \
+            --repo gluonhq/graal \
+            --pattern "*linux-x64*jdk-23*.tar.gz" \
+            --dir /tmp/graalvm
+          tar -xzf /tmp/graalvm/*.tar.gz -C /tmp/graalvm
+          GRAALVM_DIR=$(find /tmp/graalvm -maxdepth 1 -type d -name "graalvm-*" | head -1)
+          echo "GRAALVM_HOME=${GRAALVM_DIR}" >> $GITHUB_ENV
+          echo "JAVA_HOME=${GRAALVM_DIR}" >> $GITHUB_ENV
+          echo "${GRAALVM_DIR}/bin" >> $GITHUB_PATH
 
       - name: Setup Gradle 8.14
         uses: gradle/actions/setup-gradle@v3

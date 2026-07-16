@@ -8,7 +8,7 @@ buildscript {
     }
     dependencies {
         if (project.hasProperty("androidBuild")) {
-            classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.29"
+            classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.23"
         }
     }
 }
@@ -25,12 +25,12 @@ plugins {
 group = "com.mystic"
 version = "3.0.0"
 
-// The Android lane (-PandroidBuild) runs on Oracle GraalVM JDK 23.  Gluon's custom
-// builds are too old for the current Substrate (missing -H:+ForceNoROSectionRelocations)
-// and graalvm-community lacks the CAP cache entries for Android cross-compilation.
-// --release 21 keeps bytecode at Java 21 level for Substrate compatibility.
-// Desktop builds stay on 26.
-java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 23 : 26)
+// The Android lane uses GluonFX 1.0.23 (Substrate 0.0.63, which predates the
+// -H:+ForceNoROSectionRelocations requirement) with Gluon's custom GraalVM build
+// (which includes CAP cache entries for Android cross-compilation).  JDK 21 is used
+// for the toolchain; --release 21 keeps bytecode at Java 21 level for Substrate
+// compatibility.  Desktop builds stay on 26.
+java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 21 : 26)
 
 repositories {
     mavenCentral()
@@ -49,7 +49,8 @@ dependencies {
 
 javafx {
     // The Android lane compiles against JavaFX 21 so the API surface matches the
-    // JavaFX 21-ea static SDK Gluon links against; desktop keeps the 26 runtime.
+    // JavaFX 21-ea static SDK that GluonFX 1.0.23's Substrate bundles; desktop
+    // keeps the 26 runtime.
     version = project.hasProperty("androidBuild") ? "21.0.2" : "26.0.1"
     modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
 }
@@ -58,9 +59,9 @@ java {
     modularity.inferModulePath = true
 }
 
-// The sources are kept at Java 21 for Substrate / Android compatibility: the bytecode
-// level is locked to 21 via --release regardless of the host JDK, making any newer
-// language feature or JDK API a compile error on every lane.
+// The sources are kept at Java 21 for Substrate 0.0.63 / Android compatibility: the
+// bytecode level is locked to 21 via --release regardless of the host JDK, making any
+// newer language feature or JDK API a compile error on every lane.
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
@@ -183,5 +184,10 @@ if (project.hasProperty("androidBuild")) {
     apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
     gluonfx {
         target = "android"
+        // Disable CAP cache as a fallback: Gluon's custom GraalVM includes the
+        // Android cross-compilation CAP cache, but if it is absent (e.g. using
+        // a different GraalVM distribution), native-image will compute the values
+        // at build time instead of failing with a "Missing CAP cache" error.
+        compilerArgs = ["-H:-UseCAPCache"]
     }
 }
