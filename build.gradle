@@ -1,5 +1,18 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
+// The GluonFX plugin is only on the classpath when an Android build is requested
+// (-PandroidBuild), so desktop builds never resolve or load it.
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        if (project.hasProperty("androidBuild")) {
+            classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.29"
+        }
+    }
+}
+
 plugins {
     id "java"
     id "application"
@@ -133,4 +146,28 @@ tasks.register("runServer", JavaExec) {
     description = "Run the headless dedicated server"
     mainClass = "com.mystic.tarotboard.network.server.HeadlessServer"
     classpath = sourceSets.main.runtimeClasspath
+}
+
+tasks.register("serverJar", ShadowJar) {
+    group = "distribution"
+    description = "Build a plain runnable jar of the headless dedicated server"
+    archiveBaseName = "TarotBoard-Server"
+    archiveClassifier = ""
+    from sourceSets.main.output
+    configurations = [project.configurations.runtimeClasspath]
+    manifest.attributes("Main-Class": "com.mystic.tarotboard.network.server.HeadlessServer")
+    // A classpath jar, not a module — and the console server never loads a JavaFX class,
+    // so the platform-specific JavaFX jars would be pure dead weight inside it.
+    exclude "module-info.class"
+    exclude "META-INF/versions/*/module-info.class"
+    dependencies {
+        exclude(dependency("org.openjfx:.*"))
+    }
+}
+
+if (project.hasProperty("androidBuild")) {
+    apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
+    gluonfx {
+        target = "android"
+    }
 }

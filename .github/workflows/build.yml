@@ -204,10 +204,74 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  server-jar:
+    name: Headless Server Jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build server jar
+        run: ./gradlew serverJar
+
+      - name: Upload server jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-server-jar-build
+          path: build/libs/TarotBoard-Server-*.jar
+          compression-level: 0
+          if-no-files-found: error
+
+  android:
+    # Best effort: JavaFX only reaches Android through GluonFX/GraalVM native images,
+    # and that toolchain trails the JDK. The job is allowed to fail so it never blocks
+    # a release; it starts shipping an APK the day Gluon's toolchain supports this
+    # project's JDK/JavaFX versions. It runs Gradle 8.14 because the GluonFX plugin
+    # is not compatible with Gradle 9 yet.
+    name: Android APK (GluonFX, best effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '26'
+          distribution: 'graalvm'
+
+      - name: Setup Gradle 8.14
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.14'
+
+      - name: Build Android APK
+        run: gradle nativeBuild nativePackage -PandroidBuild=true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-build
+          path: build/gluonfx/**/*.apk
+          compression-level: 0
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
     if: github.ref == 'refs/heads/master'
-    needs: [ windows, linux, flatpak, headless-server-installers, headless-server-windows ]
+    needs: [ windows, linux, flatpak, headless-server-installers, headless-server-windows, server-jar, android ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
