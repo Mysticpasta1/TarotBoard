@@ -233,11 +233,12 @@ jobs:
           if-no-files-found: error
 
   android:
-    # Best effort, allowed to fail so it never blocks a release. JavaFX reaches
-    # Android only through GluonFX/Substrate, whose toolchain trails the JDK: the
-    # sources are held at Java 21 (--release 21 in build.gradle) specifically so this
-    # lane can use GraalVM for JDK 21, the newest Substrate supports (see
-    # gluonhq/substrate#1241). Gradle 8.14 because GluonFX does not support Gradle 9.
+    # Best effort, allowed to fail so it never blocks a release. Uses Gluon's
+    # custom GraalVM build (not graalvm-community) because only Gluon's builds
+    # ship the CAP cache files that native-image needs for Android cross-compilation.
+    # --release 21 in build.gradle keeps the bytecode at Java 21 level for Substrate
+    # compatibility while the JDK itself is 23. Gradle 8.14 because GluonFX does
+    # not support Gradle 9.
     name: Android APK (GluonFX, best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -246,15 +247,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # One JDK for the whole lane: GraalVM for JDK 21 is the newest GraalVM Gluon's
-      # Substrate supports, the sources are kept at Java 21 (--release 21), and
-      # Gradle 8.14 runs fine on 21 — so this serves as daemon JVM, compile
-      # toolchain, and native-image (setup-graalvm sets JAVA_HOME and GRAALVM_HOME).
-      - name: Setup GraalVM 21
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '21'
-          distribution: 'graalvm-community'
+      # Gluon's custom GraalVM includes the CAP cache for Android (AArch64) cross-
+      # compilation targets — official GraalVM Community builds do not, which causes
+      # "Missing CAP cache value for: NativeCodeInfo:PosixDirectives:ConstantInfo:
+      # CLOCK_REALTIME" during native-image.  This also sets JAVA_HOME and GRAALVM_HOME.
+      - name: Setup GraalVM built by Gluon
+        uses: gluonhq/setup-graalvm@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Gradle 8.14
         uses: gradle/actions/setup-gradle@v3
