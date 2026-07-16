@@ -246,19 +246,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # GraalVM releases trail the JDK: 25 is the newest line, so it does the
-      # native-image work while temurin 26 (set up after, so it wins JAVA_HOME)
-      # satisfies the project's Gradle toolchain. The lane compiles at --release 24.
+      # GraalVM 25 (the newest line) only does the native-image work, via GRAALVM_HOME.
+      # Temurin 24 is set up after it so it wins JAVA_HOME: Gradle 8.14's daemon cannot
+      # run past Java 24, and the same JDK serves as the lane's compile toolchain.
       - name: Setup GraalVM 25
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '25'
           distribution: 'graalvm'
 
-      - name: Setup Java 26
+      - name: Setup Java 24
         uses: actions/setup-java@v4
         with:
-          java-version: '26'
+          java-version: '24'
           distribution: 'temurin'
 
       - name: Setup Gradle 8.14

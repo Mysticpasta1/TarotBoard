@@ -25,7 +25,9 @@ plugins {
 group = "com.mystic"
 version = "3.0.0"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(26)
+// The Android lane (-PandroidBuild) is capped at Java 24: GluonFX requires Gradle 8.14,
+// whose daemon and class-file analysis cannot go past 24. Desktop builds stay on 26.
+java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 24 : 26)
 
 repositories {
     mavenCentral()
@@ -169,11 +171,5 @@ if (project.hasProperty("androidBuild")) {
     apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
     gluonfx {
         target = "android"
-    }
-    // Two ceilings force old bytecode here: native-image rejects class files newer
-    // than its own JDK (newest GraalVM is 25), and the Gradle 8.14 this lane runs on
-    // (GluonFX does not support Gradle 9) cannot parse class files past Java 24.
-    tasks.withType(JavaCompile).configureEach {
-        options.release = 24
     }
 }
