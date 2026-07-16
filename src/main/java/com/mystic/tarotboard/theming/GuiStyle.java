@@ -11,7 +11,7 @@ import java.nio.file.Path;
  * Persistent GUI style settings for card text display.
  * Loaded from {@code gui_style.json} in the app data directory, falling back to defaults.
  */
-public record GuiStyle(int cardTextSize, boolean showCardTooltips) {
+public record GuiStyle(int cardTextSize) {
     private static GuiStyle instance;
 
     /**
@@ -25,7 +25,7 @@ public record GuiStyle(int cardTextSize, boolean showCardTooltips) {
     }
 
     private static GuiStyle defaults() {
-        return new GuiStyle(15, true);
+        return new GuiStyle(15);
     }
 
     private static GuiStyle load() {

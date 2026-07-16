@@ -320,16 +320,25 @@ public class TarotBoard extends Application {
     }
 
     /**
-     * Finds a game piece pane at the given scene coordinates.
+     * Finds the topmost game piece pane at the given scene coordinates.
+     *
+     * <p>Pieces overlap heavily, most of all on the deck, so the search walks the game
+     * content's children from last to first: the last child is the one drawn on top, and
+     * so the one the player is pointing at. Scanning {@code pieceMap} instead would hand
+     * back whichever overlapping piece the hash order reached first.</p>
      *
      * @param mouseX the scene X coordinate
      * @param mouseY the scene Y coordinate
-     * @return the piece pane at the coordinates, or null if none found
+     * @return the topmost piece pane at the coordinates, or null if none found
      */
     public StackPane findPieceAtMouse(double mouseX, double mouseY) {
-        for (StackPane pane : pieceMap.values()) {
-            var pt = pane.sceneToLocal(mouseX, mouseY);
-            if (pane.contains(pt)) return pane;
+        Set<Node> pieces = new HashSet<>(pieceMap.values());
+        List<Node> content = gameScene.getGameContent().getChildren();
+        for (int i = content.size() - 1; i >= 0; i--) {
+            Node node = content.get(i);
+            if (!pieces.contains(node)) continue;
+            var pt = node.sceneToLocal(mouseX, mouseY);
+            if (node.contains(pt)) return (StackPane) node;
         }
         return null;
     }
@@ -425,9 +434,19 @@ public class TarotBoard extends Application {
     }
 
     /**
-     * Disconnects from any active multiplayer session and cleans up remote cursors and player state.
+     * Disconnects from any active multiplayer session and cleans up remote cursors and player
+     * state, keeping the board so the player can pick it back up from the start menu.
      */
     public void leaveGame() {
+        leaveGame(true);
+    }
+
+    /**
+     * @param saveBoard whether to persist the board on the way out. Shutdown passes false:
+     *                  it has already saved, while the session was still live, and that
+     *                  snapshot records the multiplayer details needed to offer a re-join.
+     */
+    private void leaveGame(boolean saveBoard) {
         if (gameClient != null) {
             gameClient.disconnect();
             gameClient = null;
@@ -463,6 +482,12 @@ public class TarotBoard extends Application {
         if (primaryStage != null) {
             primaryStage.setTitle("TarotBoard");
         }
+        // Leaving drops the player back to the start menu, from where the only ways back to
+        // the board are New Game or Continue. Without a save here Continue restores whatever
+        // the last shutdown left behind, so the piles built this session are gone. This runs
+        // after the multiplayer state is cleared so the board is saved as a local one and
+        // Continue reopens it, rather than routing back to the re-join screen.
+        if (saveBoard) saveGame();
     }
 
     /**
@@ -680,17 +705,17 @@ public class TarotBoard extends Application {
     private void handlePieceFlip(Msg.PieceFlip m) {
         if (m.playerId() == myPlayerId) return;
         var pane = pieceMap.get(m.pieceId());
-        if (pane != null && pane.getChildren().size() >= 3) {
-            Node f = pane.getChildren().get(1);
-            Node b = pane.getChildren().get(0);
-            f.setVisible(m.frontVisible());
-            b.setVisible(m.backVisible());
-            if (pane.getChildren().size() > 2) {
-                Node t = pane.getChildren().get(2);
-                t.setVisible(m.textVisible());
-            }
-            pane.toFront();
+        if (pane == null || pane.getChildren().size() < 2) return;
+        // Cards stack their images back-then-front, chips the other way round, so the
+        // sender's index convention has to be mirrored here or a chip flip lands on the
+        // wrong image. A chip pane has no third child; only cards carry the name node.
+        boolean isCard = m.pieceId().startsWith("card:");
+        pane.getChildren().get(isCard ? 1 : 0).setVisible(m.frontVisible());
+        pane.getChildren().get(isCard ? 0 : 1).setVisible(m.backVisible());
+        if (pane.getChildren().size() > 2) {
+            pane.getChildren().get(2).setVisible(m.textVisible());
         }
+        pane.toFront();
     }
 
     private void handlePieceToFront(Msg.PieceToFront m) {
@@ -839,7 +864,6 @@ public class TarotBoard extends Application {
                         text.setText(wildText.getText());
                         text.setStyle(wildText.getStyle());
                     }
-                    cards[i].refreshTooltipContent(logicalName, wilds);
                 }
             }
         }
@@ -999,11 +1023,15 @@ public class TarotBoard extends Application {
         UIUtils.makeDraggable(pane, this,
                 (x, y) -> sendPieceMove(pieceId, x, y),
                 (x, y) -> sendPieceMoveThrottled(pieceId, x, y),
-                (pile, x, y) -> {
+                (pile, x, y, isFinal) -> {
                     for (StackPane p : pile) {
                         p.setTranslateX(x);
                         p.setTranslateY(y);
-                        sendPieceMoveThrottled(getCardId(p), x, y);
+                        String id = getCardId(p);
+                        if (id == null) continue;
+                        // The resting position must not be dropped by the throttle.
+                        if (isFinal) sendPieceMove(id, x, y);
+                        else sendPieceMoveThrottled(id, x, y);
                     }
                 }
         );
@@ -1203,12 +1231,11 @@ public class TarotBoard extends Application {
                 card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
             } else {
                 card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
+                ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
+                card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
 
-            Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
-            ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
-            card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
-            card.refreshTooltipContent(cardLogicalName, wilds);
 
             String pieceId = "card:" + i;
             cards[i] = card;
@@ -1348,7 +1375,6 @@ public class TarotBoard extends Application {
                         cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
                     }
 
-                    cards[a].refreshTooltipContent(cardLogicalName, wilds);
 
                     String pieceId = "card:" + a;
                     setupPieceInteractions(cards[a].getCardPane(), pieceId, true);
@@ -1531,7 +1557,6 @@ public class TarotBoard extends Application {
                         cardNameText.setText(CardDataHelper.getWildCardName(text).getText() + "\n \n" + "(Wild)");
                         cardNameText.setStyle(CardDataHelper.getWildCardName(text).getStyle());
                     }
-                    cards[a].refreshTooltipContent(cardLogicalName, wilds);
                 }
             }
 
@@ -1584,8 +1609,6 @@ public class TarotBoard extends Application {
             for (Cards card : cards) {
                 if (card != null) {
                     card.updateImages(cardFrontImage, cardBackImage);
-                    String cardName = card.getCardName().getText();
-                    card.refreshTooltipContent(cardName, wilds);
                 }
             }
         }
@@ -1598,7 +1621,7 @@ public class TarotBoard extends Application {
     @Override
     public void stop() {
         saveGame();
-        leaveGame();
+        leaveGame(false);
     }
 
     /**
@@ -1797,7 +1820,6 @@ public class TarotBoard extends Application {
                 }
             }
 
-            cards[idx].refreshTooltipContent(cardLogicalName, wilds);
             gameScene.getGameContent().getChildren().add(pane);
             pieceMap.put(pieceId, pane);
             idx++;
@@ -1955,6 +1977,19 @@ public class TarotBoard extends Application {
         return null;
     }
 
+    /**
+     * Returns whether the given pane is one of the chips on the board.
+     *
+     * @param pane the piece pane to test
+     * @return true if the pane belongs to a chip
+     */
+    public boolean isChip(StackPane pane) {
+        for (Chips chip : chips) {
+            if (chip.getChipPane() == pane) return true;
+        }
+        return false;
+    }
+
     public boolean isWildCard(StackPane pane) {
         for (int i = 0; i < cards.length; i++) {
             if (cards[i] != null && cards[i].getCardPane() == pane) {
@@ -2007,14 +2042,14 @@ public class TarotBoard extends Application {
     public void moveWildsToPile() {
         double newX = gameScene.getScene().getWidth() - CARD_WIDTH - 50;
         double newY = 100;
-        int i = 0;
         for (int j = 0; j < cards.length; j++) {
             if (cards[j] != null && j < cardNames.size() && wilds.contains(cardNames.get(j))) {
                 StackPane cardPane = cards[j].getCardPane();
+                // Squarely on top of one another: a staggered spread is not a pile, and
+                // anything further than the pile tolerance apart cannot be dragged as one.
                 cardPane.setTranslateX(newX);
-                cardPane.setTranslateY(newY + i * 5);
+                cardPane.setTranslateY(newY);
                 sendPieceMove(getCardId(cardPane), cardPane.getTranslateX(), cardPane.getTranslateY());
-                i++;
             }
         }
     }

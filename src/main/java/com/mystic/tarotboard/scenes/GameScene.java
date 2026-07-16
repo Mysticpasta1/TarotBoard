@@ -1,7 +1,6 @@
 package com.mystic.tarotboard.scenes;
 
 import com.mystic.tarotboard.TarotBoard;
-import com.mystic.tarotboard.items.Chips;
 import com.mystic.tarotboard.network.NetworkMessage;
 import com.mystic.tarotboard.network.NetworkMessage.Msg;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
@@ -288,14 +287,15 @@ public class GameScene {
         playerListOverlay = overlayRoot;
 
         var keybinds = KeyBindConfig.getInstance();
-        scene.setOnMouseMoved(event -> {
-            mouseX[0] = event.getSceneX();
-            mouseY[0] = event.getSceneY();
-            if (tarotBoard.isMultiplayer()) {
-                tarotBoard.sendNetworkMessage(NetworkMessage.of(new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
-            }
-        });
+        // MOUSE_MOVED stops arriving the moment a button goes down, so tracking it alone
+        // left the pointer position frozen wherever a drag began: keyboard actions then
+        // acted on whatever piece sat at the old spot, and peers watched a stuck cursor.
+        // MOUSE_DRAGGED carries the rest of the gesture.
+        scene.addEventFilter(MouseEvent.MOUSE_MOVED, this::trackMouse);
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, this::trackMouse);
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, this::trackMouse);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (isTypingInTextField()) return;
             var code = event.getCode();
             if (code == keybinds.togglePlayerList()) {
                 if (tarotBoard.isMultiplayer()) {
@@ -306,13 +306,11 @@ public class GameScene {
                 return;
             }
             if (code == keybinds.multiFlip()) {
-                for (Chips chip : tarotBoard.getChips()) {
-                    StackPane pane = chip.getChipPane();
-                    var pt = pane.sceneToLocal(mouseX[0], mouseY[0]);
-                    if (pane.contains(pt)) {
-                        UIUtils.multiFlip(pane);
-                        break;
-                    }
+                // Topmost piece, not the first chip that happens to sit under the cursor,
+                // so a stacked chip flips the one the player can actually see.
+                StackPane piece = tarotBoard.findPieceAtMouse(mouseX[0], mouseY[0]);
+                if (piece != null && tarotBoard.isChip(piece)) {
+                    UIUtils.multiFlip(piece);
                 }
                 event.consume();
                 return;
@@ -343,6 +341,7 @@ public class GameScene {
             }
         });
         scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> {
+            if (isTypingInTextField()) return;
             if (event.getCode() == keybinds.togglePlayerList()) {
                 playerListOverlay.setVisible(false);
                 event.consume();
@@ -350,11 +349,35 @@ public class GameScene {
         });
         scene.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             bringCursorOverlayToFront();
-            StackPane piece = tarotBoard.findPieceAtMouse(mouseX[0], mouseY[0]);
+            // The click's own coordinates, never the tracked ones: a click carries where it
+            // happened, so there is no way for it to act on a piece somewhere else.
+            StackPane piece = tarotBoard.findPieceAtMouse(event.getSceneX(), event.getSceneY());
             if (piece != null) {
                 UIUtils.handlePieceClick(piece, event);
             }
         });
+    }
+
+    /**
+     * Whether a text field currently holds focus, in which case its keystrokes are text
+     * and not board keybinds. The board's keybinds are scene-wide filters, so without
+     * this an operator password would split piles and lose the letters it fired on.
+     */
+    private boolean isTypingInTextField() {
+        return scene.getFocusOwner() instanceof TextInputControl;
+    }
+
+    /**
+     * Records the pointer position for the keyboard actions that act on whatever piece is
+     * under the cursor, and reports it to peers so they can follow this player's cursor.
+     */
+    private void trackMouse(MouseEvent event) {
+        mouseX[0] = event.getSceneX();
+        mouseY[0] = event.getSceneY();
+        if (tarotBoard.isMultiplayer()) {
+            tarotBoard.sendNetworkMessage(NetworkMessage.of(
+                    new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+        }
     }
 
     /**

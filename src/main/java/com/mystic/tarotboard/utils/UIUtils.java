@@ -45,7 +45,11 @@ public class UIUtils {
      */
     @FunctionalInterface
     public interface PileDragCallback {
-        void onPileDrag(List<StackPane> pile, double newTranslateX, double newTranslateY);
+        /**
+         * @param isFinal true when the drag has ended, so the position is the resting one
+         *                and must be sent to peers rather than dropped by move throttling
+         */
+        void onPileDrag(List<StackPane> pile, double newTranslateX, double newTranslateY, boolean isFinal);
     }
 
     /**
@@ -127,7 +131,7 @@ public class UIUtils {
                         pileDragActive[0] = cachedPile[0].size() > 1;
                     }
                     if (pileDragActive[0] && onPileDrag != null) {
-                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY);
+                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY, false);
                     } else {
                         pane.setTranslateX(newTranslateX);
                         pane.setTranslateY(newTranslateY);
@@ -139,7 +143,7 @@ public class UIUtils {
                         pileDragActive[0] = cachedPile[0].size() > 1;
                     }
                     if (pileDragActive[0] && onPileDrag != null) {
-                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY);
+                        onPileDrag.onPileDrag(cachedPile[0], newTranslateX, newTranslateY, false);
                     } else {
                         pane.setTranslateX(newTranslateX);
                         pane.setTranslateY(newTranslateY);
@@ -167,12 +171,11 @@ public class UIUtils {
                         pileDragActive[0] = cachedPile[0].size() > 1;
                     }
                     if (pileDragActive[0]) {
-                        for (StackPane cardPane : cachedPile[0]) {
-                            cardPane.setTranslateX(pane.getTranslateX());
-                            cardPane.setTranslateY(pane.getTranslateY());
-                            if (onDragEnd != null) {
-                                onDragEnd.onDragEnd(cardPane.getTranslateX(), cardPane.getTranslateY());
-                            }
+                        // onDragEnd only ever reports the dragged pane's own id, so routing
+                        // the whole pile through it told peers one card moved N times and
+                        // left the rest of the pile wherever throttling last put them.
+                        if (onPileDrag != null) {
+                            onPileDrag.onPileDrag(cachedPile[0], pane.getTranslateX(), pane.getTranslateY(), true);
                         }
                     } else if (onDragEnd != null) {
                         onDragEnd.onDragEnd(pane.getTranslateX(), pane.getTranslateY());
@@ -507,11 +510,17 @@ public class UIUtils {
                 b.setVisible(!f.isVisible());
             }));
         }
+        TransformCallback onTransform = (TransformCallback) pane.getProperties().get("tb_onTransform");
+        ToFrontCallback onToFront = (ToFrontCallback) pane.getProperties().get("tb_onToFront");
         timeline.setOnFinished(_ -> {
             boolean showFront = new Random().nextBoolean();
             f.setVisible(showFront);
             b.setVisible(!showFront);
             pane.toFront();
+            // The landing face is random, so peers cannot infer it: tell them how it
+            // settled or their copy of this chip stays wrong for the rest of the game.
+            if (onTransform != null) onTransform.onTransform("flip", showFront ? 1 : 0);
+            if (onToFront != null) onToFront.onToFront();
         });
         timeline.play();
     }
