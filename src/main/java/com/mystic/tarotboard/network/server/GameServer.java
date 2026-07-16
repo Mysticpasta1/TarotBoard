@@ -26,7 +26,7 @@ public class GameServer {
     private volatile boolean running;
     private Consumer<NetworkMessage> onMessage;
     private GatewayDevice activeGateway;
-    private Predicate<Integer> isOperatorCheck = _ -> false; // Default: no one is operator
+    private Predicate<Integer> isOperatorCheck = playerId -> false; // Default: no one is operator
 
     private final double[][] playerColors = {
             {1.0, 0.2, 0.2}, {0.2, 1.0, 0.2}, {0.2, 0.5, 1.0}, {1.0, 1.0, 0.2},

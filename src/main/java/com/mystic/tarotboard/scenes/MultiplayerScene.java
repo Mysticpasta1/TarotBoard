@@ -39,17 +39,17 @@ public class MultiplayerScene {
         Button hostGameBtn = new Button("Host Game");
         hostGameBtn.setStyle(Styles.menuButton());
         hostGameBtn.setPrefWidth(300);
-        hostGameBtn.setOnAction(_ -> tarotBoard.switchToHostGame());
+        hostGameBtn.setOnAction(event -> tarotBoard.switchToHostGame());
 
         Button joinGameBtn = new Button("Join Game");
         joinGameBtn.setStyle(Styles.menuButton());
         joinGameBtn.setPrefWidth(300);
-        joinGameBtn.setOnAction(_ -> tarotBoard.switchToJoinGame());
+        joinGameBtn.setOnAction(event -> tarotBoard.switchToJoinGame());
 
         Button backBtn = new Button("Back to Menu");
         backBtn.setStyle(Styles.menuButton());
         backBtn.setPrefWidth(300);
-        backBtn.setOnAction(_ -> tarotBoard.switchToStart());
+        backBtn.setOnAction(event -> tarotBoard.switchToStart());
 
         layout.getChildren().addAll(title, hostGameBtn, joinGameBtn, backBtn);
 
@@ -71,8 +71,8 @@ public class MultiplayerScene {
             scale = Math.clamp(scale, 0.3, 3.0);
             mpContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
         };
-        scene.widthProperty().addListener((_, _, _) -> scaleContent.run());
-        scene.heightProperty().addListener((_, _, _) -> scaleContent.run());
+        scene.widthProperty().addListener((obs, oldV, newV) -> scaleContent.run());
+        scene.heightProperty().addListener((obs, oldV, newV) -> scaleContent.run());
     }
 
     /**

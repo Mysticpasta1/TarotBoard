@@ -98,14 +98,14 @@ public class SettingsScene {
 
         Button resetBtn = new Button("Reset to Defaults");
         resetBtn.setStyle(Styles.settingsResetBtn());
-        resetBtn.setOnAction(_ -> {
-            KeyBindConfig.update(_ -> KeyBindConfig.defaults());
+        resetBtn.setOnAction(event -> {
+            KeyBindConfig.update(c -> KeyBindConfig.defaults());
             show(stage, previousScene);
         });
 
         Button backBtn = new Button("Back");
         backBtn.setStyle(Styles.settingsCloseBtn());
-        backBtn.setOnAction(_ -> stage.setScene(previousScene));
+        backBtn.setOnAction(event -> stage.setScene(previousScene));
 
         HBox btnRow = new HBox(10, resetBtn, backBtn);
         btnRow.setAlignment(Pos.CENTER);
@@ -122,7 +122,7 @@ public class SettingsScene {
 
         Button keyBtn = new Button(formatKeyName(current));
         keyBtn.setStyle(Styles.settingsBindKey());
-        keyBtn.setOnAction(_ -> {
+        keyBtn.setOnAction(event -> {
             keyBtn.setText("Press a key...");
             keyBtn.setStyle(Styles.settingsBindKeyRecording());
             parent.addEventFilter(KeyEvent.KEY_PRESSED, new javafx.event.EventHandler<>() {
@@ -162,10 +162,10 @@ public class SettingsScene {
         btnCombo.setStyle("-fx-font-size: 14pt;");
         btnCombo.getItems().addAll(MouseButton.PRIMARY, MouseButton.SECONDARY, MouseButton.MIDDLE);
         btnCombo.setValue(button);
-        btnCombo.setOnAction(_ -> onButton.accept(btnCombo.getValue()));
+        btnCombo.setOnAction(event -> onButton.accept(btnCombo.getValue()));
         Button keyBtn = new Button(formatKeyName(keyCode));
         keyBtn.setStyle(Styles.settingsBindKey());
-        keyBtn.setOnAction(_ -> {
+        keyBtn.setOnAction(event -> {
             keyBtn.setText("Press a key...");
             keyBtn.setStyle(Styles.settingsBindKeyRecording());
             parent.addEventFilter(KeyEvent.KEY_PRESSED, new javafx.event.EventHandler<>() {
@@ -185,7 +185,7 @@ public class SettingsScene {
         CheckBox cb = new CheckBox("On");
         cb.setStyle("-fx-font-size: 14pt; -fx-text-fill: white;");
         cb.setSelected(enabled);
-        cb.selectedProperty().addListener((_, _, n) -> onToggle.accept(n));
+        cb.selectedProperty().addListener((obs, oldV, n) -> onToggle.accept(n));
         HBox row = new HBox(12, actionLabel, btnCombo, keyBtn, cb);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
@@ -196,7 +196,7 @@ public class SettingsScene {
         l.setStyle("-fx-font-size: 16pt; -fx-text-fill: white; -fx-min-width: 200;");
         Spinner<Integer> spin = new Spinner<>(1, 100, value);
         spin.setStyle("-fx-font-size: 14pt; -fx-pref-width: 100;");
-        spin.valueProperty().addListener((_, _, n) -> onUpdate.accept(n));
+        spin.valueProperty().addListener((obs, oldV, n) -> onUpdate.accept(n));
         HBox row = new HBox(12, l, spin);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;

@@ -119,8 +119,8 @@ public class Cards {
         // pips or labels for the card images and the name node.
         cardPane.getChildren().add(buildFace(width, height, cardNameText));
 
-        cardNameText.textProperty().addListener((_, _, newText) -> applyFace(newText));
-        cardNameText.styleProperty().addListener((_, _, _) -> applyFace(getCardName().getText()));
+        cardNameText.textProperty().addListener((obs, oldV, newText) -> applyFace(newText));
+        cardNameText.styleProperty().addListener((obs, oldV, newV) -> applyFace(getCardName().getText()));
         applyFace(cardNameText.getText());
     }
 

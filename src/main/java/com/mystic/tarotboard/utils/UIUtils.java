@@ -187,7 +187,7 @@ public class UIUtils {
             isDragging[0] = false;
         });
 
-        pane.addEventHandler(MouseEvent.MOUSE_RELEASED, _ -> {
+        pane.addEventHandler(MouseEvent.MOUSE_RELEASED, event -> {
             if (wasDragged[0] && !pileDragActive[0]) {
                 snapToNearestCard(pane, tarotBoard);
             }
@@ -505,14 +505,14 @@ public class UIUtils {
         int flips = 5;
         Timeline timeline = new Timeline();
         for (int i = 0; i < flips; i++) {
-            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), _ -> {
+            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(60 * i), event -> {
                 f.setVisible(!f.isVisible());
                 b.setVisible(!f.isVisible());
             }));
         }
         TransformCallback onTransform = (TransformCallback) pane.getProperties().get("tb_onTransform");
         ToFrontCallback onToFront = (ToFrontCallback) pane.getProperties().get("tb_onToFront");
-        timeline.setOnFinished(_ -> {
+        timeline.setOnFinished(event -> {
             boolean showFront = new Random().nextBoolean();
             f.setVisible(showFront);
             b.setVisible(!showFront);

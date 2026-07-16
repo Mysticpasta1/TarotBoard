@@ -49,7 +49,7 @@ public class HelpScene {
 
         Button backButton = new Button("Back");
         backButton.setStyle(Styles.helpBtn());
-        backButton.setOnAction(_ -> stage.setScene(previousScene));
+        backButton.setOnAction(event -> stage.setScene(previousScene));
 
         HBox buttonBox = new HBox(backButton);
         buttonBox.setAlignment(Pos.CENTER);

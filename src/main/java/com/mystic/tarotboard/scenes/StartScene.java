@@ -41,7 +41,7 @@ public class StartScene {
         Button singlePlayerBtn = new Button("Single Player");
         singlePlayerBtn.setStyle(Styles.menuButton());
         singlePlayerBtn.setPrefWidth(300);
-        singlePlayerBtn.setOnAction(_ -> {
+        singlePlayerBtn.setOnAction(event -> {
             tarotBoard.newGame();
             primaryStage.setScene(tarotBoard.getGameScene().getScene());
             primaryStage.setTitle("Game Scene");
@@ -50,28 +50,28 @@ public class StartScene {
         Button multiplayerBtn = new Button("Multiplayer");
         multiplayerBtn.setStyle(Styles.menuButton());
         multiplayerBtn.setPrefWidth(300);
-        multiplayerBtn.setOnAction(_ -> tarotBoard.switchToMultiplayer());
+        multiplayerBtn.setOnAction(event -> tarotBoard.switchToMultiplayer());
 
         Button continueButton = new Button("Continue");
         continueButton.setStyle(Styles.menuButton());
         continueButton.setPrefWidth(300);
         continueButton.setDisable(!new File(PlatformPaths.getSaveFilePath()).exists());
-        continueButton.setOnAction(_ -> tarotBoard.continueGame());
+        continueButton.setOnAction(event -> tarotBoard.continueGame());
 
         Button helpButton = new Button("Help");
         helpButton.setStyle(Styles.menuButton());
         helpButton.setPrefWidth(300);
-        helpButton.setOnAction(_ -> HelpScene.show(primaryStage));
+        helpButton.setOnAction(event -> HelpScene.show(primaryStage));
 
         Button quitButton = new Button("Quit");
         quitButton.setStyle(Styles.menuButton());
         quitButton.setPrefWidth(300);
-        quitButton.setOnAction(_ -> primaryStage.close());
+        quitButton.setOnAction(event -> primaryStage.close());
 
         Button settingsBtn = new Button("Settings");
         settingsBtn.setStyle(Styles.menuButton());
         settingsBtn.setPrefWidth(300);
-        settingsBtn.setOnAction(_ -> SettingsScene.show(primaryStage));
+        settingsBtn.setOnAction(event -> SettingsScene.show(primaryStage));
 
         Label updateStatusLabel = new Label();
         updateStatusLabel.setStyle("-fx-text-fill: white; -fx-font-size: 40; -fx-font-weight: bold;");
@@ -111,8 +111,8 @@ public class StartScene {
             scale = Math.clamp(scale, 0.3, 3.0);
             startContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
         };
-        scene.widthProperty().addListener((_, _, _) -> scaleStartContent.run());
-        scene.heightProperty().addListener((_, _, _) -> scaleStartContent.run());
+        scene.widthProperty().addListener((obs, oldV, newV) -> scaleStartContent.run());
+        scene.heightProperty().addListener((obs, oldV, newV) -> scaleStartContent.run());
     }
 
     /**

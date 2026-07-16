@@ -25,9 +25,10 @@ plugins {
 group = "com.mystic"
 version = "3.0.0"
 
-// The Android lane (-PandroidBuild) is capped at Java 24: GluonFX requires Gradle 8.14,
-// whose daemon and class-file analysis cannot go past 24. Desktop builds stay on 26.
-java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 24 : 26)
+// The Android lane (-PandroidBuild) runs entirely on JDK 21 — it is built to be driven
+// with GraalVM for JDK 21 as JAVA_HOME, the newest GraalVM Gluon's Substrate supports.
+// Desktop builds stay on 26; options.release below keeps the sources honest either way.
+java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 21 : 26)
 
 repositories {
     mavenCentral()
@@ -45,12 +46,21 @@ dependencies {
 }
 
 javafx {
-    version = "26.0.1"
+    // The Android lane compiles against JavaFX 21 so the API surface matches the
+    // JavaFX 21-ea static SDK Gluon links against; desktop keeps the 26 runtime.
+    version = project.hasProperty("androidBuild") ? "21.0.2" : "26.0.1"
     modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
 }
 
 java {
     modularity.inferModulePath = true
+}
+
+// The sources are kept at Java 21: Gluon's Android toolchain tops out at GraalVM for
+// JDK 21, and this flag makes any newer language feature or JDK API a compile error
+// on every lane rather than a surprise in the Android one.
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
 }
 
 application {

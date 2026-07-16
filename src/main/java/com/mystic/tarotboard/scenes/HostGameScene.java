@@ -50,7 +50,7 @@ public class HostGameScene {
 
         Button hostGameButton = new Button("Host Game");
         hostGameButton.setStyle(Styles.mpBtn());
-        hostGameButton.setOnAction(_ -> tarotBoard.hostGame());
+        hostGameButton.setOnAction(event -> tarotBoard.hostGame());
 
         hostOpPasswordField = new PasswordField();
         hostOpPasswordField.setText("admin");
@@ -63,7 +63,7 @@ public class HostGameScene {
         cursorStatusLabel.setStyle(Styles.mpSmallLabel());
         Button chooseCursorBtn = new Button("Choose Cursor Image");
         chooseCursorBtn.setStyle(Styles.menuSmallBtn());
-        chooseCursorBtn.setOnAction(_ -> tarotBoard.chooseCursorImage());
+        chooseCursorBtn.setOnAction(event -> tarotBoard.chooseCursorImage());
 
         networkStatusLabel = new Label("Checking connection...");
         networkStatusLabel.setStyle(Styles.mpLabel());
@@ -103,7 +103,7 @@ public class HostGameScene {
 
         Button backToStartBtn = new Button("Back to Menu");
         backToStartBtn.setStyle(Styles.mpBtn());
-        backToStartBtn.setOnAction(_ -> tarotBoard.switchToStart());
+        backToStartBtn.setOnAction(event -> tarotBoard.switchToStart());
 
         layout.getChildren().addAll(title, nameRow, hostRow, opPwRow, cursorRow, networkStatusLabel, backToStartBtn);
 
@@ -126,8 +126,8 @@ public class HostGameScene {
             scale = Math.clamp(scale, 0.3, 3.0);
             mpContent.getTransforms().setAll(new Scale(scale, scale, baseWidth / 2, baseHeight / 2));
         };
-        scene.widthProperty().addListener((_,_,_) -> scaleContent.run());
-        scene.heightProperty().addListener((_,_,_) -> scaleContent.run());
+        scene.widthProperty().addListener((obs, oldV, newV) -> scaleContent.run());
+        scene.heightProperty().addListener((obs, oldV, newV) -> scaleContent.run());
     }
 
     /**

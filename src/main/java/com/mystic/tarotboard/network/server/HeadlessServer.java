@@ -329,7 +329,7 @@ public class HeadlessServer {
         }
     }
 
-    static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException {
         int port = 5555;
         String password = "admin";
         for (int i = 0; i < args.length; i++) {
