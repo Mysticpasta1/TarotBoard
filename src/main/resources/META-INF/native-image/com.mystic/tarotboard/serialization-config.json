@@ -30,6 +30,7 @@
   { "name": "com.mystic.tarotboard.utils.SaveData$ChipState" },
   { "name": "com.mystic.tarotboard.utils.SaveData$DieState" },
   { "name": "java.util.ArrayList" },
+  { "name": "java.lang.String" },
   { "name": "[I" },
   { "name": "[D" },
   { "name": "[Z" },

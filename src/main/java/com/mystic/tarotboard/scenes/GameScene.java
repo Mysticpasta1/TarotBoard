@@ -381,8 +381,7 @@ public class GameScene {
                 pileDragBtn.setText(on ? "Drag Pile: On" : "Drag Pile: Off");
             });
 
-            touchActions.getChildren().addAll(splitDeckBtn, moveWildsBtn, playersBtn,
-                    pileDragBtn, touchColourSwatches(), touchDiePresets(diceSidesInput));
+            touchActions.getChildren().addAll(splitDeckBtn, moveWildsBtn, playersBtn, pileDragBtn);
         }
 
         var keybinds = KeyBindConfig.getInstance();
@@ -721,81 +720,6 @@ public class GameScene {
             gameRoot.getChildren().remove(pieceMenu);
             pieceMenu = null;
         }
-    }
-
-    /** The colours a chip or die can be spawned in by touch. */
-    private static final List<Color> TOUCH_COLOURS = List.of(
-            Color.web("#e6194b"), Color.web("#3cb44b"), Color.web("#4363d8"), Color.web("#f58231"),
-            Color.web("#911eb4"), Color.web("#42d4f4"), Color.web("#f032e6"), Color.web("#ffe119"),
-            Color.web("#ffffff"), Color.web("#000000"));
-
-    /**
-     * Builds the touch replacement for the colour picker.
-     *
-     * <p>A {@link ColorPicker} drops its palette into a popup, and a popup on Android
-     * renders but never receives a touch, so the picker is not merely awkward there but
-     * inert: every chip and die came out the one colour the picker happened to start on.
-     * These are ordinary nodes in the scene, so they are reachable. A fixed palette rather
-     * than a full colour space, because a fingertip cannot work a saturation square.</p>
-     */
-    private Pane touchColourSwatches() {
-        FlowPane swatches = new FlowPane(6, 6);
-        swatches.setMaxWidth(Double.MAX_VALUE);
-        for (Color colour : TOUCH_COLOURS) {
-            Button swatch = new Button();
-            swatch.setPrefSize(44, 44);
-            swatch.setMinSize(44, 44);
-            // No -fx-effect anywhere in here: an effect on Android takes the renderer down.
-            swatch.setStyle("-fx-background-color: " + toHex(colour)
-                    + "; -fx-border-color: #dddddd; -fx-border-width: 2; -fx-background-radius: 4;");
-            swatch.setOnAction(event -> {
-                tarotBoard.setCurrentColor(colour);
-                markSelectedSwatch(swatches, swatch);
-            });
-            swatches.getChildren().add(swatch);
-        }
-        // Start with the board's colour ringed, so the swatches agree with what the next
-        // chip will actually be rather than showing nothing chosen.
-        int current = TOUCH_COLOURS.indexOf(tarotBoard.getCurrentColor());
-        markSelectedSwatch(swatches, current < 0 ? null : (Button) swatches.getChildren().get(current));
-        return swatches;
-    }
-
-    /** Rings the chosen swatch, so the colour the next piece will use is visible. */
-    private void markSelectedSwatch(FlowPane swatches, Button chosen) {
-        for (int i = 0; i < swatches.getChildren().size(); i++) {
-            Button swatch = (Button) swatches.getChildren().get(i);
-            boolean on = swatch == chosen;
-            swatch.setStyle("-fx-background-color: " + toHex(TOUCH_COLOURS.get(i))
-                    + "; -fx-border-color: " + (on ? "#00d0ff" : "#dddddd")
-                    + "; -fx-border-width: " + (on ? 4 : 2) + "; -fx-background-radius: 4;");
-        }
-    }
-
-    /**
-     * Builds the touch replacement for typing a die's side count.
-     *
-     * <p>The side count is a {@link TextField}, which on a tablet needs a soft keyboard
-     * raised over the app to change — so the die was stuck on whatever the field was left
-     * at. These set the field instead, leaving Spawn Dice as the one thing that spawns.</p>
-     */
-    private Pane touchDiePresets(TextField diceSidesInput) {
-        FlowPane presets = new FlowPane(6, 6);
-        presets.setMaxWidth(Double.MAX_VALUE);
-        for (int sides : new int[]{4, 6, 8, 10, 12, 20, 100}) {
-            Button preset = new Button("d" + sides);
-            preset.setStyle(Styles.panelSmall());
-            preset.setMinWidth(52);
-            preset.setOnAction(event -> diceSidesInput.setText(Integer.toString(sides)));
-            presets.getChildren().add(preset);
-        }
-        return presets;
-    }
-
-    /** JavaFX colours have no hex form of their own, and inline styles want one. */
-    private static String toHex(Color c) {
-        return String.format("#%02X%02X%02X",
-                Math.round(c.getRed() * 255), Math.round(c.getGreen() * 255), Math.round(c.getBlue() * 255));
     }
 
     /**
