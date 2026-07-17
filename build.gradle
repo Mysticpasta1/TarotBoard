@@ -215,15 +215,5 @@ if (project.hasProperty("androidBuild")) {
                 'java.lang.Class',
                 'java.lang.reflect.RecordComponent'
         ]
-
-        // native-image reads total system memory once at startup and helps itself to
-        // ~48.6% of it, whatever else is on the machine. On a developer box that is
-        // harmless (26GB of a 54GB machine). On a CI runner it reserves several GB more
-        // than is actually free once Gradle's own 2GB JVM is counted, and the kernel
-        // kills the builder rather than the JVM throwing: no stack trace, no
-        // process-compile log, just a task that "Failed to compile" — which is exactly
-        // how this presented. A successful build peaks at ~3.2GB RSS, so this ceiling
-        // leaves headroom while staying well inside the smallest runner.
-        compilerArgs = ['-J-Xmx4g']
     }
 }

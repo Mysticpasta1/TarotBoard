@@ -281,29 +281,24 @@ jobs:
         with:
           gradle-version: '8.14'
 
-      # Substrate downloads its own Android SDK and points ANDROID_HOME at it, but the
-      # runner image preexports *both* ANDROID_SDK_ROOT and ANDROID_HOME at its own copy.
-      # Only the first was dropped here, so ANDROID_HOME still named the runner's SDK and
-      # sdkmanager went off to install Platform 34 into it — which is the package that
-      # then warned "Archive is not a ZIP archive" and stalled at 89% unzipping. Both are
-      # unset so the only SDK left is the one Substrate manages under ~/.gluon.
+      # Substrate manages its own SDK and NDK under ~/.gluon and only goes looking for
+      # them elsewhere if the environment names somewhere else. The runner image names
+      # somewhere else six times over — every one of these points into the preinstalled
+      # SDK deleted above — and it takes only one survivor to send Substrate back there:
+      # leaving ANDROID_HOME set had sdkmanager installing Platform 34 into the runner's
+      # SDK (the "Archive is not a ZIP archive" stall), and leaving the NDK trio set had
+      # it hunting ld.lld in a directory that no longer exists. Unset the lot.
+      #
+      # --stacktrace is not optional here: Substrate raises the real reason as the cause
+      # of a bare "Failed to compile", and it validates the NDK *before* invoking
+      # native-image, so a fault at this stage writes no process-compile log to fall back
+      # on. Without the trace there is nothing to read at all.
       - name: Build Android APK
         run: |
-          unset ANDROID_SDK_ROOT ANDROID_HOME
-          echo "--- runner capacity (native-image sizes itself from these) ---"
-          nproc; free -h; df -h /
+          unset ANDROID_HOME ANDROID_SDK_ROOT \
+                ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
+          df -h /
           gradle nativeBuild nativePackage -PandroidBuild=true --stacktrace
-
-      # A killed builder writes no log at all, so the absence of process-compile-*.log
-      # below is itself the finding: native-image errors are logged, a SIGKILL is not.
-      # The kernel records the kill even though Substrate cannot, so ask it directly.
-      - name: Was the builder killed?
-        if: failure()
-        run: |
-          echo "--- memory now ---"; free -h
-          echo "--- kernel OOM killer ---"
-          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom" | tail -20 \
-            || echo "(no OOM killer entries — the builder died of something else)"
 
       # Substrate writes the real native-image error to log files and prints only
       # "Compilation failed" to the console; without this step a failure here is
