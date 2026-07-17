@@ -89,9 +89,17 @@ public record ServerAddress(String host, int port) {
 
     /**
      * Resolves the port a server should listen on, in the order a hosting provider expects:
-     * an explicit {@code --port=N}, {@code --port N}, {@code -p N} or bare numeric argument
-     * first, then the {@code PORT} environment variable that most hosting panels use to hand a
-     * server its allocated port, then the {@link #PUBLIC_SERVER} port.
+     * <ol>
+     *     <li>an explicit {@code --port=N}, {@code --port N}, {@code -p N} or bare numeric argument;</li>
+     *     <li>{@code SERVER_PORT}, which Pterodactyl-based panels inject into the container with
+     *     the port currently allocated to the server;</li>
+     *     <li>{@code PORT}, used by most other hosting panels for the same thing;</li>
+     *     <li>the {@link #PUBLIC_SERVER} port, as a last resort.</li>
+     * </ol>
+     * The environment is what keeps a server correct across a reallocation: whenever the panel
+     * moves the server to a different port, that variable moves with it, so nothing has to be
+     * rebuilt or reconfigured. Only a server with none of these set falls back to a fixed port,
+     * which goes stale the moment the panel reallocates.
      * <p>
      * A resolved value of {@code 0} is returned as-is, meaning "bind any free port".
      *
@@ -100,6 +108,7 @@ public record ServerAddress(String host, int port) {
      */
     public static int resolvePort(List<String> args) {
         String value = null;
+        String source = null;
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             if (arg.startsWith("--port=")) {
@@ -112,13 +121,24 @@ public record ServerAddress(String host, int port) {
                 value = arg;
             }
         }
-        if (value == null) value = System.getenv("PORT");
-        if (value == null || value.isBlank()) return PUBLIC_SERVER.port();
+        if (value != null) source = "command line";
+        for (String var : List.of("SERVER_PORT", "PORT")) {
+            if (value != null && !value.isBlank()) break;
+            value = System.getenv(var);
+            source = var;
+        }
+        if (value == null || value.isBlank()) {
+            System.err.println("No port given and neither SERVER_PORT nor PORT is set - falling back to "
+                    + PUBLIC_SERVER.port() + ", which is wrong if the hosting panel has reallocated it");
+            return PUBLIC_SERVER.port();
+        }
         if (value.trim().equals("0")) return 0;
         try {
-            return parsePort(value);
+            int port = parsePort(value);
+            System.out.println("Using port " + port + " from " + source);
+            return port;
         } catch (IllegalArgumentException e) {
-            System.err.println(e.getMessage() + " - falling back to " + PUBLIC_SERVER.port());
+            System.err.println(e.getMessage() + " (from " + source + ") - falling back to " + PUBLIC_SERVER.port());
             return PUBLIC_SERVER.port();
         }
     }
