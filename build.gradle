@@ -231,9 +231,15 @@ if (project.hasProperty("androidBuild")) {
         // writeObject() throws UnsupportedFeatureError, which is an Error: neither send()'s
         // catch nor joinGame()'s catch(IOException) sees it, so the socket connects and the
         // join then dies silently before the scene switch.
+        // Passed as a file rather than -H:SerializationConfigurationResources, which resolves
+        // through ClassLoader.getResources() and so depends on the builder classpath carrying
+        // the processed resources. A path resolved by Gradle has no such dependency. The build
+        // still fails loudly if the file is missing, which is the point: a serialization config
+        // that silently goes unparsed is exactly the failure this is meant to prevent.
         compilerArgs = [
-                "-H:SerializationConfigurationResources=" +
-                        "/META-INF/native-image/com.mystic/tarotboard/serialization-config.json"
+                "-H:SerializationConfigurationFiles=" + file(
+                        "src/main/resources/META-INF/native-image/com.mystic/tarotboard/serialization-config.json")
+                        .absolutePath
         ]
     }
 }
