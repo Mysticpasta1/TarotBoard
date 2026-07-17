@@ -514,11 +514,25 @@ public class TarotBoard extends Application {
             primaryStage.setScene(gameScene.getScene());
             primaryStage.setTitle("Game Scene - Connected to " + ip + ":" + port);
         } catch (IOException e) {
-            joinGameScene.getNetworkStatusLabel().setText("Failed to connect: " + e.getMessage());
-            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
-            isMultiplayer = false;
-            gameScene.updateOperatorButtonsVisibility();
+            failJoin("Failed to connect: " + e.getMessage(), e);
+        } catch (Throwable t) {
+            // Anything non-IOException here used to escape to the FX handler, which on Android
+            // shows nothing: the socket was already open, so the join looked like it had worked
+            // while the scene never switched. Report it instead of vanishing.
+            failJoin("Join failed: " + t, t);
         }
+    }
+
+    private void failJoin(String status, Throwable cause) {
+        cause.printStackTrace();
+        if (gameClient != null) {
+            gameClient.disconnect();
+            gameClient = null;
+        }
+        isMultiplayer = false;
+        joinGameScene.getNetworkStatusLabel().setText(status);
+        joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
+        gameScene.updateOperatorButtonsVisibility();
     }
 
     /**
@@ -1498,6 +1512,13 @@ public class TarotBoard extends Application {
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Error loading save: " + e.getMessage());
             return;
+        } catch (Throwable t) {
+            // Deserialization can fail with an Error rather than an Exception (native-image
+            // raises one for any class missing from the serialization config), which would
+            // otherwise escape start() and take the whole launch down with it.
+            t.printStackTrace();
+            System.err.println("Error loading save: " + t);
+            return;
         }
 
         if (save.isMultiplayer()) {
@@ -1739,6 +1760,11 @@ public class TarotBoard extends Application {
             oos.writeObject(getSaveData(new ArrayList<>()));
         } catch (IOException e) {
             System.err.println("Error saving game: " + e.getMessage());
+        } catch (Throwable t) {
+            // As in loadSave: an unregistered class fails with an Error, and losing a save
+            // silently is worse than losing it loudly.
+            t.printStackTrace();
+            System.err.println("Error saving game: " + t);
         }
     }
 

@@ -48,18 +48,25 @@ public class GameClient {
      */
     public void start() {
         Thread readThread = new Thread(() -> {
-            while (connected) {
-                try {
-                    var msg = (NetworkMessage) in.readObject();
-                    if (onMessage != null) onMessage.accept(msg);
-                } catch (EOFException | SocketException e) {
-                    break;
-                } catch (Exception e) {
-                    if (connected) System.err.println("Client read error: " + e.getMessage());
-                    break;
+            try {
+                while (connected) {
+                    try {
+                        var msg = (NetworkMessage) in.readObject();
+                        if (onMessage != null) onMessage.accept(msg);
+                    } catch (EOFException | SocketException e) {
+                        break;
+                    } catch (Exception e) {
+                        if (connected) System.err.println("Client read error: " + e.getMessage());
+                        break;
+                    }
                 }
+            } catch (Throwable t) {
+                // An Error here would otherwise skip disconnect() and leave the client looking
+                // connected forever, with no reader running.
+                if (connected) System.err.println("Client read failed: " + t);
+            } finally {
+                disconnect();
             }
-            disconnect();
         });
         readThread.setDaemon(true);
         readThread.start();

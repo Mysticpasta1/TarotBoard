@@ -225,5 +225,15 @@ if (project.hasProperty("androidBuild")) {
                 'java.lang.Class',
                 'java.lang.reflect.RecordComponent'
         ]
+        // Multiplayer moves NetworkMessage over ObjectOutputStream, and native-image supports
+        // java.io serialization only for classes named in a serialization config — there is no
+        // reflectionList-style DSL for it, hence the raw argument. Unregistered, the first
+        // writeObject() throws UnsupportedFeatureError, which is an Error: neither send()'s
+        // catch nor joinGame()'s catch(IOException) sees it, so the socket connects and the
+        // join then dies silently before the scene switch.
+        compilerArgs = [
+                "-H:SerializationConfigurationResources=" +
+                        "/META-INF/native-image/com.mystic/tarotboard/serialization-config.json"
+        ]
     }
 }
