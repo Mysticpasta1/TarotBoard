@@ -2,6 +2,7 @@ package com.mystic.tarotboard.network.server;
 
 import com.mystic.tarotboard.network.NetworkMessage;
 import com.mystic.tarotboard.network.NetworkMessage.Msg;
+import com.mystic.tarotboard.network.ServerAddress;
 
 import java.io.IOException;
 import java.util.*;
@@ -54,6 +55,9 @@ public class HeadlessServer {
     );
 
     private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
+
+    /** Operator password used when neither an argument nor the environment supplies one. */
+    public static final String DEFAULT_OPERATOR_PASSWORD = "admin";
 
     private final GameServer gameServer;
     private final List<String> cardNames = new ArrayList<>();
@@ -121,10 +125,57 @@ public class HeadlessServer {
         gameServer = new GameServer(port, "Server", 0.5, 0.5, 0.5);
         gameServer.setIsOperatorCheck(operators::contains);
         gameServer.setOnMessage(this::handleMessage);
+        gameServer.setOnPortForwarded(external -> {
+            if (external > 0 && external != gameServer.getPort()) {
+                System.out.println("[TarotBoard] Players outside this network must connect on port " + external);
+            }
+        });
         gameServer.start();
-        System.out.println("[TarotBoard] Server started on port " + port
+        System.out.println("[TarotBoard] Server started on port " + gameServer.getPort()
                 + "  (" + NUM_CARDS + " cards)"
                 + (password.isEmpty() ? "" : " (operator auth enabled)"));
+    }
+
+    /**
+     * Returns the port the server is listening on, which is allocated by the system when the
+     * requested port was 0.
+     *
+     * @return the local port
+     */
+    public int getPort() {
+        return gameServer.getPort();
+    }
+
+    /**
+     * Stops the server and releases its port.
+     */
+    public void stop() {
+        gameServer.stop();
+    }
+
+    /**
+     * Resolves the operator password: an explicit {@code --password=X} or {@code --password X}
+     * argument first, then the {@code OPERATOR_PASSWORD} environment variable, which is how a
+     * hosting panel can set it without putting it in a visible command line, then
+     * {@link #DEFAULT_OPERATOR_PASSWORD}.
+     * <p>
+     * An explicitly empty value is honoured and disables operator authentication entirely.
+     *
+     * @param args the command-line arguments
+     * @return the operator password
+     */
+    public static String resolvePassword(List<String> args) {
+        String value = null;
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg.startsWith("--password=")) {
+                value = arg.substring("--password=".length());
+            } else if (arg.equals("--password") && i + 1 < args.size()) {
+                value = args.get(++i);
+            }
+        }
+        if (value == null) value = System.getenv("OPERATOR_PASSWORD");
+        return value == null ? DEFAULT_OPERATOR_PASSWORD : value;
     }
 
     private void initDeck() {
@@ -330,25 +381,7 @@ public class HeadlessServer {
     }
 
     public static void main(String[] args) throws IOException {
-        int port = 5555;
-        String password = "admin";
-        for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--port" -> {
-                    if (i + 1 < args.length) port = Integer.parseInt(args[++i]);
-                }
-                case "--password" -> {
-                    if (i + 1 < args.length) password = args[++i];
-                }
-                default -> {
-                    if (args[i].chars().allMatch(Character::isDigit)) {
-                        port = Integer.parseInt(args[i]);
-                    }
-                }
-            }
-        }
-
-        new HeadlessServer(port, password);
+        new HeadlessServer(ServerAddress.resolvePort(List.of(args)), resolvePassword(List.of(args)));
 
         try {
             Thread.currentThread().join();

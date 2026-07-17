@@ -19,6 +19,9 @@ import java.util.function.Predicate;
  * It also handles UPnP port forwarding for easier global access.
  */
 public class GameServer {
+    /** How many consecutive external ports to try when the router rejects the preferred one. */
+    private static final int PORT_MAPPING_ATTEMPTS = 10;
+
     private final ServerSocket serverSocket;
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private final List<PlayerInfo> players = new CopyOnWriteArrayList<>();
@@ -26,6 +29,8 @@ public class GameServer {
     private volatile boolean running;
     private Consumer<NetworkMessage> onMessage;
     private GatewayDevice activeGateway;
+    private volatile int externalPort = -1;
+    private volatile Consumer<Integer> onPortForwarded;
     private Predicate<Integer> isOperatorCheck = playerId -> false; // Default: no one is operator
 
     private final double[][] playerColors = {
@@ -37,7 +42,8 @@ public class GameServer {
     /**
      * Creates a new game server listening on the given port.
      *
-     * @param port     the TCP port to listen on
+     * @param port     the TCP port to listen on, or 0 to bind a port allocated by the OS
+     *                 (see {@link #getPort()} for the port actually bound)
      * @param hostName the display name for the host player
      * @param hostR    the red component of the host player color
      * @param hostG    the green component of the host player color
@@ -80,12 +86,35 @@ public class GameServer {
     }
 
     /**
-     * Returns the port the server is listening on.
+     * Returns the port the server is actually listening on. When the server was constructed with
+     * port 0 this is the port the OS allocated, so it is the only reliable port to show or save.
      *
      * @return the local port
      */
     public int getPort() {
         return serverSocket.getLocalPort();
+    }
+
+    /**
+     * Returns the port clients outside the network must connect to. This is the external port of
+     * the UPnP mapping, which is not always {@link #getPort()} — if the router already had that
+     * port mapped, forwarding falls back to a different external port.
+     *
+     * @return the forwarded external port, or -1 if forwarding has not succeeded (yet)
+     */
+    public int getExternalPort() {
+        return externalPort;
+    }
+
+    /**
+     * Sets a callback invoked once port forwarding finishes, with the external port that was
+     * mapped, or -1 if no mapping could be made. Forwarding runs in the background, so this may
+     * fire seconds after {@link #start()} returns, and it is invoked on that background thread.
+     *
+     * @param onPortForwarded the callback
+     */
+    public void setOnPortForwarded(Consumer<Integer> onPortForwarded) {
+        this.onPortForwarded = onPortForwarded;
     }
 
     /**
@@ -101,7 +130,10 @@ public class GameServer {
      * Starts the server's connection acceptance loop in a daemon thread and attempts to set up port forwarding.
      */
     public void start() {
-        setupPortForwarding(true);
+        // UPnP discovery blocks for seconds, so keep it off the caller's thread.
+        Thread forwardThread = new Thread(() -> setupPortForwarding(true));
+        forwardThread.setDaemon(true);
+        forwardThread.start();
         Thread acceptThread = new Thread(() -> {
             while (running) {
                 try {
@@ -198,6 +230,11 @@ public class GameServer {
 
     /**
      * Attempts to automatically configure port forwarding using UPnP.
+     * <p>
+     * The external port is mapped to the port the server actually bound. If the router already
+     * has that external port mapped to something else, nearby ports are tried instead, and the
+     * one that succeeded becomes {@link #getExternalPort()} — that is the port remote players
+     * must use, so it is reported through {@link #setOnPortForwarded}.
      *
      * @param enable true to add a port mapping, false to remove it.
      */
@@ -208,27 +245,46 @@ public class GameServer {
                 discover.discover();
                 activeGateway = discover.getValidGateway();
 
-                if (activeGateway != null) {
-                    String localAddress = activeGateway.getLocalAddress().getHostAddress();
-                    if (activeGateway.addPortMapping(getPort(), getPort(), localAddress, "TCP", "TarotBoard Server")) {
-                        System.out.println("UPnP: Port forwarding enabled for port " + getPort());
-                    } else {
-                        System.err.println("UPnP: Port forwarding failed. Please configure manually.");
-                    }
-                } else {
+                if (activeGateway == null) {
                     System.err.println("UPnP: No gateway device found.");
+                } else {
+                    String localAddress = activeGateway.getLocalAddress().getHostAddress();
+                    int localPort = getPort();
+                    for (int attempt = 0; attempt < PORT_MAPPING_ATTEMPTS; attempt++) {
+                        int candidate = localPort + attempt;
+                        if (candidate > 65535) break;
+                        if (activeGateway.addPortMapping(candidate, localPort, localAddress, "TCP", "TarotBoard Server")) {
+                            externalPort = candidate;
+                            break;
+                        }
+                    }
+                    if (externalPort < 0) {
+                        System.err.println("UPnP: Port forwarding failed. Please configure manually.");
+                    } else if (externalPort == localPort) {
+                        System.out.println("UPnP: Port forwarding enabled for port " + externalPort);
+                    } else {
+                        System.out.println("UPnP: Port " + localPort + " was unavailable on the router; "
+                                + "forwarded external port " + externalPort + " to local port " + localPort);
+                    }
                 }
+                var callback = onPortForwarded;
+                if (callback != null) callback.accept(externalPort);
             } else {
-                if (activeGateway != null) {
-                    if (activeGateway.deletePortMapping(getPort(), "TCP")) {
-                        System.out.println("UPnP: Port forwarding disabled for port " + getPort());
+                if (activeGateway != null && externalPort > 0) {
+                    if (activeGateway.deletePortMapping(externalPort, "TCP")) {
+                        System.out.println("UPnP: Port forwarding disabled for port " + externalPort);
                     } else {
                         System.err.println("UPnP: Failed to remove port forwarding.");
                     }
+                    externalPort = -1;
                 }
             }
         } catch (Exception e) {
             System.err.println("UPnP: Could not configure port forwarding: " + e.getMessage());
+            if (enable) {
+                var callback = onPortForwarded;
+                if (callback != null) callback.accept(externalPort);
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 package com.mystic.tarotboard.scenes;
 
 import com.mystic.tarotboard.TarotBoard;
+import com.mystic.tarotboard.network.ServerAddress;
 import com.mystic.tarotboard.utils.Styles;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -17,7 +18,7 @@ import java.net.Socket;
 
 /**
  * Scene containing the join multiplayer setup UI: player name/color,
- * server IP/port, operator access controls, and cursor image picker.
+ * server address/port, operator access controls, and cursor image picker.
  */
 public class JoinGameScene {
     private final Scene scene;
@@ -25,7 +26,7 @@ public class JoinGameScene {
     private final StackPane mpContent;
     private final TextField playerNameField;
     private final ColorPicker playerColorPicker;
-    private final TextField joinIpField;
+    private final TextField joinAddressField;
     private final TextField joinPortField;
     private final PasswordField operatorPasswordField;
     private final Label cursorStatusLabel;
@@ -46,15 +47,25 @@ public class JoinGameScene {
         playerColorPicker = new ColorPicker(Color.color(0.2, 0.5, 1.0));
         playerColorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 12pt;");
 
-        // Set default to 127.0.0.1 for easier local testing
-        joinIpField = new TextField("127.0.0.1");
-        joinIpField.setStyle(Styles.mpField());
-        joinIpField.setMaxWidth(200);
+        // Default to a local server for easier testing; the address field takes any host.
+        joinAddressField = new TextField("localhost");
+        joinAddressField.setStyle(Styles.mpField());
+        joinAddressField.setMaxWidth(250);
+        joinAddressField.setPromptText("host, subdomain, or IP");
+        joinAddressField.setTooltip(new Tooltip("""
+                Server address. Any of:
+                  play.example.com
+                  eu.play.example.com:7777
+                  192.168.1.20
+                  [2001:db8::1]:5555
+                A port given here wins over the Port field."""));
 
-        joinPortField = new TextField("5555");
+        joinPortField = new TextField(String.valueOf(ServerAddress.DEFAULT_PORT));
         joinPortField.setStyle(Styles.mpField());
         joinPortField.setMaxWidth(100);
-        
+        joinPortField.setTooltip(new Tooltip("Port to connect to, unless the address already names one."));
+
+
         Button joinGameButton = new Button("Join Game");
         joinGameButton.setStyle(Styles.mpBtn());
         joinGameButton.setOnAction(event -> tarotBoard.joinGame());
@@ -95,11 +106,11 @@ public class JoinGameScene {
         nameRow.setAlignment(Pos.CENTER);
         nameRow.setMaxWidth(Double.MAX_VALUE);
 
-        Label ipLbl = new Label("IP:");
-        ipLbl.setStyle(Styles.mpLabel());
+        Label addressLbl = new Label("Address:");
+        addressLbl.setStyle(Styles.mpLabel());
         Label portLbl = new Label("Port:");
         portLbl.setStyle(Styles.mpLabel());
-        HBox joinRow = new HBox(10, ipLbl, joinIpField, portLbl, joinPortField, joinGameButton);
+        HBox joinRow = new HBox(10, addressLbl, joinAddressField, portLbl, joinPortField, joinGameButton);
         joinRow.setAlignment(Pos.CENTER);
         joinRow.setMaxWidth(Double.MAX_VALUE);
 
@@ -207,12 +218,13 @@ public class JoinGameScene {
     }
 
     /**
-     * Returns the server IP address text field.
+     * Returns the server address text field, which accepts a hostname, subdomain, IPv4 or IPv6
+     * literal, optionally with an inline port.
      *
-     * @return the join IP field
+     * @return the join address field
      */
-    public TextField getJoinIpField() {
-        return joinIpField;
+    public TextField getJoinAddressField() {
+        return joinAddressField;
     }
 
     /**

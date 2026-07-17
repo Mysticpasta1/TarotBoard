@@ -5,6 +5,7 @@ import com.mystic.tarotboard.items.Chips;
 import com.mystic.tarotboard.items.Dice;
 import com.mystic.tarotboard.network.NetworkMessage;
 import com.mystic.tarotboard.network.NetworkMessage.Msg;
+import com.mystic.tarotboard.network.ServerAddress;
 import com.mystic.tarotboard.network.UpdateManager;
 import com.mystic.tarotboard.network.client.GameClient;
 import com.mystic.tarotboard.network.server.GameServer;
@@ -131,6 +132,8 @@ public class TarotBoard extends Application {
     private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
     public static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
+    /** Stand-in stored as the saved server address when the session was hosted, not joined. */
+    private static final String HOST_SAVE_MARKER = "HOST";
     private static Stage primaryStage;
     private GameScene gameScene;
     private StartScene startScene;
@@ -388,16 +391,28 @@ public class TarotBoard extends Application {
         if (gameServer != null) leaveGame();
         String name = hostGameScene.getPlayerNameField().getText().trim();
         if (name.isEmpty()) name = "Host";
-        int port;
-        try {
-            port = Integer.parseInt(hostGameScene.getHostPortField().getText().trim());
-        } catch (NumberFormatException e) {
-            hostGameScene.getNetworkStatusLabel().setText("Invalid port");
-            return;
+        String portText = hostGameScene.getHostPortField().getText().trim();
+        int requestedPort;
+        // Blank or 0 means "any free port", which is what a hosting provider hands us.
+        if (portText.isEmpty() || portText.equals("0")) {
+            requestedPort = 0;
+        } else {
+            try {
+                requestedPort = ServerAddress.parsePort(portText);
+            } catch (IllegalArgumentException e) {
+                hostGameScene.getNetworkStatusLabel().setText(e.getMessage());
+                hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
+                return;
+            }
         }
         try {
             Color c = hostGameScene.getPlayerColorPicker().getValue();
-            gameServer = new GameServer(port, name, c.getRed(), c.getGreen(), c.getBlue());
+            GameServer server = new GameServer(requestedPort, name, c.getRed(), c.getGreen(), c.getBlue());
+            gameServer = server;
+            // The bound port is the one that matters: with port 0 the OS picks it, so the
+            // requested port is not what players need to connect to.
+            int port = server.getPort();
+            hostGameScene.getHostPortField().setText(String.valueOf(port));
             myPlayerId = gameServer.getHostPlayerId();
             isHost = true;
             isMultiplayer = true;
@@ -409,6 +424,7 @@ public class TarotBoard extends Application {
             playerList.addAll(gameServer.getPlayers());
 
             gameServer.setOnMessage(msg -> Platform.runLater(() -> handleNetworkMessage(msg)));
+            server.setOnPortForwarded(external -> Platform.runLater(() -> onPortForwarded(server, port, external)));
             gameServer.start();
 
             hostGameScene.getNetworkStatusLabel().setText("Hosting on port " + port + " (ID: " + myPlayerId + ")");
@@ -429,18 +445,52 @@ public class TarotBoard extends Application {
         }
     }
 
+    /**
+     * Reports the outcome of UPnP port forwarding once it finishes in the background. When the
+     * router could not map the local port, remote players are given a different external port, so
+     * that is the port shown.
+     *
+     * @param server       the server the mapping was made for; ignored if it is no longer the
+     *                     active one, since forwarding finishes long after start
+     * @param localPort    the port the server is listening on
+     * @param externalPort the mapped external port, or -1 if forwarding failed
+     */
+    private void onPortForwarded(GameServer server, int localPort, int externalPort) {
+        if (!isHost || gameServer != server) return;
+        String status;
+        if (externalPort < 0) {
+            status = "Hosting on port " + localPort + " — not forwarded, only reachable on your network";
+        } else if (externalPort == localPort) {
+            status = "Hosting on port " + localPort + " — forwarded";
+        } else {
+            status = "Hosting on port " + localPort + " — forwarded as external port " + externalPort;
+        }
+        hostGameScene.getNetworkStatusLabel().setText(status + " (ID: " + myPlayerId + ")");
+        hostGameScene.getNetworkStatusLabel().setStyle(externalPort < 0 ? Styles.mpStatusErr() : Styles.mpStatusOk());
+        gameScene.getNetworkStatusInGame().setText(status);
+        gameScene.getNetworkStatusInGame().setStyle(Styles.panelLabel());
+    }
+
     public void joinGame() {
         if (gameClient != null && gameClient.isConnected()) leaveGame();
         String name = joinGameScene.getPlayerNameField().getText().trim();
         if (name.isEmpty()) name = "Player";
-        String ip = joinGameScene.getJoinIpField().getText().trim();
-        int port;
+        ServerAddress address;
         try {
-            port = Integer.parseInt(joinGameScene.getJoinPortField().getText().trim());
-        } catch (NumberFormatException e) {
-            joinGameScene.getNetworkStatusLabel().setText("Invalid port");
+            // The port field is only a fallback: an address like "eu.example.com:7777" carries
+            // the port a hosting provider allocated, and that wins.
+            int fallbackPort = ServerAddress.parsePort(joinGameScene.getJoinPortField().getText());
+            address = ServerAddress.parse(joinGameScene.getJoinAddressField().getText(), fallbackPort);
+        } catch (IllegalArgumentException e) {
+            joinGameScene.getNetworkStatusLabel().setText(e.getMessage());
+            joinGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusErr());
             return;
         }
+        String ip = address.host();
+        int port = address.port();
+        // Reflect what we actually parsed, so a pasted "host:port" splits into the two fields.
+        joinGameScene.getJoinAddressField().setText(ip);
+        joinGameScene.getJoinPortField().setText(String.valueOf(port));
         try {
             gameClient = new GameClient(ip, port);
             isHost = false;
@@ -1452,8 +1502,8 @@ public class TarotBoard extends Application {
 
         if (save.isMultiplayer()) {
             hostGameScene.getHostPortField().setText(String.valueOf(save.serverPort()));
-            if (save.serverIp() != null && !save.serverIp().isEmpty()) {
-                joinGameScene.getJoinIpField().setText(save.serverIp());
+            if (save.serverIp() != null && !save.serverIp().isEmpty() && !HOST_SAVE_MARKER.equals(save.serverIp())) {
+                joinGameScene.getJoinAddressField().setText(save.serverIp());
                 joinGameScene.getJoinPortField().setText(String.valueOf(save.serverPort()));
                 joinGameScene.getNetworkStatusLabel().setText("Saved multiplayer session - re-join");
                 joinGameScene.getNetworkStatusLabel().setStyle("-fx-font-size: 14pt; -fx-text-fill: #FFA500;");
@@ -1739,13 +1789,13 @@ public class TarotBoard extends Application {
         int mpPort = 0;
         if (isMultiplayer) {
             if (isHost && gameServer != null) {
-                mpIp = "HOST";
+                mpIp = HOST_SAVE_MARKER;
                 mpPort = gameServer.getPort();
             } else if (gameClient != null && gameClient.isConnected()) {
-                mpIp = joinGameScene.getJoinIpField().getText().trim();
+                mpIp = joinGameScene.getJoinAddressField().getText().trim();
                 try {
-                    mpPort = Integer.parseInt(joinGameScene.getJoinPortField().getText().trim());
-                } catch (NumberFormatException ignored) {
+                    mpPort = ServerAddress.parsePort(joinGameScene.getJoinPortField().getText());
+                } catch (IllegalArgumentException ignored) {
                 }
             }
         }

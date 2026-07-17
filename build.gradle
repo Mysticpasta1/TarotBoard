@@ -172,6 +172,16 @@ tasks.register("runServer", JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 }
 
+// The panel is a JavaFX app, so unlike runServer it has to launch on the module path.
+tasks.register("runServerPanel", JavaExec) {
+    group = "application"
+    description = "Run the dedicated server with the startup configuration panel"
+    mainModule = "tarotboard"
+    mainClass = "com.mystic.tarotboard.network.server.HeadlessServerLauncher"
+    classpath = sourceSets.main.runtimeClasspath
+    jvmArgs = ["--enable-native-access=javafx.graphics"]
+}
+
 tasks.register("serverJar", ShadowJar) {
     group = "distribution"
     description = "Build a plain runnable jar of the headless dedicated server"

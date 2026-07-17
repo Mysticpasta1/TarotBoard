@@ -45,12 +45,38 @@ Build a native installer/package:
 
 Run the headless dedicated server:
 
-    ./gradlew runServer                                # defaults to port 5555, password "admin"
+    ./gradlew runServer                                # defaults to port 25605, password "admin"
     ./gradlew runServer --args="--port 7777"            # custom port
     ./gradlew runServer --args="--password mypass"      # custom operator password
     ./gradlew runServer --args="--port 7777 --password mypass"
 
 The server also accepts a bare port number as the first positional argument (e.g. `--args="7777"`).
+
+Run it with a startup panel instead, for setting the port and operator password without a command
+line (this is what the packaged `TarotBoard-Server` build launches):
+
+    ./gradlew runServerPanel
+
+When nothing is given on the command line, the port falls back to the `PORT` environment variable
+and the operator password to `OPERATOR_PASSWORD`, so a hosting provider can supply either without
+them appearing in a visible command line. Both pre-fill the startup panel's fields:
+
+    PORT=7777 OPERATOR_PASSWORD=mypass ./gradlew runServer
+
+An empty operator password disables operator authentication entirely.
+
+Use port `0` to bind whatever port the system has free; the port actually bound is printed at
+startup and is the one clients must use. If UPnP forwarding cannot map that port on your router,
+it maps a nearby external port instead and logs the external port players outside your network
+need to connect to.
+
+Clients default to `localhost:5555`, and can enter a hostname, a subdomain, or an IP in the address
+field, with an optional port that overrides the port field:
+
+    play.example.com
+    eu.play.example.com:7777
+    192.168.1.20:5555
+    [2001:db8::1]:5555
 
 ## Android Build
 

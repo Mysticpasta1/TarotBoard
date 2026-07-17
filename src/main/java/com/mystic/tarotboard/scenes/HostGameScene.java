@@ -1,6 +1,7 @@
 package com.mystic.tarotboard.scenes;
 
 import com.mystic.tarotboard.TarotBoard;
+import com.mystic.tarotboard.network.ServerAddress;
 import com.mystic.tarotboard.utils.Styles;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -44,9 +45,12 @@ public class HostGameScene {
         playerColorPicker = new ColorPicker(Color.color(1.0, 0.2, 0.2));
         playerColorPicker.setStyle("-fx-background-color: #2d2d44; -fx-font-size: 12pt;");
 
-        hostPortField = new TextField("5555");
+        hostPortField = new TextField(String.valueOf(ServerAddress.DEFAULT_PORT));
         hostPortField.setStyle(Styles.mpField());
         hostPortField.setMaxWidth(100);
+        hostPortField.setPromptText("auto");
+        hostPortField.setTooltip(new Tooltip(
+                "Port to listen on. Leave blank or use 0 to let the system allocate a free port."));
 
         Button hostGameButton = new Button("Host Game");
         hostGameButton.setStyle(Styles.mpBtn());
