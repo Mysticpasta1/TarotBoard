@@ -15,6 +15,8 @@ public class GameClient {
     private final ObjectInputStream in;
     private volatile boolean connected;
     private Consumer<NetworkMessage> onMessage;
+    /** Guards {@link #out}: ObjectOutputStream is not thread-safe and sends are not confined to one thread. */
+    private final Object writeLock = new Object();
 
     /**
      * Connects to the TarotBoard server at the given host and port.
@@ -70,9 +72,13 @@ public class GameClient {
      */
     public void send(NetworkMessage msg) {
         try {
-            out.writeObject(msg);
-            out.flush();
-        } catch (IOException e) {
+            synchronized (writeLock) {
+                out.writeObject(msg);
+                // Without this the stream's back-reference table pins every message ever sent.
+                out.reset();
+                out.flush();
+            }
+        } catch (Exception e) {
             System.err.println("Client send error: " + e.getMessage());
         }
     }

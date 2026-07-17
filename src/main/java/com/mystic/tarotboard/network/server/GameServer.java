@@ -148,10 +148,13 @@ public class GameServer {
                             color[0], color[1], color[2]);
                     players.add(info);
                     var handler = new ClientHandler(socket, playerId, info);
-                    clients.add(handler);
+                    // start() opens the stream and sends the handshake; publishing the handler to
+                    // `clients` only afterwards keeps other threads from broadcasting into a null
+                    // stream, and keeps the new client off the PlayerList broadcast it just got.
                     handler.start();
+                    clients.add(handler);
 
-                    broadcast(NetworkMessage.of(new Msg.PlayerList(new ArrayList<>(players))), -1);
+                    broadcast(NetworkMessage.of(new Msg.PlayerList(new ArrayList<>(players))), playerId);
 
                     System.out.println("Player " + playerId + " connected");
                 } catch (IOException e) {
@@ -298,6 +301,8 @@ public class GameServer {
         private ObjectOutputStream out;
         private ObjectInputStream in;
         private volatile boolean active = true;
+        /** Guards {@link #out}: any thread may broadcast to this client, and ObjectOutputStream is not thread-safe. */
+        private final Object writeLock = new Object();
 
         /**
          * Constructs a new ClientHandler.
@@ -317,14 +322,14 @@ public class GameServer {
          */
         void start() {
             try {
-                out = new ObjectOutputStream(socket.getOutputStream());
-                out.flush();
+                synchronized (writeLock) {
+                    out = new ObjectOutputStream(socket.getOutputStream());
+                    out.flush();
+                }
                 in = new ObjectInputStream(socket.getInputStream());
 
-                out.writeObject(NetworkMessage.of(new Msg.YourId(playerId)));
-                out.flush();
-                out.writeObject(NetworkMessage.of(new Msg.PlayerList(new ArrayList<>(players))));
-                out.flush();
+                send(NetworkMessage.of(new Msg.YourId(playerId)));
+                send(NetworkMessage.of(new Msg.PlayerList(new ArrayList<>(players))));
 
                 Thread readThread = new Thread(() -> {
                     while (active) {
@@ -357,10 +362,15 @@ public class GameServer {
          */
         void send(NetworkMessage msg) {
             try {
-                out.writeObject(msg);
-                out.flush();
-            } catch (IOException e) {
+                synchronized (writeLock) {
+                    out.writeObject(msg);
+                    // Without this the stream's back-reference table pins every message ever sent.
+                    out.reset();
+                    out.flush();
+                }
+            } catch (Exception e) {
                 if (active) System.err.println("Send error to player " + playerId + ": " + e.getMessage());
+                disconnect();
             }
         }
 
