@@ -311,9 +311,25 @@ public class GameScene {
                 themeSelector
         );
 
-        controlPanelRight.layoutXProperty().bind(scene.widthProperty().subtract(controlPanelRight.widthProperty()).subtract(10));
-        controlPanelRight.setLayoutY(10);
-        gameRoot.getChildren().add(controlPanelRight);
+        // The panel is taller than a tablet screen, so its lower half — disconnect, settings,
+        // back, theme — simply had no way to be reached. A ScrollPane rather than a shorter
+        // panel because every one of those controls has to stay available.
+        ScrollPane controlPanelScroll = new ScrollPane(controlPanelRight);
+        controlPanelScroll.setFitToWidth(true);
+        controlPanelScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        controlPanelScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        controlPanelScroll.setPrefWidth(216);
+        controlPanelScroll.setMaxWidth(216);
+        // Transparent so the panel's own background stays the thing that shows.
+        controlPanelScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        // A drag inside the panel should scroll it rather than fling the board underneath.
+        controlPanelScroll.setPannable(true);
+        controlPanelScroll.layoutXProperty().bind(
+                scene.widthProperty().subtract(controlPanelScroll.widthProperty()).subtract(10));
+        controlPanelScroll.setLayoutY(10);
+        // Leaves a strip of board visible above and below rather than running edge to edge.
+        controlPanelScroll.prefHeightProperty().bind(scene.heightProperty().subtract(20));
+        gameRoot.getChildren().add(controlPanelScroll);
 
         discardZone = new StackPane();
         discardZone.setStyle(Styles.discardZone());

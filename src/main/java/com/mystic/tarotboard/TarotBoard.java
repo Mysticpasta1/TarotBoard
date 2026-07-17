@@ -17,6 +17,7 @@ import com.mystic.tarotboard.scenes.StartScene;
 import com.mystic.tarotboard.theming.RemoteCursor;
 import com.mystic.tarotboard.theming.ThemeConfiguration;
 import com.mystic.tarotboard.theming.ThemeManager;
+import com.mystic.tarotboard.utils.CardCatalog;
 import com.mystic.tarotboard.utils.CardDataHelper;
 import com.mystic.tarotboard.utils.LogWindow;
 import com.mystic.tarotboard.utils.OcclusionCuller;
@@ -81,55 +82,18 @@ public class TarotBoard extends Application {
      */
     private static final double DESIGN_HEIGHT = 1080;
 
-    private static final List<String> wilds = List.of(
-            "Joker", "Soul", "Light", "Dark", "Judgement", "Chorus", "Life", "Death", "Wrath",
-            "Pride", "Greed", "Lust", "Envy", "Gluttony", "Sloth", "Chasity", "Temperance", "Charity",
-            "Diligence", "Kindness", "Patience", "Humility", "Voice", "Voices", "Mother", "Father", "Brother",
-            "Sister", "Duality", "Accord", "Husband", "Wife", "Progeny", "Corridor", "Field", "Intellect", "Brawn",
-            "Despair", "Past", "Present", "Future", "Gate", "Sign", "Ruin", "Snow", "Rain", "Tempest", "Lovers",
-            "Discord", "Concord", "Harmony", "Dissonance", "Earth", "Fire", "Water", "Air", "Spirit",
-            "Oblivion", "Obscurity", "Purgatory", "Nether", "Underworld", "Aether", "Overworld", "Limbo", "Chaos",
-            "Balance", "Doom", "Peace", "Evil", "Good", "Neutral", "Hope", "Monster", "Human", "Dusk", "Dawn",
-            "Paradox", "Entropy"
-    );
+    private static final List<String> wilds = CardCatalog.WILDS;
 
-    private static final List<String> suits = List.of(
-            "Arcs", "Arrows", "Clouds", "Clovers", "Comets", "Crescents", "Crosses",
-            "Crowns", "Diamonds", "Embers", "Eyes", "Gears", "Glyphs", "Flames", "Flowers",
-            "Hearts", "Keys", "Locks", "Leaves", "Mountains", "Points", "Scrolls", "Shells",
-            "Shields", "Spades", "Spirals", "Stars", "Suns", "Swords", "Tridents", "Trees", "Waves",
-            "Quasars", "Runes", "Omens", "Sigils", "Orbs", "Veils", "Looms", "Shards", "Echoes",
-            "Rifts", "Ashes", "Nulls", "Hallows", "Fluxes", "Ethers", "Grims"
-    );
+    private static final List<String> suits = CardCatalog.SUITS;
 
     /**
      * All possible card values in the deck, including numbered ranks,
      * face cards, and supernatural entity names.
      */
-    public static final List<String> values = List.of(
-            "Fugitive", "Devil", "Shadow", "Specter", "Phantom", "Void", "Wraith",
-            "Ghoul", "Banshee", "Reverent", "Eidolon", "Shade",
-            "Doppelganger", "Hollow", "Abyss", "Chimera", "Poltergeist",
-            "Wight", "Apparition", "Nightmare", "Succubus", "Incubus", "Unknown",
-            "Necromancer", "Fury", "Grim", "Harbinger", "Spectacle",
-            "Lich", "Gorgon", "Drake", "Demon", "Frost",
-            "Golem", "Hydra", "Inferno", "Juggernaut", "Kraken", "Reaper",
-            "Leviathan", "Manticore", "Naga", "Blight", "Serpent",
-
-            "Hold",
-
-            "Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-            "Jack", "Queen", "King", "Nomad", "Prince",
-            "Rune", "Fable", "Sorceress", "Utopia", "Wizard",
-            "Titan", "Baron", "Illusionist", "Oracle", "Magician",
-            "Luminary", "Eclipse", "Celestial", "Duke", "Genesis",
-            "Zephyr", "Vesper", "Umbra", "Valkyrie", "Warden",
-            "Zenith", "Yggdrasil", "Zodiac", "Phoenix", "Raven",
-            "Cipher", "Angel", "Knight", "Venom"
-    );
+    public static final List<String> values = CardCatalog.VALUES;
 
     private static final Pattern CARD_PATTERN = Pattern.compile("^(?<value>[\\d,a-z,A-Z]+) of (?<suit>[a-z,A-Z]+)$");
-    private static final int NUM_CARDS = (suits.size() * values.size()) + wilds.size();
+    private static final int NUM_CARDS = CardCatalog.NUM_CARDS;
     public static final double CARD_WIDTH = 150;
     private static final double CARD_HEIGHT = 200;
     /** Stand-in stored as the saved server address when the session was hosted, not joined. */
@@ -704,12 +668,6 @@ public class TarotBoard extends Application {
         }
     }
 
-    private boolean isNotOperator(int playerId) {
-        if (operators.contains(playerId)) return false;
-        System.out.println("[TarotBoard] Denied non-operator action from player " + playerId);
-        return true;
-    }
-
     private void handlePlayerList(Msg.PlayerList p) {
         playerList.clear();
         playerList.addAll(p.players());
@@ -878,7 +836,6 @@ public class TarotBoard extends Application {
 
     private void handleReshuffleCards(Msg.ReshuffleCards m) {
         if (m.playerId() == myPlayerId) return;
-        if (isNotOperator(m.playerId())) return;
         for (int a = 0; a < NUM_CARDS; a++) {
             if (cards[a] != null) {
                 StackPane cardPane = cards[a].getCardPane();
@@ -897,7 +854,6 @@ public class TarotBoard extends Application {
 
     private void handleResetDice(Msg.ResetDice m) {
         if (m.playerId() == myPlayerId) return;
-        if (isNotOperator(m.playerId())) return;
         for (Dice die : dice) {
             gameScene.getGameContent().getChildren().remove(die.getPane());
             pieceMap.remove(die.getPieceId());
@@ -907,7 +863,6 @@ public class TarotBoard extends Application {
 
     private void handleResetChips(Msg.ResetChips m) {
         if (m.playerId() == myPlayerId) return;
-        if (isNotOperator(m.playerId())) return;
         for (Chips chip : chips) {
             gameScene.getGameContent().getChildren().remove(chip.getChipPane());
             pieceMap.remove(chip.getPieceId());
@@ -917,7 +872,6 @@ public class TarotBoard extends Application {
 
     private void handleNewGame(Msg.NewGame m) {
         if (m.playerId() == myPlayerId) return;
-        if (isNotOperator(m.playerId())) return;
         if (isHost) {
             newGame();
         } else {
@@ -949,24 +903,30 @@ public class TarotBoard extends Application {
 
     private void handleCardNamesSync(Msg.CardNamesSync m) {
         var names = m.cardNames();
-        if (names.size() == cardNames.size()) {
-            cardNames.setAll(names);
-            for (int i = 0; i < NUM_CARDS; i++) {
-                if (cards[i] != null) {
-                    String logicalName = cardNames.get(i);
-                    Text text = cards[i].getCardName();
-                    Matcher matcher = CARD_PATTERN.matcher(logicalName);
-                    if (matcher.matches() && !wilds.contains(logicalName)) {
-                        String value = matcher.group("value");
-                        String suit = matcher.group("suit");
-                        text.setText(Cards.getStyle(logicalName, value, suit, currentCardTheme).getText());
-                        text.setStyle(Cards.getStyle(logicalName, value, suit, currentCardTheme).getStyle());
-                    } else {
-                        Text wildText = CardDataHelper.getWildCardName(new Text(logicalName + "\n \n" + "(Wild)"));
-                        text.setText(wildText.getText());
-                        text.setStyle(wildText.getStyle());
-                    }
-                }
+        if (names.size() != cardNames.size()) {
+            // Dropping this quietly is how a server built from a different deck used to
+            // look like a working one: every player kept their own shuffle and saw a
+            // different board, and a reshuffle did nothing at all.
+            System.err.println("Ignoring CardNamesSync for " + names.size()
+                    + " cards; this deck holds " + cardNames.size()
+                    + ". The server is built from a different card list.");
+            return;
+        }
+        cardNames.setAll(names);
+        for (int i = 0; i < NUM_CARDS; i++) {
+            if (cards[i] == null) continue;
+            String logicalName = cardNames.get(i);
+            Text text = cards[i].getCardName();
+            Matcher matcher = CARD_PATTERN.matcher(logicalName);
+            if (matcher.matches() && !wilds.contains(logicalName)) {
+                String value = matcher.group("value");
+                String suit = matcher.group("suit");
+                text.setText(Cards.getStyle(logicalName, value, suit, currentCardTheme).getText());
+                text.setStyle(Cards.getStyle(logicalName, value, suit, currentCardTheme).getStyle());
+            } else {
+                Text wildText = CardDataHelper.getWildCardName(new Text(logicalName + "\n \n" + "(Wild)"));
+                text.setText(wildText.getText());
+                text.setStyle(wildText.getStyle());
             }
         }
     }
