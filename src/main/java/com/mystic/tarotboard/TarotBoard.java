@@ -25,6 +25,11 @@ import com.mystic.tarotboard.utils.PlatformPaths;
 import com.mystic.tarotboard.utils.SaveData;
 import com.mystic.tarotboard.utils.Styles;
 import com.mystic.tarotboard.utils.UIUtils;
+import javafx.animation.Animation;
+import javafx.animation.AnimationTimer;
+import javafx.animation.KeyFrame;
+import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -44,6 +49,7 @@ import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.io.ByteArrayInputStream;
 import java.io.*;
@@ -135,6 +141,18 @@ public class TarotBoard extends Application {
 
     private GameServer gameServer;
     private GameClient gameClient;
+    /** Periodic save of a hosted session so a host crash or restart can resume the ongoing game. */
+    private Timeline hostAutosave;
+    /** Whether the full deck of card panes has been built yet; the build is deferred off the startup path. */
+    private boolean cardsBuilt;
+    /** Cards created per frame while warming the deck up — small enough that the menu stays responsive. */
+    private static final int CARD_BUILD_CHUNK = 250;
+    /** Index of the next card the incremental build will create; also how many are already built. */
+    private int cardBuildIndex;
+    /** Card images the incremental build reuses across frames, loaded once when the build begins. */
+    private Image cardBuildFront, cardBuildBack;
+    /** The per-frame ticker driving the chunked warm-up build, or null when no warm-up is running. */
+    private AnimationTimer cardWarmUpTimer;
     private boolean isMultiplayer;
     private int myPlayerId;
     private boolean isHost;
@@ -305,7 +323,12 @@ public class TarotBoard extends Application {
         CardDataHelper.generateShuffledCardNames(cardNames);
         cards = new Cards[NUM_CARDS];
 
-        loadAndCreateCards();
+        // Building all NUM_CARDS (thousands) of card panes takes a couple of seconds. Doing it here,
+        // before the stage is shown, blocks the FX thread so nothing paints — on a slow device
+        // (a tablet) that reads as a black screen that clears only once the menu finally appears.
+        // The menu needs none of these panes, so the build is deferred until just after the menu is
+        // on screen (see warm-up below), and forced synchronously by ensureCardsBuilt() before any
+        // path that actually needs the deck.
 
         bwFrontImage = loadImage(customChipFrontPath, currentCardTheme.getChipFrontPath(), currentCardTheme);
         bwBackImage = loadImage(customChipBackPath, currentCardTheme.getChipBackPath(), currentCardTheme);
@@ -318,6 +341,65 @@ public class TarotBoard extends Application {
         primaryStage.setWidth(screenBounds.getWidth());
         primaryStage.setHeight(screenBounds.getHeight());
         primaryStage.show();
+
+        // Warm the deck up once the menu has had a frame to paint, so the wait happens behind a
+        // visible menu instead of a black screen. The short pause guarantees at least one render
+        // pulse first; then the build runs a few hundred cards per frame so the menu stays
+        // responsive, and anyone who enters a game before it finishes just completes it synchronously.
+        PauseTransition deckWarmUp = new PauseTransition(Duration.millis(150));
+        deckWarmUp.setOnFinished(e -> startCardWarmUp());
+        deckWarmUp.play();
+    }
+
+    /**
+     * Begins building the deck incrementally, a chunk of cards per animation frame, so the work is
+     * spread across frames and never freezes the menu. A no-op if the deck is already built or a
+     * warm-up is already running. If a game is entered before this finishes, {@link #ensureCardsBuilt()}
+     * completes the remaining cards in one synchronous pass.
+     */
+    private void startCardWarmUp() {
+        if (cardsBuilt || cardWarmUpTimer != null) return;
+        if (!prepareCardBuild()) return; // Images missing; entry points will retry via ensureCardsBuilt().
+        cardWarmUpTimer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                if (cardsBuilt) {
+                    stopCardWarmUp();
+                    return;
+                }
+                buildCards(cardBuildIndex, Math.min(cardBuildIndex + CARD_BUILD_CHUNK, NUM_CARDS));
+                if (cardBuildIndex >= NUM_CARDS) finishCardBuild();
+            }
+        };
+        cardWarmUpTimer.start();
+    }
+
+    /** Stops the chunked warm-up ticker if one is running. */
+    private void stopCardWarmUp() {
+        if (cardWarmUpTimer != null) {
+            cardWarmUpTimer.stop();
+            cardWarmUpTimer = null;
+        }
+    }
+
+    /**
+     * Builds the full deck of card panes if it has not been built yet. The deck is created lazily
+     * (see {@link #start(Stage)}) so it never blocks the first paint of the menu; every path that
+     * needs a populated deck — hosting, joining — calls this first, and it is a no-op once the deck
+     * exists. If the chunked warm-up is partway through, this finishes the remaining cards
+     * synchronously so the caller can rely on a complete deck the moment it returns.
+     */
+    private void ensureCardsBuilt() {
+        if (cardsBuilt) return;
+        stopCardWarmUp();
+        // If the warm-up never got as far as loading the images, fall back to the full build path;
+        // otherwise pick up exactly where the incremental build left off.
+        if (cardBuildFront == null || cardBuildBack == null) {
+            loadAndCreateCards();
+            return;
+        }
+        buildCards(cardBuildIndex, NUM_CARDS);
+        finishCardBuild();
     }
 
     /**
@@ -353,6 +435,9 @@ public class TarotBoard extends Application {
      * Starts a new multiplayer game server on the configured port and switches to the game scene.
      */
     public void hostGame() {
+        // A joiner's SendState is answered from these panes, so the deck must exist before hosting
+        // even if the deferred warm-up has not run yet.
+        ensureCardsBuilt();
         if (gameServer != null) leaveGame();
         String name = hostGameScene.getPlayerNameField().getText().trim();
         if (name.isEmpty()) name = "Host";
@@ -391,6 +476,7 @@ public class TarotBoard extends Application {
             gameServer.setOnMessage(msg -> Platform.runLater(() -> handleNetworkMessage(msg)));
             server.setOnPortForwarded(external -> Platform.runLater(() -> onPortForwarded(server, port, external)));
             gameServer.start();
+            startHostAutosave();
 
             hostGameScene.getNetworkStatusLabel().setText("Hosting on port " + port + " (ID: " + myPlayerId + ")");
             hostGameScene.getNetworkStatusLabel().setStyle(Styles.mpStatusOk());
@@ -437,6 +523,9 @@ public class TarotBoard extends Application {
     }
 
     public void joinGame() {
+        // The server's StateSync/CardNamesSync land on these panes, so build the deck before we
+        // connect and ask for state, in case the deferred warm-up has not run yet.
+        ensureCardsBuilt();
         if (gameClient != null && gameClient.isConnected()) leaveGame();
         String name = joinGameScene.getPlayerNameField().getText().trim();
         if (name.isEmpty()) name = "Player";
@@ -522,6 +611,7 @@ public class TarotBoard extends Application {
             gameServer.stop();
             gameServer = null;
         }
+        stopHostAutosave();
         isMultiplayer = false;
         isHost = false;
         isOperator = false;
@@ -1277,7 +1367,26 @@ public class TarotBoard extends Application {
         }
     }
 
+    /**
+     * Builds the whole deck synchronously, in one pass. Used by the paths that rebuild the deck
+     * outright (a new game); the startup warm-up instead drives {@link #buildCards(int, int)} a
+     * chunk at a time. A no-op-safe early return if the card images cannot be loaded.
+     */
     private void loadAndCreateCards() {
+        if (!prepareCardBuild()) return;
+        buildCards(0, NUM_CARDS);
+        finishCardBuild();
+    }
+
+    /**
+     * Clears any existing deck and loads the card images the build will reuse, resetting the build
+     * cursor to the start. Any in-flight chunked warm-up is stopped first so it cannot keep writing
+     * into a deck this is about to replace.
+     *
+     * @return true if the images loaded and the build may proceed, false if they could not
+     */
+    private boolean prepareCardBuild() {
+        stopCardWarmUp();
         if (cards != null) {
             for (Cards card : cards) {
                 if (card != null) {
@@ -1286,18 +1395,27 @@ public class TarotBoard extends Application {
             }
         }
 
-        Image cardFrontImage = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
-        Image cardBackImage = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
+        cardBuildFront = loadImage(customCardFrontPath, currentCardTheme.getCardFrontPath(), currentCardTheme);
+        cardBuildBack = loadImage(customCardBackPath, currentCardTheme.getCardBackPath(), currentCardTheme);
 
-        if (cardFrontImage == null || cardBackImage == null) {
+        if (cardBuildFront == null || cardBuildBack == null) {
             System.err.println("ERROR: Card images could not be loaded. Cannot create cards.");
-            return;
+            return false;
         }
 
         System.out.println("Adding " + NUM_CARDS + " cards to the board");
         System.out.println(suits.size() + " Suits, " + values.size() + " Values per suit, and " + wilds.size() + " Wilds");
+        cardBuildIndex = 0;
+        return true;
+    }
 
-        for (int i = 0; i < NUM_CARDS; i++) {
+    /**
+     * Creates the card panes for indices {@code [from, to)} and adds them to the board, advancing
+     * {@link #cardBuildIndex}. The caller must have run {@link #prepareCardBuild()} first so the
+     * card images are loaded.
+     */
+    private void buildCards(int from, int to) {
+        for (int i = from; i < to; i++) {
             Cards card;
             String cardLogicalName = cardNames.get(i);
 
@@ -1305,14 +1423,13 @@ public class TarotBoard extends Application {
             if (matcher.matches() && !wilds.contains(cardLogicalName)) {
                 String value = matcher.group("value");
                 String suit = matcher.group("suit");
-                card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                card = new Cards(cardLogicalName, value, suit, CARD_WIDTH, CARD_HEIGHT, cardBuildFront, cardBuildBack, currentCardTheme, wilds);
             } else {
-                card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardFrontImage, cardBackImage, currentCardTheme, wilds);
+                card = new Cards(cardLogicalName, "", "", CARD_WIDTH, CARD_HEIGHT, cardBuildFront, cardBuildBack, currentCardTheme, wilds);
                 Text cardNameText = CardDataHelper.getWildCardName(new Text(cardLogicalName + "\n \n" + "(Wild)"));
                 ((Text) card.getCardPane().getChildren().get(2)).setText(cardNameText.getText());
                 card.getCardPane().getChildren().get(2).setStyle(cardNameText.getStyle());
             }
-
 
             String pieceId = "card:" + i;
             cards[i] = card;
@@ -1323,6 +1440,13 @@ public class TarotBoard extends Application {
             gameScene.getGameContent().getChildren().add(cards[i].getCardPane());
             pieceMap.put(pieceId, cards[i].getCardPane());
         }
+        cardBuildIndex = to;
+    }
+
+    /** Marks the deck fully built and stops any warm-up ticker. */
+    private void finishCardBuild() {
+        cardsBuilt = true;
+        stopCardWarmUp();
     }
 
     /**
@@ -1736,6 +1860,28 @@ public class TarotBoard extends Application {
     }
 
     /**
+     * Starts periodically saving the board while this client is hosting. The dedicated server
+     * persists its own board; this is the equivalent for an in-app host, so a crash or restart of
+     * the hosting client leaves a Continue-able snapshot rather than losing the session. The frames
+     * fire on the JavaFX thread, which is where {@link #saveGame()} must read the board's nodes.
+     */
+    private void startHostAutosave() {
+        stopHostAutosave();
+        hostAutosave = new Timeline(new KeyFrame(Duration.seconds(30), e -> {
+            if (isHost && cards != null) saveGame();
+        }));
+        hostAutosave.setCycleCount(Animation.INDEFINITE);
+        hostAutosave.play();
+    }
+
+    private void stopHostAutosave() {
+        if (hostAutosave != null) {
+            hostAutosave.stop();
+            hostAutosave = null;
+        }
+    }
+
+    /**
      * Builds a {@link SaveData} object from the current board state, including card,
      * chip, and die positions, multiplayer connection info, and theme settings.
      *
@@ -1832,6 +1978,9 @@ public class TarotBoard extends Application {
      * @param save the save data to restore
      */
     private void loadGame(SaveData save) {
+        // This rebuilds the deck itself and replaces the cards array, so stop any in-flight warm-up
+        // first — otherwise its next frame would write cards into the array we are about to discard.
+        stopCardWarmUp();
         reshuffled = save.reshuffled();
         cardNames.setAll(save.cardNames());
 
@@ -1935,6 +2084,9 @@ public class TarotBoard extends Application {
             gameScene.getGameContent().getChildren().add(diePane);
             pieceMap.put(die.getPieceId(), diePane);
         }
+        // loadGame builds the deck itself, so mark it built or a later ensureCardsBuilt() would
+        // wipe this loaded board and rebuild a fresh deck over it.
+        cardsBuilt = true;
         gameScene.bringCursorOverlayToFront();
     }
 

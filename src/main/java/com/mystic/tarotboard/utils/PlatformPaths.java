@@ -54,6 +54,17 @@ public class PlatformPaths {
     }
 
     /**
+     * Returns the path to the dedicated server's persisted game file. This is kept separate from
+     * {@link #getSaveFilePath()} so a machine that both hosts a dedicated server and plays locally
+     * does not have the two clobber each other.
+     *
+     * @return absolute path to server-save.dat within the app data directory
+     */
+    public static String getServerSaveFilePath() {
+        return getAppDataDir() + File.separator + "server-save.dat";
+    }
+
+    /**
      * Returns the path to the themes' directory.
      *
      * @return Path to the themes subdirectory within app data
