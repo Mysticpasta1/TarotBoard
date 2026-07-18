@@ -440,9 +440,13 @@ jobs:
         with:
           gradle-version: '8.14'
 
+      # nativePackage is deliberately omitted: it runs CodeSigning, which fails without
+      # an Apple signing identity / provisioning profile ("No valid Identity found for
+      # iOS development"). Unsigned, nativeBuild is as far as this lane goes — it links
+      # the arm64 binary and produces the .app that gets uploaded.
       - name: Build iOS App
         run: |
-          gradle nativeBuild nativePackage -PiosBuild=true --stacktrace
+          gradle nativeBuild -PiosBuild=true --stacktrace
 
       # Substrate writes the real native-image error to log files and prints only
       # "Compilation failed" to the console; without this step a failure here is
@@ -464,12 +468,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-app-build
-          # The .app comes out of nativeBuild; the .ipa only if signing succeeds. Warn
-          # rather than error so an unsigned run that produced only the .app still
-          # uploads instead of failing the (best-effort) job.
-          path: |
-            build/gluonfx/**/*.app
-            build/gluonfx/**/*.ipa
+          # Unsigned nativeBuild produces the .app but no .ipa (that needs signing). Warn
+          # rather than error so a best-effort run never fails purely on the upload.
+          path: build/gluonfx/**/*.app
           if-no-files-found: warn
 
   release:
