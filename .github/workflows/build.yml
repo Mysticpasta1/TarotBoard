@@ -85,6 +85,38 @@ jobs:
           compression-level: 6
           if-no-files-found: error
 
+  macos:
+    name: macOS (DMG + PKG)
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ dmg, pkg ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build ${{ matrix.type }}
+        run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }}
+
+      - name: Upload ${{ matrix.type }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.type }}-build
+          path: build/jpackage/TarotBoard-*.${{ matrix.type }}
+          compression-level: 0
+          if-no-files-found: error
+
   flatpak:
     name: Flatpak Build
     runs-on: ubuntu-latest
@@ -200,6 +232,38 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: headless-server-windows-${{ matrix.type }}-build
+          path: build/jpackage/TarotBoard-Server-*.${{ matrix.type }}
+          compression-level: 0
+          if-no-files-found: error
+
+  headless-server-macos:
+    name: Headless Server macOS (DMG + PKG)
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ dmg, pkg ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Headless Server ${{ matrix.type }}
+        run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }} -PbuildServer=true
+
+      - name: Upload Headless Server ${{ matrix.type }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-server-macos-${{ matrix.type }}-build
           path: build/jpackage/TarotBoard-Server-*.${{ matrix.type }}
           compression-level: 0
           if-no-files-found: error
@@ -324,10 +388,94 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  ios:
+    # Best effort, allowed to fail so it never blocks a release. iOS reaches JavaFX only
+    # through GluonFX/Substrate, cross-compiling to arm64 with the same Gluon GraalVM 23
+    # fork and CAP cache the Android lane relies on (see build.gradle for the pin). The
+    # macos-latest runner is arm64, so it uses the darwin-aarch64 GraalVM. Gradle 8.14
+    # because GluonFX does not support Gradle 9.
+    #
+    # A distributable signed .ipa needs an Apple signing identity and provisioning
+    # profile, which CI has no access to here, so nativePackage will typically stop at
+    # the signing step. The nativeBuild output (the compiled .app) is what this lane
+    # actually produces and uploads.
+    name: iOS App (GluonFX, best effort)
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Gluon's GraalVM fork is not on setup-graalvm, so it is fetched by hand and used
+      # as daemon JVM, compile toolchain, and native-image. It is pinned to the exact
+      # release Substrate 0.0.65's CAP cache was generated against.
+      - name: Setup Gluon GraalVM 23
+        run: |
+          set -euo pipefail
+          URL="https://github.com/gluonhq/graal/releases/download/gluon-23%2B25.1-dev-2409082136/graalvm-java23-darwin-aarch64-gluon-23+25.1-dev.tar.gz"
+          mkdir -p /tmp/graalvm
+          curl -fsSL "$URL" -o /tmp/graalvm/graalvm.tar.gz
+          tar -xzf /tmp/graalvm/graalvm.tar.gz -C /tmp/graalvm
+          GRAALVM_DIR=$(find /tmp/graalvm -maxdepth 1 -mindepth 1 -type d -name "graalvm-*" | head -1)
+          # macOS GraalVM bundles live under Contents/Home.
+          if [ -d "${GRAALVM_DIR}/Contents/Home" ]; then
+            GRAALVM_DIR="${GRAALVM_DIR}/Contents/Home"
+          fi
+          echo "GRAALVM_HOME=${GRAALVM_DIR}" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=${GRAALVM_DIR}" >> "$GITHUB_ENV"
+          echo "${GRAALVM_DIR}/bin" >> "$GITHUB_PATH"
+
+      # GluonFX drives the iOS build through CocoaPods and Xcode's command line tools.
+      # Xcode ships on the runner; make sure CocoaPods is present.
+      - name: Ensure CocoaPods
+        run: |
+          if ! command -v pod >/dev/null 2>&1; then
+            brew install cocoapods
+          fi
+
+      - name: Setup Gradle 8.14
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.14'
+
+      - name: Build iOS App
+        run: |
+          gradle nativeBuild nativePackage -PiosBuild=true --stacktrace
+
+      # Substrate writes the real native-image error to log files and prints only
+      # "Compilation failed" to the console; without this step a failure here is
+      # undiagnosable from the Actions page.
+      - name: Show Substrate logs on failure
+        if: failure()
+        run: |
+          find build/gluonfx -name "*.log" -exec sh -c 'echo "===== {} ====="; cat "{}"' \;
+
+      - name: Upload Substrate logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-substrate-logs
+          path: build/gluonfx/**/*.log
+          if-no-files-found: ignore
+
+      - name: Upload iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-build
+          # The .app comes out of nativeBuild; the .ipa only if signing succeeds. Warn
+          # rather than error so an unsigned run that produced only the .app still
+          # uploads instead of failing the (best-effort) job.
+          path: |
+            build/gluonfx/**/*.app
+            build/gluonfx/**/*.ipa
+          if-no-files-found: warn
+
   release:
     name: Create GitHub Release
     if: github.ref == 'refs/heads/master'
-    needs: [ windows, linux, flatpak, headless-server-installers, headless-server-windows, server-jar, android ]
+    needs: [ windows, linux, macos, flatpak, headless-server-installers, headless-server-windows, headless-server-macos, server-jar, android, ios ]
     runs-on: ubuntu-latest
     permissions:
       contents: write

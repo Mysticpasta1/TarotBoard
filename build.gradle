@@ -7,7 +7,9 @@ buildscript {
         maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        if (project.hasProperty("androidBuild")) {
+        // The GluonFX plugin drives both the Android and iOS lanes; either flag pulls
+        // it onto the classpath.
+        if (project.hasProperty("androidBuild") || project.hasProperty("iosBuild")) {
             classpath "com.gluonhq:gluonfx-gradle-plugin:1.0.25"
         }
     }
@@ -39,7 +41,10 @@ version = "3.0.0"
 // The cache is not optional (cross-compiled aarch64 probes cannot run on the x64
 // builder), so 0.0.64/0.0.65 are the only versions that satisfy both constraints.
 // Desktop builds stay on 26; --release 21 keeps the sources honest on every lane.
-java.toolchain.languageVersion = JavaLanguageVersion.of(project.hasProperty("androidBuild") ? 23 : 26)
+// The iOS lane cross-compiles through the same Substrate/Gluon GraalVM 23 pairing as
+// Android, so both mobile lanes share the java23 toolchain.
+def gluonBuild = project.hasProperty("androidBuild") || project.hasProperty("iosBuild")
+java.toolchain.languageVersion = JavaLanguageVersion.of(gluonBuild ? 23 : 26)
 
 repositories {
     mavenCentral()
@@ -57,10 +62,10 @@ dependencies {
 }
 
 javafx {
-    // The Android lane compiles against JavaFX 21 so the API surface matches the
-    // JavaFX 21-ea static SDK that GluonFX 1.0.23's Substrate bundles; desktop
-    // keeps the 26 runtime.
-    version = project.hasProperty("androidBuild") ? "21.0.2" : "26.0.1"
+    // The mobile lanes compile against JavaFX 21 so the API surface matches the
+    // JavaFX 21-ea static SDK that GluonFX's Substrate bundles for Android and iOS;
+    // desktop keeps the 26 runtime.
+    version = gluonBuild ? "21.0.2" : "26.0.1"
     modules = ["javafx.controls", "javafx.fxml", "javafx.graphics"]
 }
 
@@ -199,10 +204,13 @@ tasks.register("serverJar", ShadowJar) {
     }
 }
 
-if (project.hasProperty("androidBuild")) {
+if (gluonBuild) {
     apply plugin: "com.gluonhq.gluonfx-gradle-plugin"
     gluonfx {
-        target = "android"
+        // -PiosBuild cross-compiles for iOS (arm64 device); -PandroidBuild for Android.
+        // Both share the reflection and serialization config below, since native-image
+        // needs the same registrations regardless of target OS.
+        target = project.hasProperty("iosBuild") ? "ios" : "android"
         // Gson fills these in reflectively, and native-image keeps reflective access
         // only for classes named here. Unregistered, the ThemeManager static block
         // still "succeeds" — it catches the failure and logs it — but leaves the theme
