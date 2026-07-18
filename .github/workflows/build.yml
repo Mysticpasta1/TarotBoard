@@ -86,12 +86,24 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS (DMG + PKG)
-    runs-on: macos-latest
+    # macos-13 is the last Intel (x86_64) runner; macos-latest is Apple Silicon
+    # (arm64). jpackage builds only for the runner's native arch, so an arm64-only
+    # build cannot run natively on Intel Macs. Build both and tag each output with its
+    # arch — the version-only filename (TarotBoard-<version>.dmg) is identical across
+    # arches, so without the suffix they would overwrite each other when the release
+    # job merges artifacts.
+    name: macOS ${{ matrix.arch }} (DMG + PKG)
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         type: [ dmg, pkg ]
+        arch: [ x86_64, aarch64 ]
+        include:
+          - arch: x86_64
+            os: macos-13
+          - arch: aarch64
+            os: macos-latest
 
     steps:
       - name: Checkout
@@ -109,11 +121,17 @@ jobs:
       - name: Build ${{ matrix.type }}
         run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }}
 
+      - name: Tag output with arch
+        run: |
+          for f in build/jpackage/TarotBoard-*.${{ matrix.type }}; do
+            mv "$f" "${f%.${{ matrix.type }}}-${{ matrix.arch }}.${{ matrix.type }}"
+          done
+
       - name: Upload ${{ matrix.type }}
         uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ matrix.type }}-build
-          path: build/jpackage/TarotBoard-*.${{ matrix.type }}
+          name: macos-${{ matrix.type }}-${{ matrix.arch }}-build
+          path: build/jpackage/TarotBoard-*-${{ matrix.arch }}.${{ matrix.type }}
           compression-level: 0
           if-no-files-found: error
 
@@ -237,12 +255,20 @@ jobs:
           if-no-files-found: error
 
   headless-server-macos:
-    name: Headless Server macOS (DMG + PKG)
-    runs-on: macos-latest
+    # See the client macOS job: macos-13 is Intel (x86_64), macos-latest is Apple
+    # Silicon (arm64), and each output is arch-tagged to survive the release merge.
+    name: Headless Server macOS ${{ matrix.arch }} (DMG + PKG)
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         type: [ dmg, pkg ]
+        arch: [ x86_64, aarch64 ]
+        include:
+          - arch: x86_64
+            os: macos-13
+          - arch: aarch64
+            os: macos-latest
 
     steps:
       - name: Checkout
@@ -260,11 +286,17 @@ jobs:
       - name: Build Headless Server ${{ matrix.type }}
         run: ./gradlew clean jpackage -PinstallerType=${{ matrix.type }} -PbuildServer=true
 
+      - name: Tag output with arch
+        run: |
+          for f in build/jpackage/TarotBoard-Server-*.${{ matrix.type }}; do
+            mv "$f" "${f%.${{ matrix.type }}}-${{ matrix.arch }}.${{ matrix.type }}"
+          done
+
       - name: Upload Headless Server ${{ matrix.type }}
         uses: actions/upload-artifact@v4
         with:
-          name: headless-server-macos-${{ matrix.type }}-build
-          path: build/jpackage/TarotBoard-Server-*.${{ matrix.type }}
+          name: headless-server-macos-${{ matrix.type }}-${{ matrix.arch }}-build
+          path: build/jpackage/TarotBoard-Server-*-${{ matrix.arch }}.${{ matrix.type }}
           compression-level: 0
           if-no-files-found: error
 
