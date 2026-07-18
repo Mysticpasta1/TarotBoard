@@ -77,6 +77,19 @@ public class HeadlessServer {
     private final List<TrackedChip> chips = new ArrayList<>();
     private final List<TrackedDie> dice = new ArrayList<>();
 
+    // Cards are tracked by their fixed index 0..NUM_CARDS-1 — the same index the client uses
+    // as the "card:N" id and as the slot in a StateSync. Without this the server kept no memory
+    // of where cards were, so it answered every SendState with all cards dumped back in the deck
+    // pile face-down. A fresh joiner never noticed (that is the start-of-game layout), but a
+    // player who dropped and reconnected had their whole deck reset while everyone else kept the
+    // real board, so from then on nobody's cards agreed.
+    private final double[] cardX = new double[NUM_CARDS];
+    private final double[] cardY = new double[NUM_CARDS];
+    private final double[] cardRot = new double[NUM_CARDS];
+    private final boolean[] cardBackVis = new boolean[NUM_CARDS];
+    private final boolean[] cardFrontVis = new boolean[NUM_CARDS];
+    private final boolean[] cardTextVis = new boolean[NUM_CARDS];
+
     /**
      * Creates a new headless server on the given port.
      *
@@ -153,6 +166,7 @@ public class HeadlessServer {
             }
         }
         Collections.shuffle(cardNames, new Random());
+        resetCardsToDeck();
         chips.clear();
         dice.clear();
     }
@@ -178,9 +192,42 @@ public class HeadlessServer {
             case Msg.DeletePiece m -> untrackPiece(m.pieceId());
             case Msg.PieceMove m -> updatePiecePos(m.pieceId(), m.x(), m.y());
             case Msg.PieceRotate m -> updatePieceRot(m.pieceId(), m.rotation());
+            case Msg.PieceFlip m -> updateCardFlip(m);
             default -> {
             }
         }
+    }
+
+    /** The card index carried by a {@code "card:N"} id, or -1 if the id is not an in-range card. */
+    private int cardIndex(String pieceId) {
+        if (pieceId == null || !pieceId.startsWith("card:")) return -1;
+        try {
+            int i = Integer.parseInt(pieceId.substring("card:".length()));
+            return (i >= 0 && i < NUM_CARDS) ? i : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Resets every card to the face-down deck pile, the layout a new or reshuffled game starts from. */
+    private void resetCardsToDeck() {
+        for (int i = 0; i < NUM_CARDS; i++) {
+            cardX[i] = 50;
+            cardY[i] = 50;
+            cardRot[i] = 0;
+            cardBackVis[i] = true;
+            cardFrontVis[i] = false;
+            cardTextVis[i] = false;
+        }
+    }
+
+    private void updateCardFlip(Msg.PieceFlip m) {
+        int i = cardIndex(m.pieceId());
+        if (i < 0) return;
+        // The client's StateSync convention: index 0 is the back, 1 the front, 2 the name text.
+        cardBackVis[i] = m.backVisible();
+        cardFrontVis[i] = m.frontVisible();
+        cardTextVis[i] = m.textVisible();
     }
 
     private boolean isOperator(int playerId) {
@@ -207,21 +254,8 @@ public class HeadlessServer {
 
         int nCards = NUM_CARDS;
         int[] cardIds = new int[nCards];
-        double[] cardX = new double[nCards];
-        double[] cardY = new double[nCards];
-        double[] cardRot = new double[nCards];
-        boolean[] cardBackVis = new boolean[nCards];
-        boolean[] cardFrontVis = new boolean[nCards];
-        boolean[] cardTextVis = new boolean[nCards];
-
         for (int i = 0; i < nCards; i++) {
             cardIds[i] = i;
-            cardX[i] = 50;
-            cardY[i] = 50;
-            cardRot[i] = 0;
-            cardBackVis[i] = true;
-            cardFrontVis[i] = false;
-            cardTextVis[i] = false;
         }
 
         int nChips = chips.size();
@@ -277,6 +311,9 @@ public class HeadlessServer {
 
     private void handleReshuffle() {
         Collections.shuffle(cardNames, new Random());
+        // The client's reshuffle handler drops every card back onto the deck pile, so the
+        // tracked layout has to follow or a later reconnect would restore the pre-shuffle spread.
+        resetCardsToDeck();
         gameServer.broadcastToAll(
                 NetworkMessage.of(new Msg.ReshuffleCards(0)));
         gameServer.broadcastToAll(
@@ -315,6 +352,12 @@ public class HeadlessServer {
     }
 
     private void updatePiecePos(String pieceId, double x, double y) {
+        int card = cardIndex(pieceId);
+        if (card >= 0) {
+            cardX[card] = x;
+            cardY[card] = y;
+            return;
+        }
         for (var c : chips) {
             if (c.id.equals(pieceId)) {
                 c.x = x;
@@ -332,6 +375,11 @@ public class HeadlessServer {
     }
 
     private void updatePieceRot(String pieceId, double rot) {
+        int card = cardIndex(pieceId);
+        if (card >= 0) {
+            cardRot[card] = rot;
+            return;
+        }
         for (var c : chips) {
             if (c.id.equals(pieceId)) {
                 c.rotation = rot;

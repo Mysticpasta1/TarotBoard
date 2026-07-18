@@ -29,6 +29,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
@@ -731,7 +732,13 @@ public class TarotBoard extends Application {
         if (m.playerId() == myPlayerId) return;
         var cursor = remoteCursors.get(m.playerId());
         if (cursor != null) {
-            cursor.setPosition(m.x(), m.y());
+            // The wire carries board (gameContent-local) coordinates. Map them through this
+            // client's own board transform into the cursor overlay, which sits untransformed on
+            // gameRoot — so the dot lands on the same board point the sender pointed at, whatever
+            // the two windows' sizes or zoom.
+            Point2D scenePt = gameScene.getGameContent().localToScene(m.x(), m.y());
+            Point2D overlayPt = gameScene.getCursorOverlay().sceneToLocal(scenePt);
+            cursor.setPosition(overlayPt.getX(), overlayPt.getY());
         }
     }
 

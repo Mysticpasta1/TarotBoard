@@ -496,8 +496,13 @@ public class GameScene {
         long now = System.currentTimeMillis();
         if (now - lastCursorSend < CURSOR_SEND_INTERVAL_MS) return;
         lastCursorSend = now;
+        // Send the cursor in board (gameContent-local) coordinates, the same window-independent
+        // space piece moves already use. Sending raw scene pixels meant the dot only landed
+        // right when both windows were the exact same size, zoom and pan — so it was always off
+        // between a phone and a desktop, and drifted the moment anyone zoomed.
+        Point2D board = gameContent.sceneToLocal(event.getSceneX(), event.getSceneY());
         tarotBoard.sendNetworkMessage(NetworkMessage.of(
-                new Msg.CursorMove(tarotBoard.getMyPlayerId(), event.getSceneX(), event.getSceneY())));
+                new Msg.CursorMove(tarotBoard.getMyPlayerId(), board.getX(), board.getY())));
     }
 
     /**
