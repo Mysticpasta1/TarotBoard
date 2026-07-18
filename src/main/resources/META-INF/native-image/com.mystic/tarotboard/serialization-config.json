@@ -9,6 +9,7 @@
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$OperatorStatus" },
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PieceFlip" },
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PieceMove" },
+  { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PieceMoveBatch" },
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PieceRotate" },
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PieceToFront" },
   { "name": "com.mystic.tarotboard.network.NetworkMessage$Msg$PlayerJoin" },

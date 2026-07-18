@@ -393,6 +393,12 @@ public class HeadlessServer {
                 updatePiecePos(m.pieceId(), m.x(), m.y());
                 markDirty();
             }
+            case Msg.PieceMoveBatch m -> {
+                for (String pieceId : m.pieceIds()) {
+                    updatePiecePos(pieceId, m.x(), m.y());
+                }
+                markDirty();
+            }
             case Msg.PieceRotate m -> {
                 updatePieceRot(m.pieceId(), m.rotation());
                 markDirty();

@@ -162,6 +162,8 @@ public class TarotBoard extends Application {
     private final Map<String, StackPane> pieceMap = new HashMap<>();
     private final List<NetworkMessage.PlayerInfo> playerList = new ArrayList<>();
     private final Map<String, Long> lastPieceMoveTime = new HashMap<>();
+    /** Single throttle clock for a pile drag: the whole pile shares one send, so one timestamp. */
+    private long lastPileMoveTime;
     /** Keeps the stacked-away bulk of the deck out of the render and pick passes. */
     private OcclusionCuller cardCuller;
 
@@ -726,6 +728,7 @@ public class TarotBoard extends Application {
             case Msg.CursorMove c -> handleCursorMove(c);
             case Msg.CursorImage c -> handleCursorImage(c);
             case Msg.PieceMove m -> handlePieceMove(m);
+            case Msg.PieceMoveBatch m -> handlePieceMoveBatch(m);
             case Msg.PieceRotate m -> handlePieceRotate(m);
             case Msg.PieceFlip m -> handlePieceFlip(m);
             case Msg.PieceToFront m -> handlePieceToFront(m);
@@ -847,6 +850,18 @@ public class TarotBoard extends Application {
             pane.setTranslateX(m.x());
             pane.setTranslateY(m.y());
             pane.toFront();
+        }
+    }
+
+    private void handlePieceMoveBatch(Msg.PieceMoveBatch m) {
+        if (m.playerId() == myPlayerId) return;
+        for (String pieceId : m.pieceIds()) {
+            var pane = pieceMap.get(pieceId);
+            if (pane != null) {
+                pane.setTranslateX(m.x());
+                pane.setTranslateY(m.y());
+                pane.toFront();
+            }
         }
     }
 
@@ -1194,12 +1209,23 @@ public class TarotBoard extends Application {
                     for (StackPane p : pile) {
                         p.setTranslateX(x);
                         p.setTranslateY(y);
-                        String id = getCardId(p);
-                        if (id == null) continue;
-                        // The resting position must not be dropped by the throttle.
-                        if (isFinal) sendPieceMove(id, x, y);
-                        else sendPieceMoveThrottled(id, x, y);
                     }
+                    if (!isMultiplayer) return;
+                    // One message for the whole pile, not one per card: a per-card send is a
+                    // blocking socket write, and thousands of them per frame is exactly what
+                    // made the main pile lag behind the pointer. The throttle also gates the
+                    // id-gathering below, but the resting position must never be dropped by it.
+                    if (!isFinal) {
+                        long now = System.currentTimeMillis();
+                        if (now - lastPileMoveTime <= 50) return;
+                        lastPileMoveTime = now;
+                    }
+                    ArrayList<String> ids = new ArrayList<>(pile.size());
+                    for (StackPane p : pile) {
+                        String id = getCardId(p);
+                        if (id != null) ids.add(id);
+                    }
+                    if (!ids.isEmpty()) sendPieceMoveBatch(ids, x, y);
                 }
         );
 
@@ -1226,6 +1252,11 @@ public class TarotBoard extends Application {
     public void sendPieceMove(String pieceId, double x, double y) {
         if (!isMultiplayer) return;
         sendNetworkMessage(NetworkMessage.of(new Msg.PieceMove(myPlayerId, pieceId, x, y)));
+    }
+
+    public void sendPieceMoveBatch(ArrayList<String> pieceIds, double x, double y) {
+        if (!isMultiplayer) return;
+        sendNetworkMessage(NetworkMessage.of(new Msg.PieceMoveBatch(myPlayerId, pieceIds, x, y)));
     }
 
     private void sendPieceMoveThrottled(String pieceId, double x, double y) {

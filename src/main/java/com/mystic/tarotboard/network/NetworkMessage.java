@@ -54,6 +54,17 @@ public record NetworkMessage(String type, Msg data) implements Serializable {
         }
 
         /**
+         * A whole pile of pieces being moved to a single shared position.
+         *
+         * <p>Dragging the main pile moves thousands of stacked cards to the same spot. Sent
+         * as one message rather than one {@link PieceMove} per card so a pile drag costs a
+         * single blocking socket write per frame instead of thousands, which is what let the
+         * big piles keep up with the pointer.</p>
+         */
+        record PieceMoveBatch(int playerId, ArrayList<String> pieceIds, double x, double y) implements Msg {
+        }
+
+        /**
          * A piece being rotated to a new angle.
          */
         record PieceRotate(int playerId, String pieceId, double rotation) implements Msg {
