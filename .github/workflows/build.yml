@@ -86,14 +86,17 @@ jobs:
           if-no-files-found: error
 
   macos:
-    # macos-13 is the last Intel (x86_64) runner; macos-latest is Apple Silicon
-    # (arm64). jpackage builds only for the runner's native arch, so an arm64-only
-    # build cannot run natively on Intel Macs. Build both and tag each output with its
-    # arch — the version-only filename (TarotBoard-<version>.dmg) is identical across
-    # arches, so without the suffix they would overwrite each other when the release
-    # job merges artifacts.
+    # Both arches build on the Apple Silicon runner (macos-latest). aarch64 uses the
+    # native arm64 JDK; x86_64 uses an Intel (x64) JDK running under Rosetta 2, so
+    # jpackage emits a genuine x86_64 image without depending on the macos-13 Intel
+    # runner (which GitHub is retiring and which routinely sits queued for ages).
+    # jpackage builds only for its JDK's arch, and the openjfx Gradle plugin resolves
+    # JavaFX natives from the Gradle JVM's arch, so the x64 JDK yields a fully x64
+    # build. Outputs are arch-tagged because the version-only filename
+    # (TarotBoard-<version>.dmg) is identical across arches and would otherwise
+    # overwrite each other when the release job merges artifacts.
     name: macOS ${{ matrix.arch }} (DMG + PKG)
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
@@ -101,19 +104,26 @@ jobs:
         arch: [ x86_64, aarch64 ]
         include:
           - arch: x86_64
-            os: macos-13
+            java-arch: x64
           - arch: aarch64
-            os: macos-latest
+            java-arch: aarch64
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Java 26
+      # The x64 JDK is an Intel binary; Rosetta 2 lets it (and everything jpackage
+      # forks) run on the arm64 runner. Not preinstalled on Apple Silicon images.
+      - name: Install Rosetta 2
+        if: matrix.arch == 'x86_64'
+        run: sudo softwareupdate --install-rosetta --agree-to-license
+
+      - name: Setup Java 26 (${{ matrix.java-arch }})
         uses: actions/setup-java@v4
         with:
           java-version: '26'
           distribution: 'temurin'
+          architecture: ${{ matrix.java-arch }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -255,10 +265,11 @@ jobs:
           if-no-files-found: error
 
   headless-server-macos:
-    # See the client macOS job: macos-13 is Intel (x86_64), macos-latest is Apple
-    # Silicon (arm64), and each output is arch-tagged to survive the release merge.
+    # See the client macOS job: both arches build on the Apple Silicon runner, with
+    # x86_64 driven by an Intel (x64) JDK under Rosetta 2, and each output is
+    # arch-tagged to survive the release merge.
     name: Headless Server macOS ${{ matrix.arch }} (DMG + PKG)
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
@@ -266,19 +277,24 @@ jobs:
         arch: [ x86_64, aarch64 ]
         include:
           - arch: x86_64
-            os: macos-13
+            java-arch: x64
           - arch: aarch64
-            os: macos-latest
+            java-arch: aarch64
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Java 26
+      - name: Install Rosetta 2
+        if: matrix.arch == 'x86_64'
+        run: sudo softwareupdate --install-rosetta --agree-to-license
+
+      - name: Setup Java 26 (${{ matrix.java-arch }})
         uses: actions/setup-java@v4
         with:
           java-version: '26'
           distribution: 'temurin'
+          architecture: ${{ matrix.java-arch }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
